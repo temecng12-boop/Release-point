@@ -1,26 +1,39 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy:    #0B1E36;
+  --navy-2:  #14304F;
+  --navy-3:  #20486F;
+  --red:     #C8102E;
+  --red-dim: #9E0E24;
+  --white:   #FFFFFF;
+  --bone:    #F6F5F1;
+  --ink:     #16202E;
+  --slate:   #5B6B7F;
+  --line:    #DCE1E7;
+  --card:    #FFFFFF;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-navy:   var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-navy-3: var(--navy-3);
+  --color-red:    var(--red);
+  --color-bone:   var(--bone);
+  --color-ink:    var(--ink);
+  --color-slate:  var(--slate);
+  --color-line:   var(--line);
+  --color-card:   var(--card);
+  --font-oswald:  var(--font-oswald);
+  --font-inter:   var(--font-inter);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter, Inter, sans-serif);
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-oswald, Oswald, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
