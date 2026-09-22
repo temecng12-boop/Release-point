@@ -2,11 +2,12 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
+import Logo from '@/components/Logo'
 import { signIn } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'w-full bg-[#060F1A] border border-[#1C3A5C] text-[#E8EDF5] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#9FB3CC] focus:ring-1 focus:ring-[#9FB3CC]/20 placeholder:text-[#4A6880] transition-colors'
+const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#456080] focus:ring-1 focus:ring-[#456080]/20 placeholder:text-[#7A92A8] transition-colors'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(signIn, undefined)
@@ -30,64 +31,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060F1A] flex">
+    <div className="min-h-screen bg-[#F5F7FA] flex">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-[#0B1E36] border-r border-[#1C3A5C] p-10">
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-[#1C3A5C] border-r border-[#1C3A5C] p-10">
         <div>
-          <div className="flex items-center gap-3 mb-12">
-            <span className="text-2xl">⚾</span>
-            <span className="text-xl text-white tracking-widest" style={oswald}>Release Point</span>
+          <div className="mb-12">
+            <Logo size="md" wordmarkClass="inline" />
           </div>
           <div className="space-y-8">
             <div>
-              <p className="text-3xl text-[#E8EDF5] leading-tight mb-3" style={oswald}>
+              <p className="text-3xl text-white leading-tight mb-3" style={oswald}>
                 Welcome Back.
               </p>
-              <p className="text-sm text-[#4A6880] leading-relaxed">
+              <p className="text-sm text-[#B8D0E8] leading-relaxed">
                 Your clips, metrics, and player feedback are waiting.
               </p>
             </div>
-            <div className="border-t border-[#1C3A5C] pt-8 space-y-5">
-              <p className="text-xs text-[#4A6880] tracking-widest" style={oswald}>Sign in as</p>
+            <div className="border-t border-white/20 pt-8 space-y-5">
+              <p className="text-xs text-[#B8D0E8] tracking-widest" style={oswald}>Sign in with</p>
               <div>
-                <p className="text-sm text-[#E8EDF5] mb-1" style={oswald}>Coach</p>
-                <p className="text-xs text-[#4A6880]">Use your email and password on the right.</p>
+                <p className="text-sm text-white mb-1" style={oswald}>Email + Password</p>
+                <p className="text-xs text-[#B8D0E8]">Works for coaches and players — use the credentials you signed up with.</p>
               </div>
               <div>
-                <p className="text-sm text-[#E8EDF5] mb-1" style={oswald}>Player</p>
-                <p className="text-xs text-[#4A6880]">Switch to the Email Link tab — your coach sent you an invite link to get started.</p>
+                <p className="text-sm text-white mb-1" style={oswald}>Email Link</p>
+                <p className="text-xs text-[#B8D0E8]">No password? Request a one-click sign-in link sent to your email.</p>
               </div>
             </div>
           </div>
         </div>
-        <p className="text-xs text-[#1C3A5C]">Release Point — Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-white/40">Release Point — Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 justify-center mb-8">
-            <span className="text-2xl">⚾</span>
-            <span className="text-xl text-white tracking-widest" style={oswald}>Release Point</span>
+          <div className="lg:hidden flex justify-center mb-8">
+            <Logo size="md" wordmarkClass="inline" />
           </div>
 
-          <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-xl shadow-2xl overflow-hidden">
+          <div className="bg-white border border-[#DDE4ED] rounded-xl shadow-sm overflow-hidden">
             <div className="h-1 bg-[#C8102E]" />
             <div className="p-8">
               <div className="mb-6">
-                <h1 className="text-xl text-[#E8EDF5] mb-1" style={oswald}>Sign In</h1>
-                <p className="text-sm text-[#4A6880]">Coaches use password · Players use email link</p>
+                <h1 className="text-xl text-[#0F1F33] mb-1" style={oswald}>Sign In</h1>
+                <p className="text-sm text-[#7A92A8]">Coaches and players — sign in with your password or email link</p>
               </div>
 
               {/* Mode toggle */}
-              <div className="flex bg-[#060F1A] border border-[#1C3A5C] rounded-lg p-1 mb-6 gap-1">
+              <div className="flex bg-[#F5F7FA] border border-[#DDE4ED] rounded-lg p-1 mb-6 gap-1">
                 <button
                   onClick={() => setMagicMode(false)}
                   className={`flex-1 py-2 rounded-md text-xs transition-colors ${
                     !magicMode
-                      ? 'bg-[#0B1E36] text-[#E8EDF5] border border-[#1C3A5C]'
-                      : 'text-[#4A6880] hover:text-[#9FB3CC]'
+                      ? 'bg-white text-[#0F1F33] border border-[#DDE4ED]'
+                      : 'text-[#7A92A8] hover:text-[#456080]'
                   }`}
                   style={oswald}
                 >
@@ -97,8 +96,8 @@ export default function LoginPage() {
                   onClick={() => setMagicMode(true)}
                   className={`flex-1 py-2 rounded-md text-xs transition-colors ${
                     magicMode
-                      ? 'bg-[#0B1E36] text-[#E8EDF5] border border-[#1C3A5C]'
-                      : 'text-[#4A6880] hover:text-[#9FB3CC]'
+                      ? 'bg-white text-[#0F1F33] border border-[#DDE4ED]'
+                      : 'text-[#7A92A8] hover:text-[#456080]'
                   }`}
                   style={oswald}
                 >
@@ -109,11 +108,11 @@ export default function LoginPage() {
               {!magicMode ? (
                 <form action={action} className="space-y-4">
                   <div>
-                    <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>Email Address</label>
+                    <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Email Address</label>
                     <input type="email" name="email" required placeholder="coach@example.com" className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>Password</label>
+                    <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
                     <input type="password" name="password" required placeholder="Your password" className={inputClass} />
                   </div>
                   {state?.error && (
@@ -133,7 +132,7 @@ export default function LoginPage() {
               ) : (
                 <form onSubmit={sendMagicLink} className="space-y-4">
                   <div>
-                    <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>Your Invite Email</label>
+                    <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Your Invite Email</label>
                     <input
                       type="email"
                       required
@@ -161,19 +160,30 @@ export default function LoginPage() {
                   >
                     {magicPending ? 'Sending…' : 'Send Sign-in Link'}
                   </button>
-                  <p className="text-xs text-[#4A6880] text-center">
+                  <p className="text-xs text-[#7A92A8] text-center">
                     We&apos;ll email you a one-click sign-in link.
                   </p>
                 </form>
               )}
 
-              <div className="mt-6 pt-5 border-t border-[#1C3A5C] text-center">
-                <p className="text-sm text-[#4A6880]">
-                  Need a coach account?{' '}
-                  <Link href="/auth/signup" className="text-[#9FB3CC] hover:text-white transition-colors font-medium">
-                    Sign up free
+              <div className="mt-6 pt-5 border-t border-[#DDE4ED] space-y-2 text-center">
+                <p className="text-xs text-[#7A92A8] tracking-widest mb-3" style={oswald}>New here?</p>
+                <div className="flex gap-2">
+                  <Link
+                    href="/auth/signup"
+                    className="flex-1 py-2.5 rounded-lg border border-[#DDE4ED] hover:border-[#C8102E]/50 hover:bg-[#F5F7FA] text-xs text-[#456080] hover:text-[#0F1F33] transition-all text-center"
+                    style={oswald}
+                  >
+                    Coach Account
                   </Link>
-                </p>
+                  <Link
+                    href="/auth/signup"
+                    className="flex-1 py-2.5 rounded-lg border border-[#DDE4ED] hover:border-[#C8102E]/50 hover:bg-[#F5F7FA] text-xs text-[#456080] hover:text-[#0F1F33] transition-all text-center"
+                    style={oswald}
+                  >
+                    Player Account
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

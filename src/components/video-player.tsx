@@ -245,11 +245,11 @@ const COLORS = [
 ]
 
 const oswald  = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }
-const divider = { borderTop: '1px solid #20486F' }
+const divider = { borderTop: '1px solid #DDE4ED' }
 const btnBase = 'px-3 py-2 rounded-md text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors'
-const btnIdle = 'text-[#C7D4E3] hover:bg-[#20486F] hover:text-white'
+const btnIdle = 'text-[#456080] hover:bg-[#EEF2F7] hover:text-[#0F1F33]'
 const btnOn   = 'bg-[#C8102E] text-white'
-const tgroup  = 'flex gap-1 bg-[#14304F] rounded-lg p-[3px] items-center'
+const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border border-[#DDE4ED]'
 
 // ── component ──────────────────────────────────────────────────────────────
 export default function VideoPlayer({
@@ -595,7 +595,7 @@ export default function VideoPlayer({
   }
 
   return (
-    <div className="bg-[#0B1E36] rounded-xl p-3.5">
+    <div className="bg-white border border-[#DDE4ED] rounded-xl p-3.5 shadow-sm">
       {/* Stage */}
       <div className="relative bg-black rounded-md overflow-hidden" style={{ lineHeight: 0 }}>
         <video ref={videoRef} src={src} playsInline crossOrigin="anonymous" className="w-full block" />
@@ -612,7 +612,7 @@ export default function VideoPlayer({
 
       {/* Scrub */}
       <div className="flex items-center gap-3 mt-3">
-        <span className="text-[0.76rem] text-[#B9C8DA] min-w-[100px] text-right tabular-nums" style={oswald}>
+        <span className="text-[0.76rem] text-[#7A92A8] min-w-[100px] text-right tabular-nums" style={oswald}>
           {fmtTime(currentTime)} / {fmtTime(duration)}
         </span>
         <input
@@ -667,21 +667,21 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <button onClick={toggleTracking} className={`${btnBase} bg-[#14304F] border border-[#20486F] ${trackingEnabled ? btnOn : btnIdle}`} style={oswald}>
+            <button onClick={toggleTracking} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${trackingEnabled ? btnOn : btnIdle}`} style={oswald}>
               Tracking: {trackingEnabled ? 'On' : 'Off'}
             </button>
           </div>
 
-          <button onClick={clearMarks} className={`${btnBase} bg-[#14304F] border border-[#20486F] ${btnIdle}`} style={oswald}>
+          <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
             Clear marks
           </button>
         </div>
       )}
 
       {/* Footer */}
-      <div className="mt-2 text-[0.78rem] text-[#5B6B7F]">
+      <div className="mt-2 text-[0.78rem] text-[#7A92A8]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
-        {!isCoach && markerCount > 0 && <span className="ml-2 text-[#20486F]">— coach annotations</span>}
+        {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">— coach annotations</span>}
       </div>
     </div>
   )

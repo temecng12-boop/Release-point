@@ -11,7 +11,7 @@ function fmtTime(s: number) {
   return `${m}:${sec}`
 }
 
-type TSNote = { id: string; time_seconds: number; text: string }
+type TSNote = { id: string; time_seconds: number; body: string }
 
 export default function TimestampNotes({
   clipId,
@@ -46,8 +46,8 @@ export default function TimestampNotes({
 
     const { data, error: dbError } = await supabase
       .from('timestamp_notes')
-      .insert({ clip_id: clipId, created_by: user.id, time_seconds: t, text: draft.trim() })
-      .select('id, time_seconds, text')
+      .insert({ clip_id: clipId, created_by: user.id, time_seconds: t, body: draft.trim() })
+      .select('id, time_seconds, body')
       .single()
 
     if (dbError) {
@@ -65,8 +65,8 @@ export default function TimestampNotes({
   }
 
   return (
-    <div className="bg-[#0B1E36] rounded-md border border-[#1C3A5C] p-4">
-      <p className="text-xs text-[#4A6880] mb-3 tracking-widest" style={oswald}>
+    <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm p-4">
+      <p className="text-xs text-[#7A92A8] mb-3 tracking-widest" style={oswald}>
         Timestamp Notes
       </p>
 
@@ -78,7 +78,7 @@ export default function TimestampNotes({
               onChange={e => { setDraft(e.target.value); setError(null) }}
               onKeyDown={e => { if (e.key === 'Enter') addNote() }}
               placeholder="Pause video at a moment, then type a note and click Add…"
-              className="flex-1 text-sm bg-[#060F1A] border border-[#1C3A5C] rounded-md px-3 py-1.5 text-[#E8EDF5] placeholder:text-[#4A6880] focus:outline-none focus:border-[#9FB3CC]"
+              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1.5 text-[#0F1F33] placeholder:text-[#7A92A8] focus:outline-none focus:border-[#456080]"
             />
             <button
               onClick={addNote}
@@ -95,26 +95,26 @@ export default function TimestampNotes({
       )}
 
       {notes.length === 0 ? (
-        <p className="text-sm text-[#4A6880]">
+        <p className="text-sm text-[#7A92A8]">
           {isCoach
             ? 'Pause the video, type a note, and click Add.'
             : 'No timestamp notes from your coach yet.'}
         </p>
       ) : (
-        <ul className="divide-y divide-[#1C3A5C]">
+        <ul className="divide-y divide-[#DDE4ED]">
           {notes.map(n => (
             <li key={n.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
               <button
                 onClick={() => seekTo(n.time_seconds)}
-                className="shrink-0 text-xs font-mono bg-[#1C3A5C] text-[#9FB3CC] hover:text-white px-2 py-0.5 rounded-md transition-colors"
+                className="shrink-0 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED]"
               >
                 {fmtTime(n.time_seconds)}
               </button>
-              <span className="text-sm text-[#E8EDF5] flex-1">{n.text}</span>
+              <span className="text-sm text-[#0F1F33] flex-1">{n.body}</span>
               {isCoach && (
                 <button
                   onClick={() => deleteNote(n.id)}
-                  className="text-[#4A6880] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none"
+                  className="text-[#7A92A8] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none"
                 >
                   ✕
                 </button>

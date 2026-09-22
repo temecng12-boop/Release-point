@@ -97,11 +97,11 @@ export default function AIChat({
   }
 
   return (
-    <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-md flex flex-col">
+    <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-[#1C3A5C]">
+      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
         <p
-          className="text-xs text-[#4A6880] tracking-widest"
+          className="text-xs text-[#7A92A8] tracking-widest"
           style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
         >
           AI Coach Chat
@@ -113,8 +113,8 @@ export default function AIChat({
         {/* Intro message */}
         <div className="flex justify-start">
           <div
-            className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#E8EDF5]"
-            style={{ background: '#0B1E36', border: '1px solid #1C3A5C' }}
+            className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]"
+            style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
           >
             Ask me anything about this clip, player mechanics, or what to work on.
           </div>
@@ -127,12 +127,12 @@ export default function AIChat({
               className={`max-w-[80%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'text-white'
-                  : 'text-[#E8EDF5]'
+                  : 'text-[#456080]'
               }`}
               style={
                 msg.role === 'user'
                   ? { background: '#C8102E' }
-                  : { background: '#0B1E36', border: '1px solid #1C3A5C' }
+                  : { background: '#F0F4F8', border: '1px solid #DDE4ED' }
               }
             >
               {msg.content}
@@ -144,11 +144,11 @@ export default function AIChat({
         {isLoading && (
           <div className="flex justify-start">
             <div
-              className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#E8EDF5] whitespace-pre-wrap"
-              style={{ background: '#0B1E36', border: '1px solid #1C3A5C' }}
+              className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080] whitespace-pre-wrap"
+              style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
             >
               {streaming || (
-                <span className="text-[#4A6880]">
+                <span className="text-[#7A92A8]">
                   <span className="animate-pulse">...</span>
                 </span>
               )}
@@ -158,7 +158,7 @@ export default function AIChat({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-[#1C3A5C] p-3 flex gap-2">
+      <div className="border-t border-[#DDE4ED] p-3 flex gap-2">
         <input
           type="text"
           value={input}
@@ -166,7 +166,7 @@ export default function AIChat({
           onKeyDown={handleKeyDown}
           placeholder="Ask about mechanics, pitch design, development…"
           disabled={isLoading}
-          className="flex-1 text-sm bg-[#060F1A] border border-[#1C3A5C] rounded-md px-3 py-2 text-[#E8EDF5] placeholder:text-[#4A6880] focus:outline-none focus:border-[#9FB3CC] disabled:opacity-50"
+          className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-[#0F1F33] placeholder:text-[#7A92A8] focus:outline-none focus:border-[#456080] disabled:opacity-50"
         />
         <button
           onClick={sendMessage}

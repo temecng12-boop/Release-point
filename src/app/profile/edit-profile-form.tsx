@@ -29,12 +29,12 @@ export default function EditProfileForm({ initialName, initialTeamName }: Props)
   }
 
   const inputClass =
-    'w-full bg-[#060F1A] border border-[#1C3A5C] text-[#E8EDF5] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#9FB3CC] placeholder:text-[#4A6880]'
+    'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#7A92A8]'
 
   return (
-    <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-lg p-5 space-y-4">
+    <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 space-y-4 shadow-sm">
       <p
-        className="text-xs text-[#4A6880] tracking-widest"
+        className="text-xs text-[#7A92A8] tracking-widest"
         style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
       >
         Edit Profile
@@ -42,7 +42,7 @@ export default function EditProfileForm({ initialName, initialTeamName }: Props)
 
       <div className="space-y-3">
         <div>
-          <label className="block text-xs text-[#9FB3CC] mb-1">Full Name</label>
+          <label className="block text-xs text-[#456080] mb-1">Full Name</label>
           <input
             type="text"
             value={name}
@@ -51,7 +51,7 @@ export default function EditProfileForm({ initialName, initialTeamName }: Props)
           />
         </div>
         <div>
-          <label className="block text-xs text-[#9FB3CC] mb-1">Team Name</label>
+          <label className="block text-xs text-[#456080] mb-1">Team Name</label>
           <input
             type="text"
             value={teamName}

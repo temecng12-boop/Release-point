@@ -69,8 +69,8 @@ export default function VoiceNote({
   }
 
   return (
-    <div className="bg-[#0B1E36] rounded-md border border-[#1C3A5C] p-4">
-      <p className="text-xs text-[#4A6880] mb-3 tracking-widest" style={oswald}>
+    <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm p-4">
+      <p className="text-xs text-[#7A92A8] mb-3 tracking-widest" style={oswald}>
         Coach Voice Note
       </p>
 
@@ -79,7 +79,7 @@ export default function VoiceNote({
           {recording ? (
             <button
               onClick={stopRecording}
-              className="flex items-center gap-2 text-xs bg-[#1C3A5C] text-white px-3 py-1.5 rounded-md animate-pulse"
+              className="flex items-center gap-2 text-xs bg-[#1C3A5C] text-white px-3 py-1.5 rounded-md animate-pulse border border-[#DDE4ED]"
             >
               <span className="w-2 h-2 rounded-full bg-[#C8102E] inline-block" />
               Stop Recording
@@ -95,7 +95,7 @@ export default function VoiceNote({
             </button>
           )}
           {!recording && !uploading && voiceUrl && (
-            <span className="text-xs text-[#4A6880]">Re-record to overwrite</span>
+            <span className="text-xs text-[#7A92A8]">Re-record to overwrite</span>
           )}
         </div>
       )}
@@ -105,7 +105,7 @@ export default function VoiceNote({
       {voiceUrl ? (
         <audio controls src={voiceUrl} className="w-full" style={{ height: 36 }} />
       ) : (
-        <p className="text-sm text-[#4A6880]">
+        <p className="text-sm text-[#7A92A8]">
           {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from coach yet.'}
         </p>
       )}

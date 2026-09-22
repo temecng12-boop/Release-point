@@ -36,12 +36,12 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
   }
 
   return (
-    <div className="min-h-screen bg-[#060F1A] flex flex-col">
+    <div className="min-h-screen bg-[#F5F7FA] flex flex-col">
       {/* Minimal nav */}
-      <header className="flex items-center justify-center h-14 border-b border-[#1C3A5C]">
+      <header className="flex items-center justify-center h-14 border-b border-[#DDE4ED]" style={{ backgroundColor: 'rgba(255,255,255,0.97)' }}>
         <div className="flex items-center gap-2">
           <span>⚾</span>
-          <span className="text-sm tracking-widest text-[#E8EDF5]" style={oswald}>Release Point</span>
+          <span className="text-sm tracking-widest text-[#1C2E4A]" style={oswald}>Release Point</span>
         </div>
       </header>
 
@@ -52,10 +52,10 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
               Welcome, {playerName}
             </p>
           )}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl text-[#E8EDF5] text-center mb-3 leading-[0.95]" style={oswald}>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl text-[#0F1F33] text-center mb-3 leading-[0.95]" style={oswald}>
             Pitcher or<br />Hitter?
           </h1>
-          <p className="text-sm text-[#4A6880] text-center mb-12">
+          <p className="text-sm text-[#7A92A8] text-center mb-12">
             This helps your coach and the AI give you relevant feedback.
           </p>
 
@@ -68,8 +68,9 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
                   onClick={() => setSelected(card.value)}
                   className="text-left rounded-xl p-7 transition-all focus:outline-none relative overflow-hidden"
                   style={{
-                    backgroundColor: '#0B1E36',
-                    border: `2px solid ${active ? '#C8102E' : '#1C3A5C'}`,
+                    backgroundColor: active ? '#FFFFFF' : '#FFFFFF',
+                    border: `2px solid ${active ? '#C8102E' : '#DDE4ED'}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                   }}
                 >
                   {active && (
@@ -77,17 +78,17 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
                   )}
                   <div className="flex items-start justify-between mb-5">
                     <div>
-                      <h2 className="text-2xl text-[#E8EDF5] leading-none mb-1" style={oswald}>{card.label}</h2>
-                      <p className="text-xs text-[#4A6880]">{card.sub}</p>
+                      <h2 className="text-2xl text-[#0F1F33] leading-none mb-1" style={oswald}>{card.label}</h2>
+                      <p className="text-xs text-[#7A92A8]">{card.sub}</p>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-colors ${active ? 'border-[#C8102E] bg-[#C8102E]' : 'border-[#1C3A5C]'}`}>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-colors ${active ? 'border-[#C8102E] bg-[#C8102E]' : 'border-[#DDE4ED]'}`}>
                       {active && <span className="text-white text-[10px]">✓</span>}
                     </div>
                   </div>
                   <ul className="space-y-2">
                     {card.points.map((p) => (
-                      <li key={p} className="flex items-center gap-2 text-xs text-[#9FB3CC]">
-                        <span className={`w-1 h-1 rounded-full shrink-0 ${active ? 'bg-[#C8102E]' : 'bg-[#1C3A5C]'}`} />
+                      <li key={p} className="flex items-center gap-2 text-xs text-[#456080]">
+                        <span className={`w-1 h-1 rounded-full shrink-0 ${active ? 'bg-[#C8102E]' : 'bg-[#DDE4ED]'}`} />
                         {p}
                       </li>
                     ))}
@@ -104,8 +105,8 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
               className="px-12 py-4 rounded-lg text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 ...oswald,
-                backgroundColor: selected ? '#C8102E' : '#1C3A5C',
-                color: '#E8EDF5',
+                backgroundColor: selected ? '#C8102E' : '#DDE4ED',
+                color: selected ? '#FFFFFF' : '#7A92A8',
               }}
             >
               {loading ? 'Saving…' : 'Continue to Dashboard'}

@@ -102,14 +102,14 @@ export default function ClipNotes({
     <div className="mt-5 space-y-4">
       {/* Voice note */}
       <div className="bg-white rounded-xl border border-[#DCE1E7] p-5">
-        <h2 className="text-sm text-[#0B1E36] mb-3" style={oswald}>Coach Voice Note</h2>
+        <h2 className="text-sm text-[#0F1F33] mb-3" style={oswald}>Coach Voice Note</h2>
 
         {isCoach && (
           <div className="flex items-center gap-3 mb-3">
             {recording ? (
               <button
                 onClick={stopRecording}
-                className="flex items-center gap-2 text-xs bg-[#0B1E36] text-white px-3 py-1.5 rounded-lg animate-pulse"
+                className="flex items-center gap-2 text-xs bg-[#1C3A5C] text-white px-3 py-1.5 rounded-lg animate-pulse"
               >
                 <span className="w-2 h-2 rounded bg-[#C8102E] inline-block" />
                 Stop Recording
@@ -125,7 +125,7 @@ export default function ClipNotes({
               </button>
             )}
             {!recording && !uploading && voiceUrl && (
-              <span className="text-xs text-[#9FB3CC]">Re-record to overwrite</span>
+              <span className="text-xs text-[#7A92A8]">Re-record to overwrite</span>
             )}
           </div>
         )}
@@ -135,7 +135,7 @@ export default function ClipNotes({
         {voiceUrl ? (
           <audio controls src={voiceUrl} className="w-full" style={{ height: 36 }} />
         ) : (
-          <p className="text-sm text-[#9FB3CC]">
+          <p className="text-sm text-[#7A92A8]">
             {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from coach yet.'}
           </p>
         )}
@@ -144,9 +144,9 @@ export default function ClipNotes({
       {/* Text notes */}
       <div className="bg-white rounded-xl border border-[#DCE1E7] p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-[#0B1E36]" style={oswald}>Coach Notes</h2>
+          <h2 className="text-sm text-[#0F1F33]" style={oswald}>Coach Notes</h2>
           {isCoach && (
-            <span className="text-xs text-[#9FB3CC]">
+            <span className="text-xs text-[#7A92A8]">
               {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved' : 'Saved ✓'}
             </span>
           )}
@@ -159,12 +159,12 @@ export default function ClipNotes({
             onBlur={onNotesBlur}
             placeholder="Type coaching notes here…"
             rows={4}
-            className="w-full text-sm text-[#16202E] border border-[#DCE1E7] rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#0B1E36] placeholder:text-[#9FB3CC]"
+            className="w-full text-sm text-[#0F1F33] border border-[#DDE4ED] rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#1C3A5C]/30 placeholder:text-[#7A92A8]"
           />
         ) : (
           notes
             ? <p className="text-sm text-[#16202E] whitespace-pre-wrap">{notes}</p>
-            : <p className="text-sm text-[#9FB3CC]">No notes from coach yet.</p>
+            : <p className="text-sm text-[#7A92A8]">No notes from coach yet.</p>
         )}
       </div>
     </div>

@@ -21,9 +21,9 @@ export default function SaveBanner({ role }: { role: 'coach' | 'player' }) {
   if (role !== 'coach') return null
 
   return (
-    <div className="sticky bottom-0 mt-6 bg-[#0B1E36] border-t border-[#14304F] px-5 py-3 flex items-center justify-between">
+    <div className="sticky bottom-0 mt-6 bg-white border-t border-[#DDE4ED] px-5 py-3 flex items-center justify-between shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
       <span
-        className={`text-xs transition-opacity duration-500 ${flash ? 'text-green-400 opacity-100' : 'text-[#5B6B7F] opacity-100'}`}
+        className={`text-xs transition-opacity duration-500 ${flash ? 'text-green-600 opacity-100' : 'text-[#7A92A8] opacity-100'}`}
       >
         {flash ? '✓ All feedback saved' : 'Annotations, recordings & notes save automatically'}
       </span>

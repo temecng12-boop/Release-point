@@ -161,8 +161,8 @@ export default function MetricsTab({
     <div className="space-y-4">
       {/* ── Upload area (coach only) ─────────────────────────────────────── */}
       {isCoach && (
-        <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-md p-4">
-          <p className="text-xs text-[#4A6880] tracking-widest mb-3" style={oswald}>
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4">
+          <p className="text-xs text-[#7A92A8] tracking-widest mb-3" style={oswald}>
             Upload Rapsodo Data
           </p>
 
@@ -176,7 +176,7 @@ export default function MetricsTab({
 
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full border-2 border-dashed border-[#1C3A5C] rounded-md py-4 text-sm text-[#9FB3CC] hover:border-[#C8102E] hover:text-[#E8EDF5] transition-colors"
+            className="w-full border-2 border-dashed border-[#DDE4ED] rounded-md py-4 text-sm text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
           >
             Upload Rapsodo CSV
           </button>
@@ -188,7 +188,7 @@ export default function MetricsTab({
           {/* Preview table */}
           {preview && preview.length > 0 && (
             <div className="mt-4 space-y-3">
-              <p className="text-xs text-[#9FB3CC]">
+              <p className="text-xs text-[#456080]">
                 Preview — {preview.length} pitch{preview.length !== 1 ? 'es' : ''} parsed
               </p>
               <PreviewTable rows={preview} ageGroup={playerAgeGroup} />
@@ -213,18 +213,18 @@ export default function MetricsTab({
 
       {/* ── Saved metrics table ──────────────────────────────────────────── */}
       {metrics.length > 0 ? (
-        <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-md overflow-hidden">
-          <div className="px-4 pt-3 pb-2 border-b border-[#1C3A5C]">
-            <p className="text-xs text-[#4A6880] tracking-widest" style={oswald}>
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
+            <p className="text-xs text-[#7A92A8] tracking-widest" style={oswald}>
               Pitch Metrics
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#1C3A5C]">
+                <tr className="border-b border-[#DDE4ED]">
                   {['Pitch Type', 'Velocity', 'Spin Rate', 'Spin Axis', 'H-Break', 'V-Break'].map(h => (
-                    <th key={h} className="px-3 py-2 text-left text-[10px] text-[#4A6880] tracking-widest font-medium" style={oswald}>
+                    <th key={h} className="px-3 py-2 text-left text-[10px] text-[#7A92A8] tracking-widest font-medium" style={oswald}>
                       {h}
                     </th>
                   ))}
@@ -232,9 +232,9 @@ export default function MetricsTab({
               </thead>
               <tbody>
                 {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-[#1C3A5C] hover:bg-[#112940] transition-colors">
-                    <td className="px-3 py-2 text-[#E8EDF5]">{m.pitch_type ?? '—'}</td>
-                    <td className="px-3 py-2 text-[#E8EDF5]">
+                  <tr key={m.id} className="border-b border-[#DDE4ED] hover:bg-[#F0F4F8] transition-colors">
+                    <td className="px-3 py-2 text-[#0F1F33]">{m.pitch_type ?? '—'}</td>
+                    <td className="px-3 py-2 text-[#0F1F33]">
                       {m.velocity != null ? (
                         <span>
                           {m.velocity.toFixed(1)} mph
@@ -242,16 +242,16 @@ export default function MetricsTab({
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="px-3 py-2 text-[#E8EDF5]">
+                    <td className="px-3 py-2 text-[#0F1F33]">
                       {m.spin_rate != null ? `${m.spin_rate.toLocaleString()} rpm` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-[#E8EDF5]">
+                    <td className="px-3 py-2 text-[#0F1F33]">
                       {m.spin_axis != null ? `${m.spin_axis}°` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-[#E8EDF5]">
+                    <td className="px-3 py-2 text-[#0F1F33]">
                       {m.horizontal_break != null ? `${m.horizontal_break.toFixed(1)}"` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-[#E8EDF5]">
+                    <td className="px-3 py-2 text-[#0F1F33]">
                       {m.vertical_break != null ? `${m.vertical_break.toFixed(1)}"` : '—'}
                     </td>
                   </tr>
@@ -261,14 +261,14 @@ export default function MetricsTab({
           </div>
         </div>
       ) : (
-        <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-md p-6 text-center">
-          <p className="text-sm text-[#9FB3CC]">No pitch metrics yet.</p>
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-6 text-center">
+          <p className="text-sm text-[#456080]">No pitch metrics yet.</p>
           {isCoach ? (
-            <p className="text-xs text-[#4A6880] mt-1">
+            <p className="text-xs text-[#7A92A8] mt-1">
               Upload a Rapsodo CSV above to add pitch data for this clip.
             </p>
           ) : (
-            <p className="text-xs text-[#4A6880] mt-1">
+            <p className="text-xs text-[#7A92A8] mt-1">
               Your coach will upload Rapsodo data when available.
             </p>
           )}
@@ -277,11 +277,11 @@ export default function MetricsTab({
 
       {/* ── Benchmark legend ─────────────────────────────────────────────── */}
       {playerAgeGroup && VELOCITY_BENCHMARKS[playerAgeGroup] && (
-        <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-md px-4 py-3">
-          <p className="text-[10px] text-[#4A6880] tracking-widest mb-2" style={oswald}>
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md px-4 py-3">
+          <p className="text-[10px] text-[#7A92A8] tracking-widest mb-2" style={oswald}>
             {playerAgeGroup} Velocity Benchmarks
           </p>
-          <div className="flex gap-4 text-xs text-[#9FB3CC]">
+          <div className="flex gap-4 text-xs text-[#456080]">
             <span>Avg: {VELOCITY_BENCHMARKS[playerAgeGroup].avg} mph</span>
             <span>Good: {VELOCITY_BENCHMARKS[playerAgeGroup].good}+ mph</span>
             <span>Elite: {VELOCITY_BENCHMARKS[playerAgeGroup].elite}+ mph</span>
@@ -295,12 +295,12 @@ export default function MetricsTab({
 // ── Preview table (before saving) ───────────────────────────────────────────
 function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string | null }) {
   return (
-    <div className="overflow-x-auto rounded border border-[#1C3A5C]">
+    <div className="overflow-x-auto rounded border border-[#DDE4ED]">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-[#1C3A5C]">
+          <tr className="border-b border-[#DDE4ED]">
             {['Pitch Type', 'Velocity', 'Spin Rate', 'Spin Axis', 'H-Break', 'V-Break'].map(h => (
-              <th key={h} className="px-2 py-1.5 text-left text-[#4A6880] tracking-widest" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
+              <th key={h} className="px-2 py-1.5 text-left text-[#7A92A8] tracking-widest" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
                 {h}
               </th>
             ))}
@@ -308,9 +308,9 @@ function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string 
         </thead>
         <tbody>
           {rows.slice(0, 10).map((r, i) => (
-            <tr key={i} className="border-b border-[#1C3A5C] last:border-0">
-              <td className="px-2 py-1.5 text-[#E8EDF5]">{r.pitch_type ?? '—'}</td>
-              <td className="px-2 py-1.5 text-[#E8EDF5]">
+            <tr key={i} className="border-b border-[#DDE4ED] last:border-0">
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.pitch_type ?? '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">
                 {r.velocity != null ? (
                   <span>
                     {r.velocity.toFixed(1)}
@@ -318,16 +318,16 @@ function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string 
                   </span>
                 ) : '—'}
               </td>
-              <td className="px-2 py-1.5 text-[#E8EDF5]">{r.spin_rate != null ? r.spin_rate.toLocaleString() : '—'}</td>
-              <td className="px-2 py-1.5 text-[#E8EDF5]">{r.spin_axis != null ? `${r.spin_axis}°` : '—'}</td>
-              <td className="px-2 py-1.5 text-[#E8EDF5]">{r.horizontal_break != null ? `${r.horizontal_break.toFixed(1)}"` : '—'}</td>
-              <td className="px-2 py-1.5 text-[#E8EDF5]">{r.vertical_break != null ? `${r.vertical_break.toFixed(1)}"` : '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.spin_rate != null ? r.spin_rate.toLocaleString() : '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.spin_axis != null ? `${r.spin_axis}°` : '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.horizontal_break != null ? `${r.horizontal_break.toFixed(1)}"` : '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.vertical_break != null ? `${r.vertical_break.toFixed(1)}"` : '—'}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {rows.length > 10 && (
-        <p className="px-2 py-1.5 text-[10px] text-[#4A6880]">…and {rows.length - 10} more rows</p>
+        <p className="px-2 py-1.5 text-[10px] text-[#7A92A8]">…and {rows.length - 10} more rows</p>
       )}
     </div>
   )

@@ -26,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${oswald.variable} ${inter.variable} h-full`}>
-      <body className="min-h-full bg-bone text-ink antialiased font-inter">
+      <body className="min-h-full antialiased">
         {children}
       </body>
     </html>

@@ -30,6 +30,8 @@
 
 body {
   font-family: var(--font-inter, Inter, sans-serif);
+  background-color: #060F1A;
+  color: #E8EDF5;
 }
 
 h1, h2, h3, .display {

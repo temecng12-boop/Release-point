@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS timestamp_notes (
   clip_id      uuid REFERENCES clips(id) ON DELETE CASCADE NOT NULL,
   created_by   uuid REFERENCES auth.users NOT NULL,
   time_seconds numeric NOT NULL,
-  text         text NOT NULL,
+  body         text NOT NULL,
   created_at   timestamptz DEFAULT now()
 );
 
@@ -100,3 +100,22 @@ CREATE TABLE IF NOT EXISTS pitch_metrics (
   release_extension numeric,
   created_at        timestamptz DEFAULT now()
 );
+
+-- ── Auto-create profile on signup ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO profiles (id, full_name, role)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'full_name',
+    COALESCE(NEW.raw_user_meta_data->>'role', 'player')
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();

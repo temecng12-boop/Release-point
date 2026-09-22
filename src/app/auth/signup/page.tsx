@@ -1,54 +1,133 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { signUp } from '@/app/actions/auth'
+import Logo from '@/components/Logo'
+import { signUp, signUpPlayer } from '@/app/actions/auth'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 const inputClass =
-  'w-full bg-[#060F1A] border border-[#1C3A5C] text-[#E8EDF5] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#9FB3CC] focus:ring-1 focus:ring-[#9FB3CC]/20 placeholder:text-[#4A6880] transition-colors'
+  'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#456080] focus:ring-1 focus:ring-[#456080]/20 placeholder:text-[#7A92A8] transition-colors'
+
+function CoachForm({ onBack }: { onBack: () => void }) {
+  const [state, action, pending] = useActionState(signUp, undefined)
+  return (
+    <form action={action} className="space-y-4">
+      <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#7A92A8] hover:text-[#456080] transition-colors mb-2" style={oswald}>
+        ← Back
+      </button>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Full Name</label>
+        <input type="text" name="full_name" required placeholder="Coach name" className={inputClass} />
+      </div>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Email Address</label>
+        <input type="email" name="email" required placeholder="coach@example.com" className={inputClass} />
+      </div>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
+        <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputClass} />
+      </div>
+      {state?.error && (
+        <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
+          <p className="text-sm text-[#C8102E]">{state.error}</p>
+        </div>
+      )}
+      <button type="submit" disabled={pending} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
+        {pending ? 'Creating Account…' : 'Create Coach Account'}
+      </button>
+    </form>
+  )
+}
+
+function PlayerForm({ onBack }: { onBack: () => void }) {
+  const [state, action, pending] = useActionState(signUpPlayer, undefined)
+  return (
+    <form action={action} className="space-y-4">
+      <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#7A92A8] hover:text-[#456080] transition-colors mb-2" style={oswald}>
+        ← Back
+      </button>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Full Name</label>
+        <input type="text" name="full_name" required placeholder="Your name" className={inputClass} />
+      </div>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Email Address</label>
+        <input type="email" name="email" required placeholder="your@email.com" className={inputClass} />
+        <p className="text-[11px] text-[#7A92A8] mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
+      </div>
+      <div>
+        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
+        <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputClass} />
+      </div>
+      {state?.error && (
+        <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
+          <p className="text-sm text-[#C8102E]">{state.error}</p>
+        </div>
+      )}
+      <button type="submit" disabled={pending} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
+        {pending ? 'Creating Account…' : 'Create Player Account'}
+      </button>
+    </form>
+  )
+}
+
+function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="mb-7">
+        <h1 className="text-xl text-[#0F1F33] mb-1" style={oswald}>Join Release Point</h1>
+        <p className="text-sm text-[#7A92A8]">Are you a coach or a player?</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onSelect('coach')}
+        className="w-full group text-left bg-[#F5F7FA] border border-[#DDE4ED] hover:border-[#C8102E]/60 hover:bg-[#EEF2F7] rounded-xl p-5 transition-all"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-[#0F1F33]" style={oswald}>Coach</span>
+          <span className="text-xs text-[#C8102E] opacity-0 group-hover:opacity-100 transition-opacity" style={oswald}>Get Started →</span>
+        </div>
+        <p className="text-xs text-[#7A92A8] leading-relaxed">Manage your roster, upload and annotate clips, import Rapsodo metrics, and track player development.</p>
+        <div className="mt-3 flex gap-1.5 flex-wrap">
+          {['Teams', 'Video Analysis', 'Rapsodo', 'AI Coach'].map((t) => (
+            <span key={t} className="text-[10px] px-2 py-0.5 bg-white border border-[#DDE4ED] text-[#7A92A8] rounded" style={oswald}>{t}</span>
+          ))}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelect('player')}
+        className="w-full group text-left bg-[#F5F7FA] border border-[#DDE4ED] hover:border-[#C8102E]/60 hover:bg-[#EEF2F7] rounded-xl p-5 transition-all"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-[#0F1F33]" style={oswald}>Player</span>
+          <span className="text-xs text-[#C8102E] opacity-0 group-hover:opacity-100 transition-opacity" style={oswald}>Get Started →</span>
+        </div>
+        <p className="text-xs text-[#7A92A8] leading-relaxed">Review your clips and coach annotations, track your pitch metrics, and follow your progress over time.</p>
+        <div className="mt-3 flex gap-1.5 flex-wrap">
+          {['Clip Review', 'Metrics', 'Coach Feedback'].map((t) => (
+            <span key={t} className="text-[10px] px-2 py-0.5 bg-white border border-[#DDE4ED] text-[#7A92A8] rounded" style={oswald}>{t}</span>
+          ))}
+        </div>
+      </button>
+    </div>
+  )
+}
 
 export default function SignupPage() {
-  const [state, action, pending] = useActionState(signUp, undefined)
-
-  if (state?.message) {
-    return (
-      <div className="min-h-screen bg-[#060F1A] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-xl shadow-2xl overflow-hidden">
-            <div className="h-1 bg-[#C8102E]" />
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-green-900/30 border border-green-800/50 flex items-center justify-center mx-auto mb-4">
-                <span className="text-green-400 text-xl">✓</span>
-              </div>
-              <h2 className="text-lg text-[#E8EDF5] mb-2" style={oswald}>
-                Check Your Email
-              </h2>
-              <p className="text-sm text-[#9FB3CC]">{state.message}</p>
-              <Link
-                href="/auth/login"
-                className="mt-6 inline-block text-sm text-[#C8102E] hover:text-red-400 transition-colors"
-              >
-                ← Back to sign in
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const [role, setRole] = useState<'coach' | 'player' | null>(null)
 
   return (
-    <div className="min-h-screen bg-[#060F1A] flex">
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-[#0B1E36] border-r border-[#1C3A5C] p-10">
+    <div className="min-h-screen bg-[#F5F7FA] flex">
+      {/* Left panel */}
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-[#1C3A5C] border-r border-[#1C3A5C] p-10">
         <div>
-          <div className="flex items-center gap-3 mb-12">
-            <span className="text-2xl">⚾</span>
-            <span className="text-xl text-white tracking-widest" style={oswald}>
-              Release Point
-            </span>
+          <div className="mb-12">
+            <Logo size="md" wordmarkClass="inline" />
           </div>
           <div className="space-y-6">
             {[
@@ -57,105 +136,37 @@ export default function SignupPage() {
               { n: '03', title: 'AI Coach', desc: 'Data-backed analysis tied to your player\'s age group and real numbers' },
               { n: '04', title: 'Team Management', desc: 'Organize players by team and age group, share clips instantly' },
             ].map((f) => (
-              <div key={f.title} className="flex gap-4 pl-4 border-l border-[#1C3A5C]">
+              <div key={f.title} className="flex gap-4 pl-4 border-l border-white/20">
                 <div>
                   <p className="text-[10px] text-[#C8102E] mb-1 tracking-[0.2em]" style={oswald}>{f.n}</p>
-                  <p className="text-sm text-[#E8EDF5] mb-0.5" style={oswald}>{f.title}</p>
-                  <p className="text-xs text-[#4A6880] leading-relaxed">{f.desc}</p>
+                  <p className="text-sm text-white mb-0.5" style={oswald}>{f.title}</p>
+                  <p className="text-xs text-[#B8D0E8] leading-relaxed">{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <p className="text-xs text-[#1C3A5C]">
-          Release Point — Pitching &amp; hitting mechanics analyzer
-        </p>
+        <p className="text-xs text-white/40">Release Point — Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
-      {/* Right panel — form */}
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 justify-center mb-8">
-            <span className="text-2xl">⚾</span>
-            <span className="text-xl text-white tracking-widest" style={oswald}>
-              Release Point
-            </span>
+          <div className="lg:hidden flex justify-center mb-8">
+            <Logo size="md" wordmarkClass="inline" />
           </div>
 
-          <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-xl shadow-2xl overflow-hidden">
+          <div className="bg-white border border-[#DDE4ED] rounded-xl shadow-sm overflow-hidden">
             <div className="h-1 bg-[#C8102E]" />
             <div className="p-8">
-              <div className="mb-7">
-                <h1 className="text-xl text-[#E8EDF5] mb-1" style={oswald}>
-                  Create Coach Account
-                </h1>
-                <p className="text-sm text-[#4A6880]">
-                  You&apos;ll be able to invite players and organize teams after signing in.
-                </p>
-              </div>
+              {role === null && <RoleSelect onSelect={setRole} />}
+              {role === 'coach' && <CoachForm onBack={() => setRole(null)} />}
+              {role === 'player' && <PlayerForm onBack={() => setRole(null)} />}
 
-              <form action={action} className="space-y-4">
-                <div>
-                  <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    required
-                    placeholder="Coach name"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    placeholder="coach@example.com"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-[#9FB3CC] mb-1.5 tracking-wide" style={oswald}>
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    required
-                    minLength={8}
-                    placeholder="Minimum 8 characters"
-                    className={inputClass}
-                  />
-                </div>
-
-                {state?.error && (
-                  <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
-                    <p className="text-sm text-[#C8102E]">{state.error}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-                  style={oswald}
-                >
-                  {pending ? 'Creating Account…' : 'Create Coach Account'}
-                </button>
-              </form>
-
-              <div className="mt-6 pt-5 border-t border-[#1C3A5C] text-center">
-                <p className="text-sm text-[#4A6880]">
+              <div className="mt-6 pt-5 border-t border-[#DDE4ED] text-center">
+                <p className="text-sm text-[#7A92A8]">
                   Already have an account?{' '}
-                  <Link href="/auth/login" className="text-[#9FB3CC] hover:text-white transition-colors font-medium">
+                  <Link href="/auth/login" className="text-[#1C3A5C] hover:text-[#0F1F33] transition-colors font-medium">
                     Sign in
                   </Link>
                 </p>

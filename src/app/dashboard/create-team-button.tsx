@@ -6,7 +6,7 @@ import { createTeam } from '@/app/actions/team'
 
 const AGE_GROUPS = ['Youth', 'Middle School', 'High School', 'Amateur', 'Professional']
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'w-full bg-[#060F1A] border border-[#1C3A5C] text-[#E8EDF5] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#9FB3CC] placeholder:text-[#4A6880]'
+const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#7A92A8]'
 
 export default function CreateTeamButton() {
   const [open, setOpen] = useState(false)
@@ -30,13 +30,13 @@ export default function CreateTeamButton() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}
         >
-          <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-lg p-6 w-full max-w-md mx-4 space-y-4">
-            <h2 className="text-base tracking-widest text-[#E8EDF5]" style={oswald}>
+          <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-lg p-6 w-full max-w-md mx-4 space-y-4">
+            <h2 className="text-base tracking-widest text-[#0F1F33]" style={oswald}>
               Create Team
             </h2>
             <form action={action} className="space-y-3">
               <div>
-                <label className="block text-xs text-[#9FB3CC] mb-1">Team Name</label>
+                <label className="block text-xs text-[#456080] mb-1">Team Name</label>
                 <input
                   type="text"
                   name="name"
@@ -46,7 +46,7 @@ export default function CreateTeamButton() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-[#9FB3CC] mb-1">Age Group</label>
+                <label className="block text-xs text-[#456080] mb-1">Age Group</label>
                 <select name="age_group" className={inputClass}>
                   <option value="">— select —</option>
                   {AGE_GROUPS.map((ag) => (
@@ -68,7 +68,7 @@ export default function CreateTeamButton() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 border border-[#1C3A5C] text-[#9FB3CC] hover:text-white hover:border-[#9FB3CC] rounded-md px-4 py-2 text-sm transition-colors"
+                  className="flex-1 border border-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] hover:border-[#456080] rounded-md px-4 py-2 text-sm transition-colors"
                 >
                   Cancel
                 </button>

@@ -20,12 +20,12 @@ export default function ConsentForm({ playerId }: { playerId: string }) {
       <label className="flex items-start gap-3 cursor-pointer" onClick={() => setAgreed(v => !v)}>
         <div
           className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-            agreed ? 'bg-[#C8102E] border-[#C8102E]' : 'border-[#1C3A5C] hover:border-[#4A6880]'
+            agreed ? 'bg-[#C8102E] border-[#C8102E]' : 'border-[#DDE4ED] hover:border-[#7A92A8]'
           }`}
         >
           {agreed && <span className="text-white text-[10px] leading-none">✓</span>}
         </div>
-        <span className="text-sm text-[#9FB3CC] leading-relaxed">
+        <span className="text-sm text-[#456080] leading-relaxed">
           I am the parent or legal guardian of this player and I consent to video storage as described above.
         </span>
       </label>

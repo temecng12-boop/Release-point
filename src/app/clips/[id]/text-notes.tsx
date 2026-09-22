@@ -45,11 +45,11 @@ export default function TextNotes({
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
   return (
-    <div className="bg-[#0B1E36] rounded-md border border-[#1C3A5C] p-4">
+    <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-[#4A6880] tracking-widest" style={oswald}>Coach Notes</p>
+        <p className="text-xs text-[#7A92A8] tracking-widest" style={oswald}>Coach Notes</p>
         {isCoach && (
-          <span className="text-xs text-[#4A6880]">
+          <span className="text-xs text-[#7A92A8]">
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved' : 'Saved ✓'}
           </span>
         )}
@@ -62,12 +62,12 @@ export default function TextNotes({
           onBlur={onNotesBlur}
           placeholder="Type coaching notes here…"
           rows={5}
-          className="w-full text-sm bg-[#060F1A] border border-[#1C3A5C] rounded-md p-3 text-[#E8EDF5] placeholder:text-[#4A6880] resize-none focus:outline-none focus:border-[#9FB3CC]"
+          className="w-full text-sm bg-white border border-[#DDE4ED] rounded-md p-3 text-[#0F1F33] placeholder:text-[#7A92A8] resize-none focus:outline-none focus:border-[#456080]"
         />
       ) : (
         notes
-          ? <p className="text-sm text-[#E8EDF5] whitespace-pre-wrap">{notes}</p>
-          : <p className="text-sm text-[#4A6880]">No notes from coach yet.</p>
+          ? <p className="text-sm text-[#0F1F33] whitespace-pre-wrap">{notes}</p>
+          : <p className="text-sm text-[#7A92A8]">No notes from coach yet.</p>
       )}
     </div>
   )

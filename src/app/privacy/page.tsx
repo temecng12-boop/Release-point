@@ -4,25 +4,25 @@ const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTrans
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#060F1A] text-[#E8EDF5]">
-      <header className="bg-[#0B1E36] border-b border-[#1C3A5C] px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F5F7FA] text-[#0F1F33]">
+      <header className="bg-white border-b border-[#DDE4ED] px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <span>⚾</span>
-          <span className="text-sm tracking-widest" style={oswald}>Release Point</span>
+          <span className="text-sm tracking-widest text-[#1C2E4A]" style={oswald}>Release Point</span>
         </Link>
-        <Link href="/" className="text-xs text-[#9FB3CC] hover:text-white transition-colors">← Home</Link>
+        <Link href="/" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors">← Home</Link>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-16 space-y-10">
         <div>
           <p className="text-xs text-[#C8102E] tracking-widest mb-2" style={oswald}>Legal</p>
-          <h1 className="text-4xl text-[#E8EDF5] mb-2" style={oswald}>Privacy Policy</h1>
-          <p className="text-xs text-[#4A6880]">Last updated: September 2026</p>
+          <h1 className="text-4xl text-[#0F1F33] mb-2" style={oswald}>Privacy Policy</h1>
+          <p className="text-xs text-[#7A92A8]">Last updated: September 2026</p>
         </div>
 
-        <div className="bg-[#0B1E36] border border-[#1C3A5C] rounded-lg p-5">
-          <p className="text-xs text-[#9FB3CC] leading-relaxed">
-            <strong className="text-[#E8EDF5]">Note:</strong> This Privacy Policy is provided as a good-faith effort to explain how Release Point handles data. It does not constitute legal advice. If you have specific compliance requirements, consult a licensed attorney.
+        <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
+          <p className="text-xs text-[#456080] leading-relaxed">
+            <strong className="text-[#0F1F33]">Note:</strong> This Privacy Policy is provided as a good-faith effort to explain how Release Point handles data. It does not constitute legal advice. If you have specific compliance requirements, consult a licensed attorney.
           </p>
         </div>
 
@@ -118,17 +118,17 @@ To exercise any of these rights, contact us at the address below.`,
           },
         ].map((section) => (
           <div key={section.title}>
-            <h2 className="text-sm text-[#E8EDF5] mb-3" style={oswald}>{section.title}</h2>
-            <div className="text-sm text-[#9FB3CC] leading-relaxed whitespace-pre-line">
+            <h2 className="text-sm text-[#0F1F33] mb-3" style={oswald}>{section.title}</h2>
+            <div className="text-sm text-[#456080] leading-relaxed whitespace-pre-line">
               {section.body.split('\n').map((line, i) => {
                 if (line.startsWith('**') && line.endsWith('**')) {
-                  return <p key={i} className="font-semibold text-[#E8EDF5] mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>
+                  return <p key={i} className="font-semibold text-[#0F1F33] mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>
                 }
                 if (line.startsWith('**')) {
                   const parts = line.split('**')
                   return (
                     <p key={i} className="mb-1">
-                      <strong className="text-[#E8EDF5]">{parts[1]}</strong>{parts[2]}
+                      <strong className="text-[#0F1F33]">{parts[1]}</strong>{parts[2]}
                     </p>
                   )
                 }
@@ -143,11 +143,11 @@ To exercise any of these rights, contact us at the address below.`,
         ))}
       </main>
 
-      <footer className="border-t border-[#1C3A5C] px-6 py-6 text-center">
-        <div className="flex items-center justify-center gap-6 text-xs text-[#4A6880]">
-          <Link href="/privacy" className="hover:text-[#9FB3CC] transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-[#9FB3CC] transition-colors">Terms of Service</Link>
-          <Link href="/" className="hover:text-[#9FB3CC] transition-colors">Home</Link>
+      <footer className="border-t border-[#DDE4ED] px-6 py-6 text-center">
+        <div className="flex items-center justify-center gap-6 text-xs text-[#7A92A8]">
+          <Link href="/privacy" className="hover:text-[#456080] transition-colors">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-[#456080] transition-colors">Terms of Service</Link>
+          <Link href="/" className="hover:text-[#456080] transition-colors">Home</Link>
         </div>
       </footer>
     </div>

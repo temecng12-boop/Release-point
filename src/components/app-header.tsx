@@ -15,24 +15,24 @@ export default function AppHeader({ backHref, backLabel, right, showSignOut }: P
     <header
       className="sticky top-0 z-50 flex items-center justify-between px-5 md:px-8 h-14"
       style={{
-        backgroundColor: 'rgba(6,15,26,0.9)',
+        backgroundColor: 'rgba(255,255,255,0.97)',
         backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(28,58,92,0.4)',
+        borderBottom: '1px solid #DDE4ED',
       }}
     >
       <div className="flex items-center gap-4">
         <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
           <span className="text-base">⚾</span>
-          <span className="text-sm tracking-widest text-[#E8EDF5] hidden sm:block" style={oswald}>
+          <span className="text-sm tracking-widest text-[#1C2E4A] hidden sm:block" style={oswald}>
             Release Point
           </span>
         </Link>
         {backHref && (
           <>
-            <span className="text-[#1C3A5C]">/</span>
+            <span className="text-[#DDE4ED]">/</span>
             <Link
               href={backHref}
-              className="text-xs text-[#4A6880] hover:text-[#9FB3CC] transition-colors"
+              className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors"
               style={oswald}
             >
               {backLabel ?? 'Back'}
@@ -47,7 +47,7 @@ export default function AppHeader({ backHref, backLabel, right, showSignOut }: P
           <form action={signOut}>
             <button
               type="submit"
-              className="text-xs text-[#4A6880] hover:text-[#9FB3CC] transition-colors px-2 py-1"
+              className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors px-2 py-1"
               style={oswald}
             >
               Sign Out
