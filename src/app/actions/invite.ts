@@ -46,18 +46,8 @@ export async function invitePlayer(
     )
   }
 
-  // Send invite email to player
-  const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(playerEmail, {
-    data: { role: 'player', full_name: playerName },
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/dashboard`,
-  })
-
-  if (inviteError) {
-    // Player row created even if email fails
-    revalidatePath('/', 'layout')
-    return { success: `${playerName} added. Email invite failed: ${inviteError.message}` }
-  }
-
   revalidatePath('/', 'layout')
-  return { success: `Invite sent to ${playerEmail}` }
+  return {
+    success: `${playerName} added! Have them go to ${process.env.NEXT_PUBLIC_SITE_URL ?? 'your app'} and sign up as a Player using ${playerEmail}.`,
+  }
 }

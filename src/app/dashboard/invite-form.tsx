@@ -16,7 +16,7 @@ export default function InviteForm({ teams }: Props) {
     <div className="bg-white rounded-xl border border-[#DDE4ED] shadow-sm overflow-hidden">
       <div className="h-1 bg-[#C8102E]" />
       <div className="p-5">
-        <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-4" style={oswald}>Invite Player</p>
+        <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-4" style={oswald}>Add Player</p>
         <form action={action} className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
@@ -52,7 +52,7 @@ export default function InviteForm({ teams }: Props) {
             className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50"
             style={oswald}
           >
-            {pending ? 'Sending…' : 'Send Invite'}
+            {pending ? 'Adding…' : 'Add Player'}
           </button>
         </form>
       </div>
