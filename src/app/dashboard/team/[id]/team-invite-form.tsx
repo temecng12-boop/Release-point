@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -8,13 +8,18 @@ const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2
 
 export default function TeamInviteForm({ teamId }: { teamId: string }) {
   const [state, action, pending] = useActionState(invitePlayer, undefined)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    if (state?.success) formRef.current?.reset()
+  }, [state?.success])
 
   return (
     <div className="bg-white rounded-xl border border-[#DDE4ED] shadow-sm overflow-hidden">
       <div className="h-1 bg-[#C8102E]" />
       <div className="p-5">
         <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-4" style={oswald}>Add Player to Roster</p>
-        <form action={action} className="space-y-3">
+        <form ref={formRef} action={action} className="space-y-3">
           <input type="hidden" name="team_id" value={teamId} />
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
@@ -40,8 +45,18 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
               </button>
             </div>
           </div>
-          {state?.error && <p className="text-xs text-[#C8102E]">{state.error}</p>}
-          {state?.success && <p className="text-xs text-green-400">{state.success}</p>}
+          {state?.error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <span className="text-[#C8102E] text-sm">✕</span>
+              <p className="text-sm text-[#C8102E]">{state.error}</p>
+            </div>
+          )}
+          {state?.success && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+              <span className="text-green-600 text-sm">✓</span>
+              <p className="text-sm text-green-700">{state.success}</p>
+            </div>
+          )}
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
           Guardian receives a consent email. Player appears on the roster after they consent.
