@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { addPitchMetric } from '@/app/actions/clips'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -105,6 +106,33 @@ export default function MetricsTab({
   const [preview, setPreview] = useState<ParsedRow[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [showManual, setShowManual] = useState(false)
+  const [manualSaving, setManualSaving] = useState(false)
+  const [manualError, setManualError] = useState<string | null>(null)
+  const emptyManual = { pitch_type: '', velocity: '', spin_rate: '', spin_axis: '', horizontal_break: '', vertical_break: '' }
+  const [manualForm, setManualForm] = useState(emptyManual)
+
+  async function handleManualSave() {
+    setManualSaving(true)
+    setManualError(null)
+    const result = await addPitchMetric(clipId, {
+      pitch_type: manualForm.pitch_type || null,
+      velocity: manualForm.velocity ? parseFloat(manualForm.velocity) : null,
+      spin_rate: manualForm.spin_rate ? parseInt(manualForm.spin_rate) : null,
+      spin_axis: manualForm.spin_axis ? parseInt(manualForm.spin_axis) : null,
+      horizontal_break: manualForm.horizontal_break ? parseFloat(manualForm.horizontal_break) : null,
+      vertical_break: manualForm.vertical_break ? parseFloat(manualForm.vertical_break) : null,
+    })
+    if (result?.error) {
+      setManualError(result.error)
+    } else if (result?.metric) {
+      setMetrics(prev => [...prev, result.metric as MetricRow])
+      setManualForm(emptyManual)
+      setShowManual(false)
+    }
+    setManualSaving(false)
+  }
 
   // ── Handle file selection ──────────────────────────────────────────────
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,6 +238,58 @@ export default function MetricsTab({
           )}
         </div>
       )}
+
+      {/* ── Manual entry (coach CSV or player manual) ───────────────────── */}
+      <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>
+            {isCoach ? 'Add Single Pitch' : 'Enter Rapsodo Data'}
+          </p>
+          <button
+            onClick={() => setShowManual(v => !v)}
+            className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors"
+            style={oswald}
+          >
+            {showManual ? 'Cancel' : '+ Add Pitch'}
+          </button>
+        </div>
+
+        {showManual && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { key: 'pitch_type', label: 'Pitch Type', placeholder: 'Fastball', type: 'text' },
+                { key: 'velocity', label: 'Velocity (mph)', placeholder: '92.4', type: 'number' },
+                { key: 'spin_rate', label: 'Spin Rate (rpm)', placeholder: '2340', type: 'number' },
+                { key: 'spin_axis', label: 'Spin Axis (°)', placeholder: '225', type: 'number' },
+                { key: 'horizontal_break', label: 'H-Break (in)', placeholder: '-8.2', type: 'number' },
+                { key: 'vertical_break', label: 'V-Break (in)', placeholder: '14.1', type: 'number' },
+              ].map(field => (
+                <div key={field.key}>
+                  <label className="block text-[10px] text-[#3D5166] mb-1" style={oswald}>{field.label}</label>
+                  <input
+                    type={field.type}
+                    step="any"
+                    placeholder={field.placeholder}
+                    value={manualForm[field.key as keyof typeof manualForm]}
+                    onChange={e => setManualForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    className="w-full bg-[#F5F7FA] border border-[#DDE4ED] rounded px-2 py-1.5 text-sm text-[#0F1F33] focus:outline-none focus:border-[#456080]"
+                  />
+                </div>
+              ))}
+            </div>
+            {manualError && <p className="text-xs text-[#C8102E]">{manualError}</p>}
+            <button
+              onClick={handleManualSave}
+              disabled={manualSaving}
+              className="px-4 py-2 rounded-md text-xs text-white transition-colors disabled:opacity-50"
+              style={{ ...oswald, background: '#C8102E' }}
+            >
+              {manualSaving ? 'Saving…' : 'Save Pitch'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Saved metrics table ──────────────────────────────────────────── */}
       {metrics.length > 0 ? (

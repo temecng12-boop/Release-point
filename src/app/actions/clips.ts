@@ -157,3 +157,25 @@ export async function deleteClip(clipId: string) {
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+export async function addPitchMetric(clipId: string, data: {
+  pitch_type: string | null
+  velocity: number | null
+  spin_rate: number | null
+  spin_axis: number | null
+  horizontal_break: number | null
+  vertical_break: number | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: row, error } = await supabaseAdmin
+    .from('pitch_metrics')
+    .insert({ clip_id: clipId, created_by: user.id, ...data })
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+    .single()
+
+  if (error) return { error: error.message }
+  return { metric: row }
+}
