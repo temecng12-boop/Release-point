@@ -626,8 +626,14 @@ export default function VideoPlayer({
           <button onClick={togglePlay} className={`${btnBase} ${playing ? btnOn : btnIdle}`}>
             {playing ? 'Pause' : 'Play'}
           </button>
-          <button onClick={stepBack} className={`${btnBase} ${btnIdle}`}>◄ Frame</button>
-          <button onClick={stepFwd}  className={`${btnBase} ${btnIdle}`}>Frame ►</button>
+          <button onClick={stepBack} className={`${btnBase} ${btnIdle}`}>
+            <svg className="inline w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16"><path d="M3 3h2v10H3V3zm9.854 1.146a.5.5 0 01.146.354v7a.5.5 0 01-.854.354L7.5 8.207V13a.5.5 0 01-1 0V3a.5.5 0 011 0v4.793l4.646-4.647a.5.5 0 01.708 0z"/></svg>
+            Frame
+          </button>
+          <button onClick={stepFwd}  className={`${btnBase} ${btnIdle}`}>
+            Frame
+            <svg className="inline w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 16 16"><path d="M13 3h-2v10h2V3zm-9.854 1.146a.5.5 0 00-.146.354v7a.5.5 0 00.854.354L8.5 8.207V13a.5.5 0 001 0V3a.5.5 0 00-1 0v4.793L4.854 3.146a.5.5 0 00-.708 0z"/></svg>
+          </button>
         </div>
         <div className={tgroup} style={oswald}>
           {([0.25, 0.5, 1, 1.5, 2] as const).map(s => (
