@@ -162,7 +162,7 @@ export default function MetricsTab({
       {/* ── Upload area (coach only) ─────────────────────────────────────── */}
       {isCoach && (
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4">
-          <p className="text-xs text-[#7A92A8] tracking-widest mb-3" style={oswald}>
+          <p className="text-xs text-[#3D5166] tracking-widest mb-3" style={oswald}>
             Upload Rapsodo Data
           </p>
 
@@ -215,7 +215,7 @@ export default function MetricsTab({
       {metrics.length > 0 ? (
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md overflow-hidden">
           <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
-            <p className="text-xs text-[#7A92A8] tracking-widest" style={oswald}>
+            <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>
               Pitch Metrics
             </p>
           </div>
@@ -224,7 +224,7 @@ export default function MetricsTab({
               <thead>
                 <tr className="border-b border-[#DDE4ED]">
                   {['Pitch Type', 'Velocity', 'Spin Rate', 'Spin Axis', 'H-Break', 'V-Break'].map(h => (
-                    <th key={h} className="px-3 py-2 text-left text-[10px] text-[#7A92A8] tracking-widest font-medium" style={oswald}>
+                    <th key={h} className="px-3 py-2 text-left text-[10px] text-[#3D5166] tracking-widest font-medium" style={oswald}>
                       {h}
                     </th>
                   ))}
@@ -264,11 +264,11 @@ export default function MetricsTab({
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-6 text-center">
           <p className="text-sm text-[#456080]">No pitch metrics yet.</p>
           {isCoach ? (
-            <p className="text-xs text-[#7A92A8] mt-1">
+            <p className="text-xs text-[#3D5166] mt-1">
               Upload a Rapsodo CSV above to add pitch data for this clip.
             </p>
           ) : (
-            <p className="text-xs text-[#7A92A8] mt-1">
+            <p className="text-xs text-[#3D5166] mt-1">
               Your coach will upload Rapsodo data when available.
             </p>
           )}
@@ -278,7 +278,7 @@ export default function MetricsTab({
       {/* ── Benchmark legend ─────────────────────────────────────────────── */}
       {playerAgeGroup && VELOCITY_BENCHMARKS[playerAgeGroup] && (
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md px-4 py-3">
-          <p className="text-[10px] text-[#7A92A8] tracking-widest mb-2" style={oswald}>
+          <p className="text-[10px] text-[#3D5166] tracking-widest mb-2" style={oswald}>
             {playerAgeGroup} Velocity Benchmarks
           </p>
           <div className="flex gap-4 text-xs text-[#456080]">
@@ -300,7 +300,7 @@ function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string 
         <thead>
           <tr className="border-b border-[#DDE4ED]">
             {['Pitch Type', 'Velocity', 'Spin Rate', 'Spin Axis', 'H-Break', 'V-Break'].map(h => (
-              <th key={h} className="px-2 py-1.5 text-left text-[#7A92A8] tracking-widest" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
+              <th key={h} className="px-2 py-1.5 text-left text-[#3D5166] tracking-widest" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
                 {h}
               </th>
             ))}
@@ -327,7 +327,7 @@ function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string 
         </tbody>
       </table>
       {rows.length > 10 && (
-        <p className="px-2 py-1.5 text-[10px] text-[#7A92A8]">…and {rows.length - 10} more rows</p>
+        <p className="px-2 py-1.5 text-[10px] text-[#3D5166]">…and {rows.length - 10} more rows</p>
       )}
     </div>
   )

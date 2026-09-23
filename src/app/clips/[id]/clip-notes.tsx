@@ -125,7 +125,7 @@ export default function ClipNotes({
               </button>
             )}
             {!recording && !uploading && voiceUrl && (
-              <span className="text-xs text-[#7A92A8]">Re-record to overwrite</span>
+              <span className="text-xs text-[#3D5166]">Re-record to overwrite</span>
             )}
           </div>
         )}
@@ -135,7 +135,7 @@ export default function ClipNotes({
         {voiceUrl ? (
           <audio controls src={voiceUrl} className="w-full" style={{ height: 36 }} />
         ) : (
-          <p className="text-sm text-[#7A92A8]">
+          <p className="text-sm text-[#3D5166]">
             {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from coach yet.'}
           </p>
         )}
@@ -146,7 +146,7 @@ export default function ClipNotes({
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm text-[#0F1F33]" style={oswald}>Coach Notes</h2>
           {isCoach && (
-            <span className="text-xs text-[#7A92A8]">
+            <span className="text-xs text-[#3D5166]">
               {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved' : 'Saved ✓'}
             </span>
           )}
@@ -159,12 +159,12 @@ export default function ClipNotes({
             onBlur={onNotesBlur}
             placeholder="Type coaching notes here…"
             rows={4}
-            className="w-full text-sm text-[#0F1F33] border border-[#DDE4ED] rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#1C3A5C]/30 placeholder:text-[#7A92A8]"
+            className="w-full text-sm text-[#0F1F33] border border-[#DDE4ED] rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#1C3A5C]/30 placeholder:text-[#3D5166]"
           />
         ) : (
           notes
             ? <p className="text-sm text-[#16202E] whitespace-pre-wrap">{notes}</p>
-            : <p className="text-sm text-[#7A92A8]">No notes from coach yet.</p>
+            : <p className="text-sm text-[#3D5166]">No notes from coach yet.</p>
         )}
       </div>
     </div>

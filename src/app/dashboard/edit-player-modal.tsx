@@ -82,7 +82,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
     else { onClose(); router.refresh() }
   }
 
-  const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#7A92A8]'
+  const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#3D5166]'
 
   return (
     <div
@@ -176,7 +176,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
         <div className="border-t border-[#DDE4ED] pt-3">
           {!confirmDelete ? (
             <button onClick={() => setConfirmDelete(true)} disabled={saving || deleting}
-              className="text-xs text-[#7A92A8] hover:text-[#C8102E] transition-colors">
+              className="text-xs text-[#3D5166] hover:text-[#C8102E] transition-colors">
               Remove from roster
             </button>
           ) : (

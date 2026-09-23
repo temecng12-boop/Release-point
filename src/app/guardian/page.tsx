@@ -56,12 +56,12 @@ export default async function GuardianPage() {
           <span className="text-sm tracking-widest text-[#1C2E4A] hidden sm:block" style={oswald}>Release Point</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-xs text-[#7A92A8] hidden sm:block truncate max-w-[140px]">
+          <span className="text-xs text-[#3D5166] hidden sm:block truncate max-w-[140px]">
             {profile?.full_name ?? user.email}
           </span>
           <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded" style={oswald}>Guardian</span>
           <form action={signOut}>
-            <button type="submit" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors" style={oswald}>
+            <button type="submit" className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors" style={oswald}>
               Sign Out
             </button>
           </form>
@@ -90,7 +90,7 @@ export default async function GuardianPage() {
 
               {playerClips.length === 0 ? (
                 <div className="bg-white border border-[#DDE4ED] rounded-xl p-8 text-center shadow-sm">
-                  <p className="text-sm text-[#7A92A8]">No clips yet — your player's coach will upload them.</p>
+                  <p className="text-sm text-[#3D5166]">No clips yet — your player's coach will upload them.</p>
                 </div>
               ) : (
                 <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
@@ -103,7 +103,7 @@ export default async function GuardianPage() {
                         className="flex items-center justify-between px-5 py-3 hover:bg-[#F0F4F8] transition-colors"
                       >
                         <span className="text-sm text-[#0F1F33]">{clip.title}</span>
-                        <span className="text-xs text-[#7A92A8]">
+                        <span className="text-xs text-[#3D5166]">
                           {fmtDate(clip.session_date ?? null, clip.created_at)}
                         </span>
                       </Link>
@@ -115,7 +115,7 @@ export default async function GuardianPage() {
           )
         }) : (
           <div className="bg-white border border-[#DDE4ED] rounded-xl p-12 text-center shadow-sm">
-            <p className="text-sm text-[#7A92A8]">No players linked to your account yet.</p>
+            <p className="text-sm text-[#3D5166]">No players linked to your account yet.</p>
           </div>
         )}
       </main>

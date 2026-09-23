@@ -1,8 +1,9 @@
 'use server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
-const AGE_GROUPS = ['12U', '13U', '14U', '15U', '16U', '17U', '18U']
+const AGE_GROUPS = ['Youth', 'Middle School', 'High School', 'Amateur', 'Professional']
 
 export async function createTeam(
   _prev: { error?: string; success?: boolean } | undefined,
@@ -18,7 +19,7 @@ export async function createTeam(
   if (!name) return { error: 'Team name is required' }
   if (ageGroup && !AGE_GROUPS.includes(ageGroup)) return { error: 'Invalid age group' }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('teams')
     .insert({ coach_id: user.id, name, age_group: ageGroup || null })
 
@@ -32,7 +33,7 @@ export async function deleteTeam(teamId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('teams')
     .delete()
     .eq('id', teamId)

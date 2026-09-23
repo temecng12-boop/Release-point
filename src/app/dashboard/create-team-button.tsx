@@ -6,7 +6,7 @@ import { createTeam } from '@/app/actions/team'
 
 const AGE_GROUPS = ['Youth', 'Middle School', 'High School', 'Amateur', 'Professional']
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#7A92A8]'
+const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#3D5166]'
 
 export default function CreateTeamButton() {
   const [open, setOpen] = useState(false)

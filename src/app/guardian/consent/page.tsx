@@ -33,7 +33,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
           <div className="p-8">
             <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-4" style={oswald}>Guardian Consent</p>
             <h1 className="text-2xl text-[#0F1F33] mb-2" style={oswald}>Video Storage Consent</h1>
-            <p className="text-sm text-[#7A92A8] mb-8">
+            <p className="text-sm text-[#3D5166] mb-8">
               For <span className="text-[#456080]">{player.full_name}</span>
               {player.age_group ? ` · ${player.age_group}` : ''}
             </p>
@@ -45,7 +45,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
               <p className="text-xs text-[#456080] leading-relaxed">
                 Video is accessible only to you, the player, and the coach who invited you. It is never shared publicly. You may request deletion at any time by contacting your coach.
               </p>
-              <p className="text-xs text-[#7A92A8] leading-relaxed">
+              <p className="text-xs text-[#3D5166] leading-relaxed">
                 This consent covers: video recordings, annotations, Rapsodo metrics, and AI-generated coaching notes attached to this player's profile.
               </p>
             </div>

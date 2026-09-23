@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { saveAnnotation } from '@/app/actions/clips'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -271,7 +271,6 @@ export default function VideoPlayer({
   const frameCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const prevFrameRef   = useRef<{ imgData: ImageData; w: number; h: number } | null>(null)
   const scrubbingRef   = useRef(false)
-  const userIdRef      = useRef<string | null>(null)
 
   // drawing state refs
   const annotationsRef     = useRef<Shape[]>([])
@@ -290,20 +289,13 @@ export default function VideoPlayer({
   const [markerCount,     setMarkerCount]     = useState(0)
   const [trackingEnabled, setTrackingEnabled] = useState(true)
 
-  // cache user id for annotation saves
-  useEffect(() => {
-    if (!isCoach) return
-    createClient().auth.getUser().then(({ data: { user } }) => {
-      userIdRef.current = user?.id ?? null
-    })
-  }, [isCoach])
-
   // load initial annotations from DB
   useEffect(() => {
     const shapes = initialAnnotations.map(dbToShape)
     annotationsRef.current = shapes
     setMarkerCount(shapes.length)
-    drawFrame()
+    // Use rAF so canvas is sized after video layout
+    requestAnimationFrame(() => { resizeCanvas(); drawFrame() })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -475,18 +467,23 @@ export default function VideoPlayer({
         setMarkerCount(c => c + 1)
 
         // persist to DB (fire-and-forget)
-        if (userIdRef.current) {
-          createClient().from('annotations').insert({
-            clip_id:      clipId,
-            created_by:   userIdRef.current,
-            type:         d.type,
-            color:        d.color,
-            points:       d.points ?? null,
-            start_pt:     d.start  ?? null,
-            end_pt:       d.end    ?? null,
-            origin_time:  d.originTime,
-          }).then(({ error }) => { if (error) console.error('annotation save failed:', error) })
-        }
+        saveAnnotation({
+          clip_id:     clipId,
+          type:        d.type,
+          color:       d.color,
+          points:      d.points ?? null,
+          start_pt:    d.start  ?? null,
+          end_pt:      d.end    ?? null,
+          origin_time: d.originTime ?? 0,
+        }).then(result => {
+          if (result?.error) {
+            console.error('annotation save failed:', result.error)
+            // Remove the annotation from UI if save failed
+            annotationsRef.current = annotationsRef.current.slice(0, -1)
+            setMarkerCount(c => c - 1)
+            drawFrame()
+          }
+        })
       }
       draftRef.current = null
       drawFrame()
@@ -612,7 +609,7 @@ export default function VideoPlayer({
 
       {/* Scrub */}
       <div className="flex items-center gap-3 mt-3">
-        <span className="text-[0.76rem] text-[#7A92A8] min-w-[100px] text-right tabular-nums" style={oswald}>
+        <span className="text-[0.76rem] text-[#3D5166] min-w-[100px] text-right tabular-nums" style={oswald}>
           {fmtTime(currentTime)} / {fmtTime(duration)}
         </span>
         <input
@@ -679,7 +676,7 @@ export default function VideoPlayer({
       )}
 
       {/* Footer */}
-      <div className="mt-2 text-[0.78rem] text-[#7A92A8]">
+      <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
         {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">— coach annotations</span>}
       </div>

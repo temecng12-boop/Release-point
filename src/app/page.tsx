@@ -13,9 +13,9 @@ export default function HomePage() {
         className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 md:px-12 h-14"
         style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid #DDE4ED' }}
       >
-        <Logo wordmarkClass="inline" />
+        <Logo size="md" wordmarkClass="inline" />
         <nav className="flex items-center gap-1">
-          <Link href="/auth/login" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors px-4 py-2" style={oswald}>Sign In</Link>
+          <Link href="/auth/login" className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors px-4 py-2" style={oswald}>Sign In</Link>
           <Link href="/auth/signup" className="text-xs bg-[#C8102E] hover:bg-[#A50D26] text-white px-5 py-2 rounded-lg transition-colors" style={oswald}>Get Started</Link>
         </nav>
       </header>
@@ -46,7 +46,7 @@ export default function HomePage() {
                 See Every<br />Pitch<br /><span className="text-[#C8102E]">Differently.</span>
               </h1>
 
-              <p className="text-[15px] text-[#7A92A8] max-w-[360px] mb-10 leading-[1.75]">
+              <p className="text-[15px] text-[#3D5166] max-w-[360px] mb-10 leading-[1.75]">
                 Frame-by-frame video analysis, Rapsodo metrics, and AI coaching in one platform. Built for coaches who take development seriously.
               </p>
 
@@ -60,7 +60,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/auth/login"
-                  className="px-8 py-3.5 border border-[#DDE4ED] hover:border-[#456080] text-[#7A92A8] hover:text-[#456080] text-sm rounded-lg transition-colors text-center"
+                  className="px-8 py-3.5 border border-[#DDE4ED] hover:border-[#456080] text-[#3D5166] hover:text-[#456080] text-sm rounded-lg transition-colors text-center"
                   style={oswald}
                 >
                   Player Login
@@ -68,10 +68,10 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-5 flex-wrap">
-                {['No credit card required', 'Free for coaches', '5 age groups'].map((t) => (
+                {['No credit card required', 'Free for coaches', 'All pitchers welcome'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
                     <div className="w-1 h-1 rounded-full bg-[#C8102E]/60" />
-                    <span className="text-[11px] text-[#7A92A8]">{t}</span>
+                    <span className="text-[11px] text-[#3D5166]">{t}</span>
                   </div>
                 ))}
               </div>
@@ -91,7 +91,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1 bg-[#060F1A] border border-[#1C3A5C] rounded-md px-3 py-1 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#1C3A5C] shrink-0" />
-                    <span className="text-[10px] text-[#4A6880] font-mono truncate">app.release-point.co/clips/jake-morrison</span>
+                    <span className="text-[10px] text-[#4A6880] font-mono truncate">app.releasepoint.io/clips/jake-morrison</span>
                   </div>
                 </div>
 
@@ -203,8 +203,8 @@ export default function HomePage() {
 
         {/* Scroll cue */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2 opacity-30">
-          <span className="text-[9px] text-[#7A92A8] tracking-[0.3em]" style={oswald}>Scroll</span>
-          <div className="w-px h-8 bg-gradient-to-b from-[#7A92A8] to-transparent" />
+          <span className="text-[9px] text-[#3D5166] tracking-[0.3em]" style={oswald}>Scroll</span>
+          <div className="w-px h-8 bg-gradient-to-b from-[#3D5166] to-transparent" />
         </div>
       </section>
 
@@ -212,13 +212,13 @@ export default function HomePage() {
       <div className="border-y border-[#DDE4ED]">
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-[#DDE4ED]">
           {[
-            { n: '12U–Pro', l: 'Age-adjusted benchmarks' },
+            { n: 'All Levels', l: 'Youth through professional' },
             { n: 'Rapsodo', l: 'Native CSV import' },
             { n: 'AI', l: 'Built-in coaching intelligence' },
           ].map((s) => (
             <div key={s.n} className="py-10 text-center px-4">
               <p className="text-[clamp(22px,3.5vw,38px)] text-[#0F1F33] leading-none mb-2" style={oswald}>{s.n}</p>
-              <p className="text-xs text-[#7A92A8]">{s.l}</p>
+              <p className="text-xs text-[#3D5166]">{s.l}</p>
             </div>
           ))}
         </div>
@@ -227,11 +227,11 @@ export default function HomePage() {
       {/* ── Feature 1: Video ── */}
       <section className="max-w-6xl mx-auto px-6 py-28 md:py-40 grid md:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-5" style={oswald}>01 — Video Analysis</p>
+          <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>01 — Video Analysis</p>
           <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
             Annotate<br />Every<br />Frame.
           </h2>
-          <p className="text-sm text-[#7A92A8] leading-[1.85] max-w-sm">
+          <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
             Draw directly on video. Mark arm angles, hip rotation, and release points. Every annotation is timestamped and shared with your player instantly.
           </p>
         </div>
@@ -256,11 +256,11 @@ export default function HomePage() {
             <div className="flex-1 h-px bg-[#DDE4ED] rounded-full overflow-hidden">
               <div className="h-full w-1/3 bg-[#C8102E] rounded-full" />
             </div>
-            <span className="text-[10px] text-[#7A92A8] font-mono shrink-0">0:34 / 1:47</span>
+            <span className="text-[10px] text-[#3D5166] font-mono shrink-0">0:34 / 1:47</span>
           </div>
           <div className="px-4 py-2.5 flex items-center gap-2 border-t border-[#DDE4ED]">
             {['Line', 'Circle', 'Box', 'Free'].map((t, i) => (
-              <span key={t} className={`text-[9px] px-2 py-1 rounded ${i === 0 ? 'bg-[#C8102E] text-white' : 'bg-[#F5F7FA] text-[#7A92A8] border border-[#DDE4ED]'}`} style={oswald}>{t}</span>
+              <span key={t} className={`text-[9px] px-2 py-1 rounded ${i === 0 ? 'bg-[#C8102E] text-white' : 'bg-[#F5F7FA] text-[#3D5166] border border-[#DDE4ED]'}`} style={oswald}>{t}</span>
             ))}
             <div className="ml-auto flex items-center gap-1.5">
               {['#C8102E', '#3B82F6', '#10B981'].map((c) => <div key={c} className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: c }} />)}
@@ -274,7 +274,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-28 md:py-40 grid md:grid-cols-2 gap-16 items-center">
           <div className="rounded-xl border border-[#DDE4ED] bg-white overflow-hidden shadow-sm order-2 md:order-1">
             <div className="px-5 py-4 border-b border-[#DDE4ED] flex items-center justify-between">
-              <span className="text-xs text-[#7A92A8]" style={oswald}>Session · Sep 14, 2026</span>
+              <span className="text-xs text-[#3D5166]" style={oswald}>Session · Sep 14, 2026</span>
               <span className="text-[10px] bg-green-900/30 text-green-400 px-2 py-0.5 rounded" style={oswald}>Rapsodo Connected</span>
             </div>
             {[
@@ -286,8 +286,8 @@ export default function HomePage() {
             ].map((m) => (
               <div key={m.label} className="px-5 py-3.5 border-b border-[#EEF2F7] last:border-0">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs text-[#7A92A8]" style={oswald}>{m.label}</span>
-                  <span className="text-sm text-[#0F1F33] font-mono">{m.value}<span className="text-xs text-[#7A92A8] ml-0.5">{m.unit}</span></span>
+                  <span className="text-xs text-[#3D5166]" style={oswald}>{m.label}</span>
+                  <span className="text-sm text-[#0F1F33] font-mono">{m.value}<span className="text-xs text-[#3D5166] ml-0.5">{m.unit}</span></span>
                 </div>
                 <div className="h-px bg-[#DDE4ED] rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all" style={{ width: `${m.pct}%`, backgroundColor: m.color }} />
@@ -295,16 +295,16 @@ export default function HomePage() {
               </div>
             ))}
             <div className="px-5 py-3 flex items-center justify-between bg-[#F0F4F8]">
-              <span className="text-[10px] text-[#7A92A8]" style={oswald}>16U Benchmark</span>
+              <span className="text-[10px] text-[#3D5166]" style={oswald}>16U Benchmark</span>
               <span className="text-[10px] text-[#C8102E]" style={oswald}>Above Average ↑</span>
             </div>
           </div>
           <div className="order-1 md:order-2">
-            <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-5" style={oswald}>02 — Rapsodo</p>
+            <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>02 — Rapsodo</p>
             <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
               Data That<br />Means<br />Something.
             </h2>
-            <p className="text-sm text-[#7A92A8] leading-[1.85] max-w-sm">
+            <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
               Import your Rapsodo CSV. Velocity, spin rate, axis, and break — each metric benchmarked against real data for your player&apos;s age group. No interpretation needed.
             </p>
           </div>
@@ -314,18 +314,18 @@ export default function HomePage() {
       {/* ── Feature 3: AI ── */}
       <section className="max-w-6xl mx-auto px-6 py-28 md:py-40 grid md:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-5" style={oswald}>03 — AI Coach</p>
+          <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>03 — AI Coach</p>
           <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
             An Expert<br />In Every<br />Session.
           </h2>
-          <p className="text-sm text-[#7A92A8] leading-[1.85] max-w-sm">
+          <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
             The AI knows your player&apos;s age group, position, and Rapsodo numbers. Ask it anything. It responds with real data — not guesses.
           </p>
         </div>
         <div className="rounded-xl border border-[#DDE4ED] bg-white overflow-hidden shadow-sm">
           <div className="px-5 py-3.5 border-b border-[#DDE4ED] flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#C8102E]" />
-            <span className="text-xs text-[#7A92A8]" style={oswald}>AI Coach · Jake M · 16U · Pitcher</span>
+            <span className="text-xs text-[#3D5166]" style={oswald}>AI Coach · Jake M · 16U · Pitcher</span>
           </div>
           <div className="p-5 space-y-4">
             <div className="flex justify-end">
@@ -350,7 +350,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="px-4 py-3 border-t border-[#DDE4ED] flex gap-2">
-            <div className="flex-1 bg-[#F5F7FA] border border-[#DDE4ED] rounded-lg px-3 py-2 text-xs text-[#7A92A8]">Ask about this clip…</div>
+            <div className="flex-1 bg-[#F5F7FA] border border-[#DDE4ED] rounded-lg px-3 py-2 text-xs text-[#3D5166]">Ask about this clip…</div>
             <button className="bg-[#C8102E] hover:bg-[#A50D26] rounded-lg px-4 py-2 text-xs text-white transition-colors" style={oswald}>Send</button>
           </div>
         </div>
@@ -359,7 +359,7 @@ export default function HomePage() {
       {/* ── How it works ── */}
       <section className="border-y border-[#DDE4ED] bg-[#F0F4F8]">
         <div className="max-w-5xl mx-auto px-6 py-24 md:py-36">
-          <p className="text-[10px] tracking-[0.3em] text-[#7A92A8] mb-14 text-center" style={oswald}>How It Works</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-14 text-center" style={oswald}>How It Works</p>
           <div className="grid md:grid-cols-3 gap-12 md:gap-8">
             {[
               { n: '01', t: 'Build Your Program', d: 'Create teams by age group. Invite players by email. Guardian consent handled automatically.' },
@@ -369,7 +369,7 @@ export default function HomePage() {
               <div key={s.n} className="relative pl-6 border-l border-[#DDE4ED]">
                 <p className="text-5xl text-[#C8102E] leading-none mb-5" style={oswald}>{s.n}</p>
                 <p className="text-base text-[#0F1F33] mb-2.5" style={oswald}>{s.t}</p>
-                <p className="text-sm text-[#7A92A8] leading-relaxed">{s.d}</p>
+                <p className="text-sm text-[#3D5166] leading-relaxed">{s.d}</p>
               </div>
             ))}
           </div>
@@ -378,9 +378,9 @@ export default function HomePage() {
 
       {/* ── Age groups ── */}
       <section className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <p className="text-[10px] tracking-[0.3em] text-[#7A92A8] mb-6" style={oswald}>Built for every level</p>
+        <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-6" style={oswald}>All pitchers welcome · All levels</p>
         <div className="flex items-center justify-center flex-wrap gap-2">
-          {['Youth', 'Middle School', 'High School', 'Amateur', 'Professional'].map((age) => (
+          {['Youth', 'Middle School', 'High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches'].map((age) => (
             <span key={age} className="px-5 py-2 rounded-lg border border-[#DDE4ED] text-xs text-[#456080] hover:border-[#C8102E]/50 hover:text-[#0F1F33] transition-colors cursor-default" style={oswald}>{age}</span>
           ))}
         </div>
@@ -400,7 +400,7 @@ export default function HomePage() {
           >
             Get Started Free
           </Link>
-          <p className="text-xs text-[#7A92A8] mt-5">Free for coaches · No credit card required</p>
+          <p className="text-xs text-[#3D5166] mt-5">Free for coaches · No credit card required</p>
         </div>
       </section>
 

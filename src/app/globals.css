@@ -28,10 +28,28 @@
   --font-inter:   var(--font-inter);
 }
 
+html {
+  font-size: 22px;
+}
+
 body {
   font-family: var(--font-inter, Inter, sans-serif);
   background-color: #060F1A;
   color: #E8EDF5;
+}
+
+/* Minimum tap targets */
+button, a {
+  min-height: 36px;
+}
+
+/* Header links must not inherit min-height — prevents vertical misalignment */
+header a,
+header button,
+header span {
+  min-height: unset;
+  display: inline-flex;
+  align-items: center;
 }
 
 h1, h2, h3, .display {

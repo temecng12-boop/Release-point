@@ -45,7 +45,7 @@ export default function DeleteAccountButton() {
         <button
           onClick={() => { setConfirming(false); setInput('') }}
           disabled={pending}
-          className="text-xs text-[#7A92A8] hover:text-[#456080] px-4 py-2 rounded-lg transition-colors"
+          className="text-xs text-[#3D5166] hover:text-[#456080] px-4 py-2 rounded-lg transition-colors"
           style={oswald}
         >
           Cancel

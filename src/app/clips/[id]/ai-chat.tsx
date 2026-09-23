@@ -101,7 +101,7 @@ export default function AIChat({
       {/* Header */}
       <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
         <p
-          className="text-xs text-[#7A92A8] tracking-widest"
+          className="text-xs text-[#3D5166] tracking-widest"
           style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
         >
           AI Coach Chat
@@ -148,7 +148,7 @@ export default function AIChat({
               style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
             >
               {streaming || (
-                <span className="text-[#7A92A8]">
+                <span className="text-[#3D5166]">
                   <span className="animate-pulse">...</span>
                 </span>
               )}
@@ -166,7 +166,7 @@ export default function AIChat({
           onKeyDown={handleKeyDown}
           placeholder="Ask about mechanics, pitch design, development…"
           disabled={isLoading}
-          className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-[#0F1F33] placeholder:text-[#7A92A8] focus:outline-none focus:border-[#456080] disabled:opacity-50"
+          className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-50"
         />
         <button
           onClick={sendMessage}

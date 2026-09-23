@@ -41,6 +41,82 @@ export async function createClip(data: {
   return { success: true }
 }
 
+export async function saveAnnotation(data: {
+  clip_id: string
+  type: string
+  color: string
+  points: { x: number; y: number }[] | null
+  start_pt: { x: number; y: number } | null
+  end_pt: { x: number; y: number } | null
+  origin_time: number
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabaseAdmin.from('annotations').insert({
+    clip_id:    data.clip_id,
+    created_by: user.id,
+    type:       data.type,
+    color:      data.color,
+    points:     data.points,
+    start_pt:   data.start_pt,
+    end_pt:     data.end_pt,
+    origin_time: data.origin_time,
+  })
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function saveTimestampNote(data: {
+  clip_id: string
+  time_seconds: number
+  body: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: note, error } = await supabaseAdmin
+    .from('timestamp_notes')
+    .insert({ clip_id: data.clip_id, created_by: user.id, time_seconds: data.time_seconds, body: data.body })
+    .select('id, time_seconds, body')
+    .single()
+
+  if (error) return { error: error.message }
+  return { success: true, note }
+}
+
+export async function deleteTimestampNote(noteId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabaseAdmin
+    .from('timestamp_notes')
+    .delete()
+    .eq('id', noteId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function saveVoicePath(clipId: string, voicePath: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabaseAdmin
+    .from('clips')
+    .update({ voice_path: voicePath })
+    .eq('id', clipId)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
 export async function deleteClip(clipId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

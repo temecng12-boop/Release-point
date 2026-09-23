@@ -9,7 +9,7 @@ import AiChat from './ai-chat'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-type TSNote   = { id: string; time_seconds: number; text: string }
+type TSNote   = { id: string; time_seconds: number; body: string }
 type Metric   = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
 type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Metrics' | 'AI Coach'
 
@@ -48,10 +48,10 @@ export default function ClipTabs({
           <button
             key={tab}
             onClick={() => setActive(tab)}
-            className={`px-4 py-2.5 text-xs tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap ${
+            className={`px-4 py-2.5 text-[13px] tracking-wider transition-colors border-b-2 -mb-px whitespace-nowrap ${
               active === tab
                 ? 'border-[#C8102E] text-[#0F1F33]'
-                : 'border-transparent text-[#7A92A8] hover:text-[#456080]'
+                : 'border-transparent text-[#3D5166] hover:text-[#456080]'
             }`}
             style={oswald}
           >

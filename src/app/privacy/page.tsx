@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         <div>
           <p className="text-xs text-[#C8102E] tracking-widest mb-2" style={oswald}>Legal</p>
           <h1 className="text-4xl text-[#0F1F33] mb-2" style={oswald}>Privacy Policy</h1>
-          <p className="text-xs text-[#7A92A8]">Last updated: September 2026</p>
+          <p className="text-xs text-[#3D5166]">Last updated: September 2026</p>
         </div>
 
         <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
@@ -144,7 +144,7 @@ To exercise any of these rights, contact us at the address below.`,
       </main>
 
       <footer className="border-t border-[#DDE4ED] px-6 py-6 text-center">
-        <div className="flex items-center justify-center gap-6 text-xs text-[#7A92A8]">
+        <div className="flex items-center justify-center gap-6 text-xs text-[#3D5166]">
           <Link href="/privacy" className="hover:text-[#456080] transition-colors">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-[#456080] transition-colors">Terms of Service</Link>
           <Link href="/" className="hover:text-[#456080] transition-colors">Home</Link>

@@ -20,7 +20,7 @@ export default function ConsentForm({ playerId }: { playerId: string }) {
       <label className="flex items-start gap-3 cursor-pointer" onClick={() => setAgreed(v => !v)}>
         <div
           className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-            agreed ? 'bg-[#C8102E] border-[#C8102E]' : 'border-[#DDE4ED] hover:border-[#7A92A8]'
+            agreed ? 'bg-[#C8102E] border-[#C8102E]' : 'border-[#DDE4ED] hover:border-[#3D5166]'
           }`}
         >
           {agreed && <span className="text-white text-[10px] leading-none">✓</span>}

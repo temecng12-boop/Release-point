@@ -4,12 +4,17 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
+function toTitleCase(s: string) {
+  return s.trim().replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())
+}
+
 export async function signUp(_prevState: { error?: string; message?: string } | undefined, formData: FormData) {
   const supabase = await createClient()
 
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
-  const fullName = formData.get('full_name') as string
+  let fullName = formData.get('full_name') as string
+  if (fullName) fullName = toTitleCase(fullName)
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -31,7 +36,8 @@ export async function signUpPlayer(_prevState: { error?: string } | undefined, f
 
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
-  const fullName = formData.get('full_name') as string
+  let fullName = formData.get('full_name') as string
+  if (fullName) fullName = toTitleCase(fullName)
 
   const { data, error } = await supabase.auth.signUp({
     email,

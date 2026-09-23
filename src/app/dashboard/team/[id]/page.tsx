@@ -1,10 +1,9 @@
 import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
-import Logo from '@/components/Logo'
+import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -51,21 +50,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
-      <header
-        className="sticky top-0 z-50 flex items-center justify-between px-5 md:px-8 h-14"
-        style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #DDE4ED' }}
-      >
-        <div className="flex items-center gap-4 min-w-0">
-          <Logo size="sm" href="/dashboard" className="shrink-0" />
-          <span className="text-[#DDE4ED] shrink-0">/</span>
-          <Link href="/dashboard" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors shrink-0" style={oswald}>Dashboard</Link>
-          <span className="text-[#DDE4ED] shrink-0">/</span>
-          <span className="text-xs text-[#456080] truncate" style={oswald}>{team.name}</span>
-        </div>
-        <Link href="/dashboard" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors shrink-0" style={oswald}>
-          ← Back
-        </Link>
-      </header>
+      <AppHeader
+        breadcrumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: team.name }]}
+        showSignOut
+      />
 
       <main className="max-w-4xl mx-auto px-5 py-6 space-y-6">
         {/* Team header */}
@@ -89,7 +77,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
           {!players || players.length === 0 ? (
             <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm px-6 py-10 text-center">
-              <p className="text-sm text-[#7A92A8]">No players on this team yet — invite someone above.</p>
+              <p className="text-sm text-[#3D5166]">No players on this team yet — invite someone above.</p>
             </div>
           ) : (
             <div className="space-y-3">

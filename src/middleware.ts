@@ -30,11 +30,18 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isAuthRoute  = pathname.startsWith('/auth')
-  const isPublicPath = pathname === '/' || isAuthRoute
+  const isPublicPath = pathname === '/' || pathname === '/about' || isAuthRoute
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Redirect logged-in users away from the root landing page to dashboard
+  if (user && pathname === '/') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 

@@ -55,7 +55,7 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
           <h1 className="text-5xl sm:text-6xl md:text-7xl text-[#0F1F33] text-center mb-3 leading-[0.95]" style={oswald}>
             Pitcher or<br />Hitter?
           </h1>
-          <p className="text-sm text-[#7A92A8] text-center mb-12">
+          <p className="text-sm text-[#3D5166] text-center mb-12">
             This helps your coach and the AI give you relevant feedback.
           </p>
 
@@ -79,7 +79,7 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
                   <div className="flex items-start justify-between mb-5">
                     <div>
                       <h2 className="text-2xl text-[#0F1F33] leading-none mb-1" style={oswald}>{card.label}</h2>
-                      <p className="text-xs text-[#7A92A8]">{card.sub}</p>
+                      <p className="text-xs text-[#3D5166]">{card.sub}</p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-colors ${active ? 'border-[#C8102E] bg-[#C8102E]' : 'border-[#DDE4ED]'}`}>
                       {active && <span className="text-white text-[10px]">✓</span>}
@@ -106,7 +106,7 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
               style={{
                 ...oswald,
                 backgroundColor: selected ? '#C8102E' : '#DDE4ED',
-                color: selected ? '#FFFFFF' : '#7A92A8',
+                color: selected ? '#FFFFFF' : '#3D5166',
               }}
             >
               {loading ? 'Saving…' : 'Continue to Dashboard'}

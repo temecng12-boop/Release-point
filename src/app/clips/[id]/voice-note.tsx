@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { saveVoicePath } from '@/app/actions/clips'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -61,7 +62,7 @@ export default function VoiceNote({
     await supabase.storage.from('clips').remove([path])
     const { error } = await supabase.storage.from('clips').upload(path, blob, { contentType: mimeType })
     if (!error) {
-      await supabase.from('clips').update({ voice_path: path }).eq('id', clipId)
+      await saveVoicePath(clipId, path)
       const { data: signed } = await supabase.storage.from('clips').createSignedUrl(path, 3600)
       if (signed?.signedUrl) setVoiceUrl(signed.signedUrl)
     }
@@ -70,7 +71,7 @@ export default function VoiceNote({
 
   return (
     <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm p-4">
-      <p className="text-xs text-[#7A92A8] mb-3 tracking-widest" style={oswald}>
+      <p className="text-[13px] text-[#3D5166] mb-3 tracking-wider" style={oswald}>
         Coach Voice Note
       </p>
 
@@ -95,7 +96,7 @@ export default function VoiceNote({
             </button>
           )}
           {!recording && !uploading && voiceUrl && (
-            <span className="text-xs text-[#7A92A8]">Re-record to overwrite</span>
+            <span className="text-xs text-[#3D5166]">Re-record to overwrite</span>
           )}
         </div>
       )}
@@ -105,7 +106,7 @@ export default function VoiceNote({
       {voiceUrl ? (
         <audio controls src={voiceUrl} className="w-full" style={{ height: 36 }} />
       ) : (
-        <p className="text-sm text-[#7A92A8]">
+        <p className="text-sm text-[#3D5166]">
           {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from coach yet.'}
         </p>
       )}

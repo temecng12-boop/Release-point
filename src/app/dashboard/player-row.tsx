@@ -99,7 +99,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
 
         {/* Clips list */}
         {clips.length === 0 ? (
-          <p className="text-xs text-[#7A92A8] px-4 py-2">No clips yet.</p>
+          <p className="text-xs text-[#3D5166] px-4 py-2">No clips yet.</p>
         ) : (
           <ul className="divide-y divide-[#DDE4ED]">
             {clips.map((clip) => (
@@ -117,7 +117,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
                       </button>
                       <button
                         onClick={() => setConfirmClip(null)}
-                        className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors"
+                        className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors"
                       >
                         Cancel
                       </button>
@@ -131,7 +131,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
                     </Link>
                     <button
                       onClick={() => setConfirmClip(clip.id)}
-                      className="ml-3 text-[#7A92A8] hover:text-[#C8102E] opacity-0 group-hover:opacity-100 transition-all text-xs leading-none shrink-0"
+                      className="ml-3 text-[#3D5166] hover:text-[#C8102E] opacity-0 group-hover:opacity-100 transition-all text-xs leading-none shrink-0"
                       title="Delete clip"
                     >
                       ✕

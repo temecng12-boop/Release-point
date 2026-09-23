@@ -11,7 +11,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
   if (variant === 'app') {
     return (
       <footer className="border-t border-[#DDE4ED] px-5 md:px-8 py-5 mt-8">
-        <p className="text-xs text-[#7A92A8] text-center">
+        <p className="text-xs text-[#3D5166] text-center">
           Designed &amp; built by{' '}
           <a
             href="https://www.linkedin.com/in/nolangeorge12"
@@ -50,7 +50,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          <p className="text-[10px] text-[#7A92A8] tracking-widest mb-1" style={oswald}>Links</p>
+          <p className="text-[10px] text-[#3D5166] tracking-widest mb-1" style={oswald}>Links</p>
           <Link href="/auth/signup" className="text-xs text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>Coach Sign Up</Link>
           <Link href="/auth/login" className="text-xs text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>Player Login</Link>
           <Link href="/about" className="text-xs text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>About</Link>
@@ -61,10 +61,10 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
 
       {/* Bottom bar */}
       <div className="border-t border-[#DDE4ED] px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <p className="text-xs text-[#7A92A8]">
+        <p className="text-xs text-[#3D5166]">
           &copy; {new Date().getFullYear()} Release Point &mdash; Designed &amp; built by Nolan George
         </p>
-        <p className="text-xs text-[#7A92A8]">Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-[#3D5166]">Pitching &amp; hitting mechanics analyzer</p>
       </div>
     </footer>
   )

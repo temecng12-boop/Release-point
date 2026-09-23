@@ -38,7 +38,11 @@ async function compressVideo(file: File, onProgress: (pct: number) => void): Pro
   ])
 
   const data = await ffmpeg.readFile('output.mp4')
-  const blob = new Blob([data as Uint8Array], { type: 'video/mp4' })
+  const rawBytes = typeof data === 'string' ? new TextEncoder().encode(data) : (data as Uint8Array)
+  const safeBuf = rawBytes.buffer instanceof SharedArrayBuffer
+    ? rawBytes.slice(0).buffer
+    : (rawBytes.buffer as ArrayBuffer)
+  const blob = new Blob([safeBuf], { type: 'video/mp4' })
   return new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' })
 }
 
@@ -126,7 +130,7 @@ export default function UploadButton({
       <div className="relative group">
         <button
           disabled
-          className="text-xs bg-[#EEF2F7] text-[#7A92A8] px-3 py-1.5 rounded-md cursor-not-allowed whitespace-nowrap border border-[#DDE4ED]"
+          className="text-xs bg-[#EEF2F7] text-[#3D5166] px-3 py-1.5 rounded-md cursor-not-allowed whitespace-nowrap border border-[#DDE4ED]"
         >
           Upload Clip
         </button>
@@ -151,7 +155,7 @@ export default function UploadButton({
                 style={{ width: `${compressPct}%` }}
               />
             </div>
-            <p className="text-xs text-[#7A92A8] mt-2 text-right">{compressPct}%</p>
+            <p className="text-xs text-[#3D5166] mt-2 text-right">{compressPct}%</p>
           </div>
         </div>
       </div>

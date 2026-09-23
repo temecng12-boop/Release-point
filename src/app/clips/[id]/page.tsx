@@ -1,15 +1,11 @@
 import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { signOut } from '@/app/actions/auth'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs from './clip-tabs'
 import SaveBanner from './save-banner'
-import Logo from '@/components/Logo'
+import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
-
-const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -78,32 +74,10 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
-      {/* Nav */}
-      <header
-        className="sticky top-0 z-50 flex items-center justify-between px-5 md:px-8 h-14"
-        style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #DDE4ED' }}
-      >
-        <div className="flex items-center gap-4 min-w-0">
-          <Logo size="sm" href="/dashboard" className="shrink-0" />
-          <span className="text-[#DDE4ED] shrink-0">/</span>
-          <div className="min-w-0">
-            <p className="text-xs text-[#456080] truncate" style={oswald}>{clip.title}</p>
-            {sessionLabel && (
-              <p className="text-[10px] text-[#7A92A8]">{sessionLabel}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Link href="/dashboard" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors" style={oswald}>
-            ← Dashboard
-          </Link>
-          <form action={signOut}>
-            <button type="submit" className="text-xs text-[#7A92A8] hover:text-[#456080] transition-colors px-2 py-1 hidden sm:block" style={oswald}>
-              Sign Out
-            </button>
-          </form>
-        </div>
-      </header>
+      <AppHeader
+        breadcrumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: clip.title }]}
+        showSignOut
+      />
 
       <main className="max-w-5xl mx-auto px-4 md:px-6 py-5">
         <VideoPlayer
