@@ -47,8 +47,20 @@ export async function invitePlayer(
     )
   }
 
+  // Send invite email via Supabase Auth
+  const siteUrl = 'https://release-point.vercel.app'
+  const { error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(playerEmail, {
+    data: { role: 'player' },
+    redirectTo: `${siteUrl}/auth/confirm`,
+  })
+
+  // If they already have an account, that's fine — player row is created
+  if (inviteErr && !inviteErr.message.toLowerCase().includes('already')) {
+    return { error: `Player added but invite email failed: ${inviteErr.message}` }
+  }
+
   revalidatePath('/', 'layout')
   return {
-    success: `${playerName} added! Have them go to ${process.env.NEXT_PUBLIC_SITE_URL ?? 'your app'} and sign up as a Player using ${playerEmail}.`,
+    success: `Invite sent to ${playerEmail}! ${playerName ? `${playerName} will` : 'They will'} receive an email to set up their account.`,
   }
 }
