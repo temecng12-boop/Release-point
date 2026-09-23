@@ -489,6 +489,11 @@ export default async function DashboardPage() {
               /* Has clips */
               <div className="space-y-4">
                 {/* Career stats + best pitch */}
+                {(myMetrics?.length ?? 0) === 0 && (
+                  <div className="bg-white border border-[#DDE4ED] rounded-xl px-5 py-4 shadow-sm text-center">
+                    <p className="text-xs text-[#3D5166]">No pitch metrics yet — upload a Rapsodo CSV on any clip to start tracking.</p>
+                  </div>
+                )}
                 {(myMetrics?.length ?? 0) > 0 && (
                   <>
                     <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">

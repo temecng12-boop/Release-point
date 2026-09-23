@@ -15,8 +15,17 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Release Point",
-  description: "Pitching & hitting mechanics analyzer for coaches and players",
+  title: { default: "Release Point", template: "%s | Release Point" },
+  description: "Pitching and hitting mechanics analysis for coaches and players. Upload video, track Rapsodo data, and get AI-powered feedback.",
+  metadataBase: new URL("https://release-point.vercel.app"),
+  openGraph: {
+    title: "Release Point",
+    description: "Video analysis and Rapsodo metrics for baseball coaches and players.",
+    url: "https://release-point.vercel.app",
+    siteName: "Release Point",
+    type: "website",
+  },
+  icons: { icon: "/rp-icon.png", apple: "/rp-icon.png" },
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { updatePlayerSelfProfile } from '@/app/actions/player'
 import { COLLEGE_PROGRAMS } from '@/data/college-programs'
 
@@ -95,6 +95,12 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!saved) return
+    const t = setTimeout(() => setSaved(false), 3000)
+    return () => clearTimeout(t)
+  }, [saved])
 
   const [height, setHeight] = useState(player?.height ?? '')
   const [weight, setWeight] = useState(player?.weight ?? '')
@@ -200,8 +206,18 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
         </div>
       </div>
 
-      {error && <p className="text-sm text-[#C8102E]">{error}</p>}
-      {saved && <p className="text-sm text-green-600">Profile saved.</p>}
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+          <span className="text-[#C8102E] text-sm">✕</span>
+          <p className="text-sm text-[#C8102E]">{error}</p>
+        </div>
+      )}
+      {saved && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+          <span className="text-green-600 text-sm">✓</span>
+          <p className="text-sm text-green-700">Profile saved.</p>
+        </div>
+      )}
 
       <button
         type="submit"

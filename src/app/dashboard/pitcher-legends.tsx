@@ -147,7 +147,7 @@ export default function PitcherLegends() {
                 style={{ color: 'rgba(255,255,255,0.05)', fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}
                 aria-hidden
               >
-                {legend.stat.replace(/[^0-9]/g, '').slice(0, 2) || '⚾'}
+                {legend.stat.replace(/[^0-9]/g, '').slice(0, 2) || '—'}
               </div>
 
               <p className="text-[10px] tracking-[0.2em] mb-1" style={{ color: legend.accent, ...oswald }}>
