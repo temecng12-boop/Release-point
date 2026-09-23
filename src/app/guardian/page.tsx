@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { signOut } from '@/app/actions/auth'
+import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -51,10 +52,7 @@ export default async function GuardianPage() {
         className="sticky top-0 z-50 flex items-center justify-between px-5 md:px-8 h-14"
         style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #DDE4ED' }}
       >
-        <div className="flex items-center gap-2">
-          <span>⚾</span>
-          <span className="text-sm tracking-widest text-[#1C2E4A] hidden sm:block" style={oswald}>Release Point</span>
-        </div>
+        <Logo size="sm" />
         <div className="flex items-center gap-4">
           <span className="text-xs text-[#3D5166] hidden sm:block truncate max-w-[140px]">
             {profile?.full_name ?? user.email}

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ConsentForm from './consent-form'
+import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -23,9 +24,8 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
   return (
     <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
-        <div className="flex items-center gap-2.5 justify-center mb-10">
-          <span>⚾</span>
-          <span className="text-sm tracking-[0.15em] text-[#1C2E4A]" style={oswald}>Release Point</span>
+        <div className="flex justify-center mb-10">
+          <Logo size="sm" />
         </div>
 
         <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">

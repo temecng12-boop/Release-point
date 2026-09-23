@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 type Position = 'pitcher' | 'hitter'
@@ -39,10 +40,7 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
     <div className="min-h-screen bg-[#F5F7FA] flex flex-col">
       {/* Minimal nav */}
       <header className="flex items-center justify-center h-14 border-b border-[#DDE4ED]" style={{ backgroundColor: 'rgba(255,255,255,0.97)' }}>
-        <div className="flex items-center gap-2">
-          <span>⚾</span>
-          <span className="text-sm tracking-widest text-[#1C2E4A]" style={oswald}>Release Point</span>
-        </div>
+        <Logo size="sm" />
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">

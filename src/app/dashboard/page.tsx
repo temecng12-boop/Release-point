@@ -89,10 +89,12 @@ export default async function DashboardPage() {
   const { data: playerRow } = !isCoach
     ? await supabaseAdmin
         .from('players')
-        .select('id, full_name')
+        .select('id, full_name, position')
         .eq('user_id', user.id)
         .single()
     : { data: null }
+
+  if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin

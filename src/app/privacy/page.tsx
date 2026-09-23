@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -6,10 +7,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#F5F7FA] text-[#0F1F33]">
       <header className="bg-white border-b border-[#DDE4ED] px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <span>⚾</span>
-          <span className="text-sm tracking-widest text-[#1C2E4A]" style={oswald}>Release Point</span>
-        </Link>
+        <Logo size="sm" href="/" />
         <Link href="/" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors">← Home</Link>
       </header>
 
