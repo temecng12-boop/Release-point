@@ -20,11 +20,12 @@ export async function invitePlayer(
 
   if (profile?.role !== 'coach') return { error: 'Only coaches can invite players' }
 
-  const playerName  = (formData.get('full_name') as string).trim()
-  const playerEmail = (formData.get('player_email') as string).trim().toLowerCase()
-  const teamIds = formData.getAll('team_ids') as string[]
+  const playerName  = ((formData.get('full_name') as string | null) ?? '').trim()
+  const playerEmail = ((formData.get('guardian_email') as string | null) ?? '').trim().toLowerCase()
+  const teamId  = formData.get('team_id') as string | null
+  const teamIds = teamId ? [teamId] : (formData.getAll('team_ids') as string[])
 
-  if (!playerEmail) return { error: 'Player email is required' }
+  if (!playerEmail) return { error: 'Guardian email is required' }
 
   // Create player row
   const { data: player, error: playerError } = await supabaseAdmin
