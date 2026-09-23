@@ -187,8 +187,8 @@ export default function MetricsTab({
 
   return (
     <div className="space-y-4">
-      {/* ── Upload area (coach only) ─────────────────────────────────────── */}
-      {isCoach && (
+      {/* ── CSV upload (coaches and players) ────────────────────────────── */}
+      {(
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4">
           <p className="text-xs text-[#3D5166] tracking-widest mb-3" style={oswald}>
             Upload Rapsodo Data
