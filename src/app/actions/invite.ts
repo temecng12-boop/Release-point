@@ -30,18 +30,14 @@ export async function invitePlayer(
   // Create player row
   const { data: player, error: playerError } = await supabaseAdmin
     .from('players')
-    .insert({
-      coach_id:  user.id,
-      full_name: playerName,
-      email:     playerEmail,
-    })
+    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail })
     .select('id')
     .single()
 
-  if (playerError) return { error: playerError.message }
+  if (playerError && playerError.code !== '23505') return { error: playerError.message }
 
-  // Assign teams via junction table
-  if (teamIds.length > 0) {
+  // Assign teams via junction table (only for new players)
+  if (!playerError && player && teamIds.length > 0) {
     await supabaseAdmin.from('player_teams').insert(
       teamIds.map((tid) => ({ player_id: player.id, team_id: tid }))
     )
