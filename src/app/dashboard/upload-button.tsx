@@ -180,7 +180,7 @@ export default function UploadButton({
       <button
         onClick={() => phase === 'idle' && inputRef.current?.click()}
         disabled={phase === 'uploading'}
-        className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors whitespace-nowrap disabled:opacity-60"
+        className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap disabled:opacity-60"
       >
         {phase === 'uploading' ? 'Uploading…' : 'Upload Clip'}
       </button>

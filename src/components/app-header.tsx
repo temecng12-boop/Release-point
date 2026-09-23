@@ -25,15 +25,15 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
         borderBottom: '1px solid #DDE4ED',
       }}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
         <Logo size="sm" href="/dashboard" className="shrink-0" />
         {breadcrumbs?.map((crumb, i) => (
-          <span key={i} className="flex items-center gap-2.5 min-w-0">
+          <span key={i} className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             <span className="text-[#DDE4ED] shrink-0">/</span>
             {crumb.href ? (
               <Link
                 href={crumb.href}
-                className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors shrink-0"
+                className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors shrink-0 hidden sm:inline"
                 style={oswald}
               >
                 {crumb.label}

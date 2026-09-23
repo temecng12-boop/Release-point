@@ -103,7 +103,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-[#456080] mb-1">Age Group</label>
               <select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)} className={inputClass}>
@@ -120,7 +120,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-[#456080] mb-1">Height</label>
               <select value={height} onChange={(e) => setHeight(e.target.value)} className={inputClass}>

@@ -48,7 +48,7 @@ export default function ClipTabs({
           <button
             key={tab}
             onClick={() => setActive(tab)}
-            className={`px-4 py-2.5 text-[13px] tracking-wider transition-colors border-b-2 -mb-px whitespace-nowrap ${
+            className={`px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] tracking-wider transition-colors border-b-2 -mb-px whitespace-nowrap ${
               active === tab
                 ? 'border-[#C8102E] text-[#0F1F33]'
                 : 'border-transparent text-[#3D5166] hover:text-[#456080]'

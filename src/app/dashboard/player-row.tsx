@@ -76,9 +76,9 @@ export default function PlayerRow({ player, clips, teams }: Props) {
             <p className="text-xs text-[#456080] mt-0.5">{player.email}</p>
           </div>
 
-          <div className="flex items-center gap-2 ml-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-3 shrink-0">
             <span
-              className={`text-xs px-2 py-0.5 rounded-md uppercase tracking-wide ${
+              className={`hidden sm:inline-block text-xs px-2 py-0.5 rounded-md uppercase tracking-wide ${
                 player.accepted_at
                   ? 'bg-green-100 text-green-700'
                   : 'bg-[#EEF2F7] text-[#456080]'
@@ -89,7 +89,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
             </span>
             <button
               onClick={() => setEditOpen(true)}
-              className="text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md transition-colors border border-[#DDE4ED]"
+              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED]"
             >
               Edit
             </button>

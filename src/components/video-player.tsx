@@ -246,7 +246,7 @@ const COLORS = [
 
 const oswald  = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }
 const divider = { borderTop: '1px solid #DDE4ED' }
-const btnBase = 'px-3 py-2 rounded-md text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors'
+const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors'
 const btnIdle = 'text-[#456080] hover:bg-[#EEF2F7] hover:text-[#0F1F33]'
 const btnOn   = 'bg-[#C8102E] text-white'
 const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border border-[#DDE4ED]'

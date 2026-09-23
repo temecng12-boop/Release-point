@@ -219,7 +219,7 @@ export default async function DashboardPage() {
             </div>
 
             {/* ── Content Grid ── */}
-            <div className="grid lg:grid-cols-[1fr_1.6fr] gap-5">
+            <div className="grid md:grid-cols-[1fr_1.6fr] gap-5">
 
               {/* Left: Teams */}
               <div className="space-y-3">

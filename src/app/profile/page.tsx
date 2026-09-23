@@ -106,7 +106,7 @@ export default async function ProfilePage() {
             </div>
 
             {isCoach && (
-              <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[#DDE4ED]">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-5 pt-5 border-t border-[#DDE4ED]">
                 <div className="text-center">
                   <p className="text-2xl text-[#0F1F33]" style={oswald}>{rosterCount}</p>
                   <p className="text-xs text-[#3D5166] mt-0.5">Players</p>
@@ -152,7 +152,7 @@ export default async function ProfilePage() {
             )}
 
             {isCoach && (profile?.social_twitter || profile?.social_instagram || profile?.social_linkedin) && (
-              <div className="flex gap-4 mt-4 pt-4 border-t border-[#DDE4ED]">
+              <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-[#DDE4ED]">
                 {profile.social_twitter && (
                   <span className="text-xs text-[#3D5166] flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.262 5.636 5.902-5.636zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
