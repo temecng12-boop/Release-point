@@ -288,6 +288,7 @@ export default function VideoPlayer({
   const [inkColor,        setInkColor]        = useState('#E9412F')
   const [markerCount,     setMarkerCount]     = useState(0)
   const [trackingEnabled, setTrackingEnabled] = useState(true)
+  const [videoError,      setVideoError]      = useState(false)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -595,7 +596,19 @@ export default function VideoPlayer({
     <div className="bg-white border border-[#DDE4ED] rounded-xl p-3.5 shadow-sm">
       {/* Stage */}
       <div className="relative bg-black rounded-md overflow-hidden" style={{ lineHeight: 0 }}>
-        <video ref={videoRef} src={src} playsInline crossOrigin="anonymous" className="w-full block" />
+        {videoError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+            <p className="text-white text-sm opacity-70">Video unavailable — try refreshing the page.</p>
+          </div>
+        )}
+        <video
+          ref={videoRef}
+          src={src}
+          playsInline
+          crossOrigin="anonymous"
+          className="w-full block"
+          onError={() => setVideoError(true)}
+        />
         <canvas
           ref={overlayRef}
           className="absolute inset-0 w-full h-full"

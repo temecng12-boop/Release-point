@@ -1,8 +1,21 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, Fragment } from 'react'
 
 type Message = { role: 'user' | 'assistant'; content: string }
+
+function renderMarkdown(text: string) {
+  return text.split('\n').map((line, li) => (
+    <Fragment key={li}>
+      {li > 0 && <br />}
+      {line.split(/(\*\*[^*]+\*\*)/).map((part, pi) =>
+        part.startsWith('**') && part.endsWith('**')
+          ? <strong key={pi}>{part.slice(2, -2)}</strong>
+          : part
+      )}
+    </Fragment>
+  ))
+}
 type Metric  = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
 
 export default function AIChat({
@@ -124,7 +137,7 @@ export default function AIChat({
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap ${
+              className={`max-w-[80%] rounded-md px-3 py-2 text-sm ${
                 msg.role === 'user'
                   ? 'text-white'
                   : 'text-[#456080]'
@@ -135,7 +148,7 @@ export default function AIChat({
                   : { background: '#F0F4F8', border: '1px solid #DDE4ED' }
               }
             >
-              {msg.content}
+              {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
             </div>
           </div>
         ))}
@@ -144,10 +157,10 @@ export default function AIChat({
         {isLoading && (
           <div className="flex justify-start">
             <div
-              className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080] whitespace-pre-wrap"
+              className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]"
               style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
             >
-              {streaming || (
+              {streaming ? renderMarkdown(streaming) : (
                 <span className="text-[#3D5166]">
                   <span className="animate-pulse">...</span>
                 </span>

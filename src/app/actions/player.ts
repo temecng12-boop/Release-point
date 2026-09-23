@@ -88,6 +88,21 @@ export async function deletePlayer(playerId: string) {
   return { success: true }
 }
 
+export async function savePlayerPosition(position: 'pitcher' | 'hitter') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabaseAdmin
+    .from('players')
+    .update({ position })
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
 export async function updatePlayerSelfProfile(data: {
   full_name?: string
   height?: string

@@ -17,11 +17,22 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   const { data: clip } = await supabaseAdmin
     .from('clips')
-    .select('id, title, storage_path, created_at, session_date, player_id, notes, voice_path, phase_checklist')
+    .select('id, title, storage_path, created_at, session_date, player_id, notes, voice_path')
     .eq('id', id)
     .single()
 
   if (!clip) notFound()
+
+  // Fetch phase_checklist separately — column may not exist if migration hasn't run
+  let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
+  try {
+    const { data: checklistData } = await supabaseAdmin
+      .from('clips')
+      .select('phase_checklist')
+      .eq('id', id)
+      .single()
+    phaseChecklist = (checklistData as { phase_checklist: typeof phaseChecklist } | null)?.phase_checklist ?? null
+  } catch { /* column not yet migrated */ }
 
   const { data: signed } = await supabaseAdmin.storage
     .from('clips')
@@ -112,7 +123,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
             initialVoiceUrl={voiceUrl}
             initialTsNotes={tsNotes ?? []}
             initialMetrics={rawMetrics ?? []}
-            initialChecklist={(clip.phase_checklist as { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null) ?? null}
+            initialChecklist={phaseChecklist}
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}

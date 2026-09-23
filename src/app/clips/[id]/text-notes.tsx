@@ -16,14 +16,18 @@ export default function TextNotes({
 }) {
   const isCoach = role === 'coach'
   const [notes, setNotes] = useState(initialNotes ?? '')
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'pending' | 'saving'>('saved')
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const notesRef = useRef(notes)
   notesRef.current = notes
 
   async function persistNotes(text: string) {
     setSaveStatus('saving')
-    await createClient().from('clips').update({ notes: text }).eq('id', clipId)
+    const { error } = await createClient().from('clips').update({ notes: text }).eq('id', clipId)
+    if (error) {
+      setSaveStatus('error')
+      return
+    }
     setSaveStatus('saved')
     window.dispatchEvent(new CustomEvent('clip-notes-saved'))
   }
@@ -50,7 +54,7 @@ export default function TextNotes({
         <p className="text-[13px] text-[#3D5166] tracking-wider" style={oswald}>Coach Notes</p>
         {isCoach && (
           <span className="text-xs text-[#3D5166]">
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved' : 'Saved ✓'}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'pending' ? 'Unsaved' : saveStatus === 'error' ? 'Save failed' : 'Saved ✓'}
           </span>
         )}
       </div>

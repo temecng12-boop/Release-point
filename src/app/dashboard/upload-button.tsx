@@ -76,7 +76,9 @@ export default function UploadButton({
       try {
         fileToUpload = await compressVideo(file, setCompressPct)
       } catch {
+        // Compression failed — upload original. User will see the larger file size.
         fileToUpload = file
+        setError('Compression failed — uploading original file.')
       }
     }
 

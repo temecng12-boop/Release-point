@@ -56,15 +56,22 @@ export default function VoiceNote({
 
   async function uploadVoice(ext: string, mimeType: string) {
     setUploading(true)
+    setRecordError(null)
     const supabase = createClient()
     const path = `${playerId}/${clipId}/voice.${ext}`
     const blob = new Blob(chunksRef.current, { type: mimeType })
     await supabase.storage.from('clips').remove([path])
-    const { error } = await supabase.storage.from('clips').upload(path, blob, { contentType: mimeType })
-    if (!error) {
-      await saveVoicePath(clipId, path)
-      const { data: signed } = await supabase.storage.from('clips').createSignedUrl(path, 3600)
-      if (signed?.signedUrl) setVoiceUrl(signed.signedUrl)
+    const { error: uploadErr } = await supabase.storage.from('clips').upload(path, blob, { contentType: mimeType })
+    if (uploadErr) {
+      setRecordError('Failed to save voice note — please try again.')
+    } else {
+      const result = await saveVoicePath(clipId, path)
+      if (result?.error) {
+        setRecordError('Voice saved but failed to link — refresh and try again.')
+      } else {
+        const { data: signed } = await supabase.storage.from('clips').createSignedUrl(path, 3600)
+        if (signed?.signedUrl) setVoiceUrl(signed.signedUrl)
+      }
     }
     setUploading(false)
   }

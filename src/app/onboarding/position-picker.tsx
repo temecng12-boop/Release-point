@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { savePlayerPosition } from '@/app/actions/player'
 import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -23,16 +23,22 @@ const CARDS: { value: Position; label: string; sub: string; points: string[] }[]
   },
 ]
 
-export default function PositionPicker({ playerId, playerName }: { playerId: string; playerName: string }) {
+export default function PositionPicker({ playerName }: { playerId: string; playerName: string }) {
   const [selected, setSelected] = useState<Position | null>(null)
   const [loading, setLoading]   = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const router = useRouter()
 
   async function handleContinue() {
-    if (!selected || !playerId) return
+    if (!selected) return
     setLoading(true)
-    const supabase = createClient()
-    await supabase.from('players').update({ position: selected }).eq('id', playerId)
+    setSaveError(null)
+    const result = await savePlayerPosition(selected)
+    if (result?.error) {
+      setSaveError('Failed to save — please try again.')
+      setLoading(false)
+      return
+    }
     router.push('/dashboard')
   }
 
@@ -95,6 +101,10 @@ export default function PositionPicker({ playerId, playerName }: { playerId: str
               )
             })}
           </div>
+
+          {saveError && (
+            <p className="text-sm text-[#C8102E] text-center mb-4">{saveError}</p>
+          )}
 
           <div className="flex justify-center">
             <button

@@ -36,15 +36,28 @@ export async function invitePlayer(
 
   if (playerError && playerError.code !== '23505') return { error: playerError.message }
 
-  // Assign teams via junction table (only for new players)
-  if (!playerError && player && teamIds.length > 0) {
-    await supabaseAdmin.from('player_teams').insert(
-      teamIds.map((tid) => ({ player_id: player.id, team_id: tid }))
+  // Resolve player id — either newly inserted or existing (on duplicate key)
+  let playerId = player?.id ?? null
+  if (playerError?.code === '23505') {
+    const { data: existing } = await supabaseAdmin
+      .from('players')
+      .select('id')
+      .eq('coach_id', user.id)
+      .eq('email', playerEmail)
+      .single()
+    playerId = existing?.id ?? null
+  }
+
+  // Assign teams via junction table (new assignments only, ignore duplicates)
+  if (playerId && teamIds.length > 0) {
+    await supabaseAdmin.from('player_teams').upsert(
+      teamIds.map((tid) => ({ player_id: playerId, team_id: tid })),
+      { onConflict: 'player_id,team_id', ignoreDuplicates: true }
     )
   }
 
   // Send invite email via Supabase Auth
-  const siteUrl = 'https://release-point.vercel.app'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://release-point.vercel.app'
   const { error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(playerEmail, {
     data: { role: 'player' },
     redirectTo: `${siteUrl}/auth/confirm`,

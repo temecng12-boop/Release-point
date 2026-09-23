@@ -123,7 +123,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
       weight: weight || undefined,
       high_school: highSchool || undefined,
       travel_team: travelTeam || undefined,
-      graduation_year: gradYear ? parseInt(gradYear) : null,
+      graduation_year: gradYear ? (Number.isFinite(parseInt(gradYear, 10)) ? parseInt(gradYear, 10) : null) : null,
       throws: throws || undefined,
       bats: bats || undefined,
       college_interests: interests,

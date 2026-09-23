@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
@@ -35,6 +36,10 @@ function formatMetrics(metrics: Metric[]): string {
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new Response('Unauthorized', { status: 401 })
+
   const { messages, context } = await req.json()
 
   const { playerName, ageGroup, position, metrics = [] } = context
