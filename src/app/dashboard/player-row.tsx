@@ -5,6 +5,8 @@ import Link from 'next/link'
 import UploadButton from './upload-button'
 import RecordButton from './record-button'
 import EditPlayerModal from './edit-player-modal'
+import BullpenModal from './bullpen-modal'
+import type { BullpenSession } from './bullpen-modal'
 import { deleteClip } from '@/app/actions/clips'
 
 interface Clip {
@@ -31,6 +33,7 @@ interface Props {
   player: Player
   clips: Clip[]
   teams: Team[]
+  sessions: BullpenSession[]
 }
 
 function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
@@ -38,8 +41,9 @@ function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
   return new Date(iso + (sessionDate ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function PlayerRow({ player, clips, teams }: Props) {
+export default function PlayerRow({ player, clips, teams, sessions }: Props) {
   const [editOpen, setEditOpen]         = useState(false)
+  const [bullpenOpen, setBullpenOpen]   = useState(false)
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
@@ -100,6 +104,16 @@ export default function PlayerRow({ player, clips, teams }: Props) {
             >
               Edit
             </button>
+            <button
+              onClick={() => setBullpenOpen(true)}
+              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] whitespace-nowrap flex items-center gap-1"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1C3A5C] shrink-0" />
+              Bullpen
+              {sessions.length > 0 && (
+                <span className="text-[9px] bg-[#1C3A5C] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">{sessions.length}</span>
+              )}
+            </button>
             <RecordButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
             <UploadButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
           </div>
@@ -159,6 +173,14 @@ export default function PlayerRow({ player, clips, teams }: Props) {
           player={player}
           teams={teams}
           onClose={() => setEditOpen(false)}
+        />
+      )}
+      {bullpenOpen && (
+        <BullpenModal
+          playerId={player.id}
+          playerName={player.full_name}
+          initialSessions={sessions}
+          onClose={() => setBullpenOpen(false)}
         />
       )}
     </>

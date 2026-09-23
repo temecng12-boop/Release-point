@@ -48,6 +48,14 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         .order('created_at', { ascending: false })
     : { data: [] }
 
+  const { data: sessions } = playerIds.length > 0
+    ? await supabaseAdmin
+        .from('bullpen_sessions')
+        .select('id, player_id, session_date, status, pitches, notes, created_at')
+        .in('player_id', playerIds)
+        .order('created_at', { ascending: false })
+    : { data: [] }
+
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <AppHeader
@@ -87,6 +95,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                   player={{ ...p, teamIds: [id] }}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
                   teams={[team]}
+                  sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}
                 />
               ))}
             </div>

@@ -80,6 +80,15 @@ export default async function DashboardPage() {
         .limit(6)
     : { data: [] }
 
+  // Bullpen sessions per player
+  const { data: allSessions } = isCoach && playerIds.length > 0
+    ? await supabaseAdmin
+        .from('bullpen_sessions')
+        .select('id, player_id, session_date, status, pitches, notes, created_at')
+        .in('player_id', playerIds)
+        .order('created_at', { ascending: false })
+    : { data: [] }
+
   // Build players with teamIds for the roster component
   const playersWithTeams = (players ?? []).map(p => ({
     ...p,
