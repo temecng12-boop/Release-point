@@ -6,6 +6,7 @@ import { signOut } from '@/app/actions/auth'
 import UploadButton from './upload-button'
 import CreateTeamButton from './create-team-button'
 import PlayerRoster from './player-roster'
+import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -220,7 +221,22 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* ── Content Grid ── */}
+            {/* ── Onboarding wizard (new coaches) ── */}
+            {(teams?.length ?? 0) === 0 && (players?.length ?? 0) === 0 && (
+              <CoachOnboardingWizard
+                hasTeams={false}
+                hasPlayers={false}
+              />
+            )}
+            {(teams?.length ?? 0) > 0 && (players?.length ?? 0) === 0 && (
+              <CoachOnboardingWizard
+                hasTeams={true}
+                hasPlayers={false}
+                firstTeamId={teams![0].id}
+              />
+            )}
+
+          {/* ── Content Grid ── */}
             <div className="grid md:grid-cols-[1fr_1.6fr] gap-5">
 
               {/* Left: Teams */}

@@ -13,6 +13,7 @@ const inputClass =
 
 function CoachForm({ onBack }: { onBack: () => void }) {
   const [state, action, pending] = useActionState(signUp, undefined)
+  const [tosAccepted, setTosAccepted] = useState(false)
   return (
     <form action={action} className="space-y-4">
       <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#456080] transition-colors mb-2" style={oswald}>
@@ -30,12 +31,27 @@ function CoachForm({ onBack }: { onBack: () => void }) {
         <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
         <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputClass} />
       </div>
+      <label className="flex items-start gap-3 cursor-pointer group">
+        <input
+          type="checkbox"
+          name="tos"
+          checked={tosAccepted}
+          onChange={(e) => setTosAccepted(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-[#C8102E] shrink-0"
+        />
+        <span className="text-xs text-[#456080] leading-relaxed">
+          I agree to the{' '}
+          <a href="/terms" target="_blank" className="text-[#1C3A5C] hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" target="_blank" className="text-[#1C3A5C] hover:underline">Privacy Policy</a>
+        </span>
+      </label>
       {state?.error && (
         <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
           <p className="text-sm text-[#C8102E]">{state.error}</p>
         </div>
       )}
-      <button type="submit" disabled={pending} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
+      <button type="submit" disabled={pending || !tosAccepted} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
         {pending ? 'Creating Account…' : 'Create Coach Account'}
       </button>
     </form>
@@ -44,6 +60,7 @@ function CoachForm({ onBack }: { onBack: () => void }) {
 
 function PlayerForm({ onBack }: { onBack: () => void }) {
   const [state, action, pending] = useActionState(signUpPlayer, undefined)
+  const [tosAccepted, setTosAccepted] = useState(false)
   return (
     <form action={action} className="space-y-4">
       <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#456080] transition-colors mb-2" style={oswald}>
@@ -62,12 +79,27 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
         <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputClass} />
       </div>
+      <label className="flex items-start gap-3 cursor-pointer group">
+        <input
+          type="checkbox"
+          name="tos"
+          checked={tosAccepted}
+          onChange={(e) => setTosAccepted(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-[#C8102E] shrink-0"
+        />
+        <span className="text-xs text-[#456080] leading-relaxed">
+          I agree to the{' '}
+          <a href="/terms" target="_blank" className="text-[#1C3A5C] hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" target="_blank" className="text-[#1C3A5C] hover:underline">Privacy Policy</a>
+        </span>
+      </label>
       {state?.error && (
         <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
           <p className="text-sm text-[#C8102E]">{state.error}</p>
         </div>
       )}
-      <button type="submit" disabled={pending} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
+      <button type="submit" disabled={pending || !tosAccepted} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
         {pending ? 'Creating Account…' : 'Create Player Account'}
       </button>
     </form>

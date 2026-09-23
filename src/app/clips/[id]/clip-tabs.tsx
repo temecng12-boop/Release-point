@@ -6,14 +6,16 @@ import TextNotes from './text-notes'
 import VoiceNote from './voice-note'
 import MetricsTab from './metrics-tab'
 import AiChat from './ai-chat'
+import PhaseChecklist from './phase-checklist'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-type TSNote   = { id: string; time_seconds: number; body: string }
-type Metric   = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
-type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Metrics' | 'AI Coach'
+type TSNote      = { id: string; time_seconds: number; body: string }
+type Metric      = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
+type PhaseRow    = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
+type Tab         = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
 
-const TABS: Tab[] = ['Timestamps', 'Notes', 'Voice', 'Metrics', 'AI Coach']
+const TABS: Tab[] = ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
 
 export default function ClipTabs({
   clipId,
@@ -23,6 +25,7 @@ export default function ClipTabs({
   initialVoiceUrl,
   initialTsNotes,
   initialMetrics,
+  initialChecklist,
   playerName,
   playerAgeGroup,
   playerPosition,
@@ -34,6 +37,7 @@ export default function ClipTabs({
   initialVoiceUrl: string | null
   initialTsNotes: TSNote[]
   initialMetrics: Metric[]
+  initialChecklist: PhaseRow[] | null
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
@@ -70,6 +74,9 @@ export default function ClipTabs({
         )}
         {active === 'Voice' && (
           <VoiceNote clipId={clipId} playerId={playerId} role={role} initialVoiceUrl={initialVoiceUrl} />
+        )}
+        {active === 'Mechanics' && (
+          <PhaseChecklist clipId={clipId} role={role} initial={initialChecklist} />
         )}
         {active === 'Metrics' && (
           <MetricsTab

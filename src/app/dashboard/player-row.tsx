@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import UploadButton from './upload-button'
+import RecordButton from './record-button'
 import EditPlayerModal from './edit-player-modal'
 import { deleteClip } from '@/app/actions/clips'
 
@@ -41,12 +42,18 @@ export default function PlayerRow({ player, clips, teams }: Props) {
   const [editOpen, setEditOpen]         = useState(false)
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
+  const [deleteError, setDeleteError]   = useState<string | null>(null)
 
   async function handleDeleteClip(clipId: string) {
     setDeletingClip(clipId)
-    await deleteClip(clipId)
+    setDeleteError(null)
+    const result = await deleteClip(clipId)
     setDeletingClip(null)
-    setConfirmClip(null)
+    if (result?.error) {
+      setDeleteError(result.error)
+    } else {
+      setConfirmClip(null)
+    }
   }
 
   return (
@@ -93,6 +100,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
             >
               Edit
             </button>
+            <RecordButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
             <UploadButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
           </div>
         </div>
@@ -106,7 +114,9 @@ export default function PlayerRow({ player, clips, teams }: Props) {
               <li key={clip.id}>
                 {confirmClip === clip.id ? (
                   <div className="flex items-center justify-between px-4 py-2 bg-[#FFF5F5]">
-                    <span className="text-xs text-[#456080]">Delete &ldquo;{clip.title}&rdquo;?</span>
+                    <span className="text-xs text-[#456080]">
+                      {deleteError ?? `Delete "${clip.title}"?`}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDeleteClip(clip.id)}
@@ -116,7 +126,7 @@ export default function PlayerRow({ player, clips, teams }: Props) {
                         {deletingClip === clip.id ? 'Deleting…' : 'Delete'}
                       </button>
                       <button
-                        onClick={() => setConfirmClip(null)}
+                        onClick={() => { setConfirmClip(null); setDeleteError(null) }}
                         className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors"
                       >
                         Cancel

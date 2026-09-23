@@ -69,11 +69,51 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState('')
   const [loading, setLoading] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, streaming])
+
+  async function generateSummary() {
+    setSummaryLoading(true)
+    const summaryPrompt = `Generate a concise development summary for ${playerName}. Based on their ${metrics.length} pitches tracked, identify: (1) strongest metrics, (2) areas for improvement, (3) 2-3 specific drills or focuses for the next session. Be direct and baseball-specific.`
+    const next: Message[] = [...messages, { role: 'user', content: summaryPrompt }]
+    setMessages(next)
+    setLoading(true)
+    setSummaryLoading(false)
+    setStreaming('')
+
+    try {
+      const res = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: next,
+          context: { playerName, ageGroup, position, clipId: null, viewerRole: 'coach', metrics: metrics.map(m => ({ pitch_type: m.pitch_type, velocity: m.velocity, spin_rate: m.spin_rate, spin_axis: m.spin_axis, horizontal_break: m.horizontal_break, vertical_break: m.vertical_break })) },
+        }),
+      })
+      if (!res.ok || !res.body) throw new Error(`${res.status}`)
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let acc = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        acc += dec.decode(value, { stream: true })
+        setStreaming(acc)
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: acc }])
+      setStreaming('')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong'
+      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${msg}` }])
+      setStreaming('')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function send() {
     const text = input.trim()
@@ -131,8 +171,22 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
   return (
     <div className="bg-white border border-[#DDE4ED] rounded-xl shadow-sm flex flex-col overflow-hidden">
       <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
-        <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>AI Development Assistant</p>
-        <p className="text-[11px] text-[#3D5166] mt-0.5">Ask about {playerName}&apos;s mechanics, progress, and what to work on next.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>AI Development Assistant</p>
+            <p className="text-[11px] text-[#3D5166] mt-0.5">Ask about {playerName}&apos;s mechanics, progress, and what to work on next.</p>
+          </div>
+          {metrics.length > 0 && (
+            <button
+              onClick={generateSummary}
+              disabled={loading || summaryLoading}
+              className="text-[10px] bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+              style={oswald}
+            >
+              {summaryLoading ? '…' : 'Session Summary'}
+            </button>
+          )}
+        </div>
       </div>
       <div ref={scrollRef} className="max-h-[420px] overflow-y-auto p-4 space-y-3">
         <div className="flex justify-start">
@@ -177,6 +231,47 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
   )
 }
 
+// ── Inline sparkline chart ────────────────────────────────────────────────────
+function Sparkline({ values, color, unit }: { values: number[]; color: string; unit: string }) {
+  if (values.length < 2) return null
+  const W = 260, H = 56, pad = 4
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const xs = values.map((_, i) => pad + (i / (values.length - 1)) * (W - pad * 2))
+  const ys = values.map(v => H - pad - ((v - min) / range) * (H - pad * 2))
+  const d = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
+  const last = values[values.length - 1]
+  const prev = values[values.length - 2]
+  const trend = last > prev ? '↑' : last < prev ? '↓' : '→'
+  const trendColor = last > prev ? '#22c55e' : last < prev ? '#C8102E' : '#456080'
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] text-[#3D5166]">{min}{unit} – {max}{unit}</span>
+        <span className="text-xs font-mono" style={{ color: trendColor }}>{trend} {last}{unit}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+        <defs>
+          <linearGradient id={`g-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          d={`${d} L${xs[xs.length-1].toFixed(1)},${H} L${xs[0].toFixed(1)},${H} Z`}
+          fill={`url(#g-${color.replace('#','')})`}
+        />
+        <path d={d} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        {xs.map((x, i) => (
+          <circle key={i} cx={x} cy={ys[i]} r="2.5" fill={color} />
+        ))}
+      </svg>
+    </div>
+  )
+}
+
 // ── Metrics aggregation ───────────────────────────────────────────────────────
 function MetricsSummary({ metrics }: { metrics: Metric[] }) {
   if (metrics.length === 0) {
@@ -200,8 +295,41 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
     return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null
   }
 
+  function nonNull(vals: (number | null)[]) {
+    return vals.filter((x): x is number => x != null)
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Trend charts for all pitches combined */}
+      {metrics.length >= 3 && (() => {
+        const veloSeries = nonNull(metrics.map(m => m.velocity))
+        const spinSeries = nonNull(metrics.map(m => m.spin_rate))
+        return (
+          <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-[#DDE4ED]">
+              <p className="text-sm text-[#0F1F33]" style={oswald}>Trend</p>
+              <p className="text-xs text-[#3D5166] mt-0.5">All pitch types · chronological order</p>
+            </div>
+            <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#DDE4ED]">
+              {veloSeries.length >= 3 && (
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-[#3D5166] tracking-wide" style={oswald}>Velocity</p>
+                  <Sparkline values={veloSeries} color="#C8102E" unit=" mph" />
+                </div>
+              )}
+              {spinSeries.length >= 3 && (
+                <div className="px-4 py-3">
+                  <p className="text-[10px] text-[#3D5166] tracking-wide" style={oswald}>Spin Rate</p>
+                  <Sparkline values={spinSeries} color="#1C3A5C" unit=" rpm" />
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Per-pitch-type breakdowns */}
       {Object.entries(byType).map(([type, ms]) => (
         <div key={type} className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-[#DDE4ED]">
@@ -224,6 +352,15 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
               </div>
             ))}
           </div>
+          {ms.length >= 3 && (() => {
+            const vs = nonNull(ms.map(m => m.velocity))
+            return vs.length >= 3 ? (
+              <div className="px-4 py-3 border-t border-[#DDE4ED]">
+                <p className="text-[10px] text-[#3D5166] tracking-wide mb-1" style={oswald}>Velocity Trend</p>
+                <Sparkline values={vs} color="#C8102E" unit=" mph" />
+              </div>
+            ) : null
+          })()}
         </div>
       ))}
     </div>
