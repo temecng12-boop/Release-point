@@ -232,7 +232,9 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
 }
 
 // ── Inline sparkline chart ────────────────────────────────────────────────────
+let _sparklineId = 0
 function Sparkline({ values, color, unit }: { values: number[]; color: string; unit: string }) {
+  const [uid] = useState(() => ++_sparklineId)
   if (values.length < 2) return null
   const W = 260, H = 56, pad = 4
   const min = Math.min(...values)
@@ -245,6 +247,7 @@ function Sparkline({ values, color, unit }: { values: number[]; color: string; u
   const prev = values[values.length - 2]
   const trend = last > prev ? '↑' : last < prev ? '↓' : '→'
   const trendColor = last > prev ? '#22c55e' : last < prev ? '#C8102E' : '#456080'
+  const gradId = `g-${uid}`
 
   return (
     <div className="mt-3">
@@ -254,14 +257,14 @@ function Sparkline({ values, color, unit }: { values: number[]; color: string; u
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
         <defs>
-          <linearGradient id={`g-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.3" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
           d={`${d} L${xs[xs.length-1].toFixed(1)},${H} L${xs[0].toFixed(1)},${H} Z`}
-          fill={`url(#g-${color.replace('#','')})`}
+          fill={`url(#${gradId})`}
         />
         <path d={d} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         {xs.map((x, i) => (

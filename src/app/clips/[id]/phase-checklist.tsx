@@ -168,19 +168,21 @@ export default function PhaseChecklist({
 
       {/* Save button (coach only) */}
       {isCoach && (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[#3D5166]">
-            {saved ? '✓ Saved' : ratedCount > 0 ? `${ratedCount} / ${PHASES.length} phases rated` : 'Rate each phase to build the report'}
-          </span>
-          <button
-            onClick={handleSave}
-            disabled={saving || ratedCount === 0}
-            className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-            style={oswald}
-          >
-            {saving ? 'Saving…' : 'Save Checklist'}
-          </button>
-          {error && <p className="text-xs text-[#C8102E] ml-3">{error}</p>}
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#3D5166]">
+              {saved ? '✓ Saved' : ratedCount > 0 ? `${ratedCount} / ${PHASES.length} phases rated` : 'Rate each phase to build the report'}
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={saving || ratedCount === 0}
+              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+              style={oswald}
+            >
+              {saving ? 'Saving…' : 'Save Checklist'}
+            </button>
+          </div>
+          {error && <p className="text-xs text-[#C8102E] mt-2">{error}</p>}
         </div>
       )}
     </div>

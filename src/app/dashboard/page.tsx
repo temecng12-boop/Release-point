@@ -223,17 +223,13 @@ export default async function DashboardPage() {
 
             {/* ── Onboarding wizard (new coaches) ── */}
             {(teams?.length ?? 0) === 0 && (players?.length ?? 0) === 0 && (
-              <CoachOnboardingWizard
-                hasTeams={false}
-                hasPlayers={false}
-              />
+              <CoachOnboardingWizard hasTeams={false} hasPlayers={false} />
             )}
             {(teams?.length ?? 0) > 0 && (players?.length ?? 0) === 0 && (
-              <CoachOnboardingWizard
-                hasTeams={true}
-                hasPlayers={false}
-                firstTeamId={teams![0].id}
-              />
+              <CoachOnboardingWizard hasTeams={true} hasPlayers={false} firstTeamId={teams![0].id} />
+            )}
+            {(teams?.length ?? 0) > 0 && (players?.length ?? 0) > 0 && (allClips?.length ?? 0) === 0 && (
+              <CoachOnboardingWizard hasTeams={true} hasPlayers={true} hasClips={false} firstTeamId={teams![0].id} />
             )}
 
           {/* ── Content Grid ── */}

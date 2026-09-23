@@ -11,6 +11,8 @@ function toTitleCase(s: string) {
 export async function signUp(_prevState: { error?: string; message?: string } | undefined, formData: FormData) {
   const supabase = await createClient()
 
+  if (!formData.get('tos')) return { error: 'You must accept the Terms of Service to continue.' }
+
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
   let fullName = formData.get('full_name') as string
@@ -33,6 +35,8 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
 
 export async function signUpPlayer(_prevState: { error?: string } | undefined, formData: FormData) {
   const supabase = await createClient()
+
+  if (!formData.get('tos')) return { error: 'You must accept the Terms of Service to continue.' }
 
   const email    = formData.get('email') as string
   const password = formData.get('password') as string

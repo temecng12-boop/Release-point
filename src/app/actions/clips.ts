@@ -166,6 +166,11 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
+
   const { error } = await supabaseAdmin
     .from('clips')
     .update({ voice_path: voicePath })
@@ -238,7 +243,7 @@ export async function savePhaseChecklist(clipId: string, checklist: {
     .select('coach_id, user_id')
     .eq('id', clip.player_id)
     .single()
-  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
+  if (player?.coach_id !== user.id) return { error: 'Only the coach can save the mechanics checklist' }
 
   const { error } = await supabaseAdmin
     .from('clips')

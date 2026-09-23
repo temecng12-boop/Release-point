@@ -23,16 +23,16 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   if (!clip) notFound()
 
-  // Fetch phase_checklist separately — column may not exist if migration hasn't run
+  // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
-  try {
-    const { data: checklistData } = await supabaseAdmin
-      .from('clips')
-      .select('phase_checklist')
-      .eq('id', id)
-      .single()
+  const { data: checklistData, error: checklistError } = await supabaseAdmin
+    .from('clips')
+    .select('phase_checklist')
+    .eq('id', id)
+    .single()
+  if (!checklistError) {
     phaseChecklist = (checklistData as { phase_checklist: typeof phaseChecklist } | null)?.phase_checklist ?? null
-  } catch { /* column not yet migrated */ }
+  }
 
   const { data: signed } = await supabaseAdmin.storage
     .from('clips')

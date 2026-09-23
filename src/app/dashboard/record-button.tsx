@@ -21,11 +21,12 @@ export default function RecordButton({
   const [phase, setPhase]     = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
   const [error, setError]     = useState<string | null>(null)
-  const videoRef  = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const recRef    = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const videoRef     = useRef<HTMLVideoElement>(null)
+  const streamRef    = useRef<MediaStream | null>(null)
+  const recRef       = useRef<MediaRecorder | null>(null)
+  const chunksRef    = useRef<Blob[]>([])
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cancelledRef = useRef(false)
   const router    = useRouter()
 
   async function openCamera() {
@@ -70,6 +71,7 @@ export default function RecordButton({
   }
 
   function cancel() {
+    cancelledRef.current = true
     if (timerRef.current) clearInterval(timerRef.current)
     recRef.current?.stop()
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -81,6 +83,7 @@ export default function RecordButton({
   }
 
   async function uploadRecording(mimeType: string) {
+    if (cancelledRef.current) { cancelledRef.current = false; return }
     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
     const storagePath = `${playerId}/${Date.now()}.${ext}`
 

@@ -7,10 +7,11 @@ const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTrans
 interface Props {
   hasTeams: boolean
   hasPlayers: boolean
+  hasClips?: boolean
   firstTeamId?: string
 }
 
-export default function CoachOnboardingWizard({ hasTeams, hasPlayers, firstTeamId }: Props) {
+export default function CoachOnboardingWizard({ hasTeams, hasPlayers, hasClips = false, firstTeamId }: Props) {
   const steps = [
     {
       n: '01',
@@ -28,7 +29,7 @@ export default function CoachOnboardingWizard({ hasTeams, hasPlayers, firstTeamI
       n: '03',
       title: 'Upload a Clip',
       desc: 'Film a bullpen or game appearance. Annotate mechanics, leave voice notes, ask the AI coach.',
-      done: false,
+      done: hasClips,
     },
   ]
 
