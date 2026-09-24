@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Oswald } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Script from "next/script";
 import "./globals.css";
 
 const oswald = Oswald({
@@ -45,7 +46,9 @@ export default function RootLayout({
       <body className="min-h-full antialiased">
         {children}
         <SpeedInsights />
-        <script
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
           }}
