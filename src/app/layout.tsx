@@ -13,17 +13,17 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#06090F',
+  themeColor: '#ffffff',
 }
 
 export const metadata: Metadata = {
   title: { default: "Release Point", template: "%s | Release Point" },
   description: "Pitching and hitting mechanics analysis for coaches and players. Upload video, track Rapsodo data, and get AI-powered feedback.",
-  metadataBase: new URL("https://release-point.vercel.app"),
+  metadataBase: new URL("https://releasepointai.com"),
   openGraph: {
     title: "Release Point",
     description: "Video analysis and Rapsodo metrics for baseball coaches and players.",
-    url: "https://release-point.vercel.app",
+    url: "https://releasepointai.com",
     siteName: "Release Point",
     type: "website",
   },
