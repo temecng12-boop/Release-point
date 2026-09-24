@@ -44,8 +44,7 @@ export default function PhaseChecklist({
   initial: PhaseRow[] | null
 }) {
   const [phases, setPhases] = useState<PhaseRow[]>(() => initPhases(initial))
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(!!initial)
+  const [saved, setSaved] = useState(!!initial)
   const [error, setError]   = useState<string | null>(null)
   const isCoach = role === 'coach'
 
@@ -60,14 +59,13 @@ export default function PhaseChecklist({
   }
 
   async function handleSave() {
-    setSaving(true)
+    // Optimistic: show saved immediately, revert only if the server rejects it
+    setSaved(true)
     setError(null)
     const result = await savePhaseChecklist(clipId, phases)
-    setSaving(false)
     if (result?.error) {
+      setSaved(false)
       setError(result.error)
-    } else {
-      setSaved(true)
     }
   }
 
@@ -175,11 +173,11 @@ export default function PhaseChecklist({
             </span>
             <button
               onClick={handleSave}
-              disabled={saving || ratedCount === 0}
+              disabled={ratedCount === 0}
               className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50"
               style={oswald}
             >
-              {saving ? 'Saving…' : 'Save Checklist'}
+              Save Checklist
             </button>
           </div>
           {error && <p className="text-xs text-[#C8102E] mt-2">{error}</p>}

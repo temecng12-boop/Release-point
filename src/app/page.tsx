@@ -46,7 +46,7 @@ export default function HomePage() {
                 See Every<br />Pitch<br /><span className="text-[#C8102E]">Differently.</span>
               </h1>
 
-              <p className="text-[15px] text-[#3D5166] max-w-[360px] mb-10 leading-[1.75]">
+              <p className="text-base sm:text-lg text-[#3D5166] max-w-[360px] mb-10 leading-[1.75]">
                 Frame-by-frame video analysis, Rapsodo metrics, and AI coaching in one platform. Built for coaches who take development seriously.
               </p>
 
@@ -71,7 +71,7 @@ export default function HomePage() {
                 {['No credit card required', 'Free for coaches', 'All pitchers welcome'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
                     <div className="w-1 h-1 rounded-full bg-[#C8102E]/60" />
-                    <span className="text-[11px] text-[#3D5166]">{t}</span>
+                    <span className="text-xs text-[#3D5166]">{t}</span>
                   </div>
                 ))}
               </div>
@@ -227,11 +227,11 @@ export default function HomePage() {
       {/* ── Feature 1: Video ── */}
       <section className="max-w-6xl mx-auto px-6 py-28 md:py-40 grid md:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>01 — Video Analysis</p>
+          <p className="text-xs sm:text-sm tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>01 — Video Analysis</p>
           <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
             Annotate<br />Every<br />Frame.
           </h2>
-          <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
+          <p className="text-base sm:text-lg text-[#3D5166] leading-[1.85] max-w-sm">
             Draw directly on video. Mark arm angles, hip rotation, and release points. Every annotation is timestamped and shared with your player instantly.
           </p>
         </div>
@@ -300,11 +300,11 @@ export default function HomePage() {
             </div>
           </div>
           <div className="order-1 md:order-2">
-            <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>02 — Rapsodo</p>
+            <p className="text-xs sm:text-sm tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>02 — Rapsodo</p>
             <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
               Data That<br />Means<br />Something.
             </h2>
-            <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
+            <p className="text-base sm:text-lg text-[#3D5166] leading-[1.85] max-w-sm">
               Import your Rapsodo CSV. Velocity, spin rate, axis, and break — each metric benchmarked against real data for your player&apos;s age group. No interpretation needed.
             </p>
           </div>
@@ -314,11 +314,11 @@ export default function HomePage() {
       {/* ── Feature 3: AI ── */}
       <section className="max-w-6xl mx-auto px-6 py-28 md:py-40 grid md:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="text-[14px] tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>03 — AI Coach</p>
+          <p className="text-xs sm:text-sm tracking-[0.2em] text-[#C8102E] mb-5" style={oswald}>03 — AI Coach</p>
           <h2 className="text-[clamp(36px,5.5vw,68px)] leading-[0.88] text-[#0F1F33] mb-6" style={oswald}>
             An Expert<br />In Every<br />Session.
           </h2>
-          <p className="text-sm text-[#3D5166] leading-[1.85] max-w-sm">
+          <p className="text-base sm:text-lg text-[#3D5166] leading-[1.85] max-w-sm">
             The AI knows your player&apos;s age group, position, and Rapsodo numbers. Ask it anything. It responds with real data — not guesses.
           </p>
         </div>
@@ -368,8 +368,8 @@ export default function HomePage() {
             ].map((s) => (
               <div key={s.n} className="relative pl-6 border-l border-[#DDE4ED]">
                 <p className="text-5xl text-[#C8102E] leading-none mb-5" style={oswald}>{s.n}</p>
-                <p className="text-base text-[#0F1F33] mb-2.5" style={oswald}>{s.t}</p>
-                <p className="text-sm text-[#3D5166] leading-relaxed">{s.d}</p>
+                <p className="text-base sm:text-lg text-[#0F1F33] mb-2.5" style={oswald}>{s.t}</p>
+                <p className="text-sm sm:text-base text-[#3D5166] leading-relaxed">{s.d}</p>
               </div>
             ))}
           </div>
