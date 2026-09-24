@@ -10,14 +10,14 @@ interface Props {
 export default function SiteFooter({ variant = 'marketing' }: Props) {
   if (variant === 'app') {
     return (
-      <footer className="px-5 md:px-8 py-6 mt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-xs text-white/20 text-center">
+      <footer className="px-5 md:px-8 py-6 mt-8" style={{ borderTop: '1px solid #e2e8f0' }}>
+        <p className="text-xs text-slate-400 text-center">
           Designed &amp; built by{' '}
           <a
             href="https://www.linkedin.com/in/nolangeorge12"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/35 hover:text-white/60 transition-colors hover:underline underline-offset-2"
+            className="text-slate-500 hover:text-slate-700 transition-colors hover:underline underline-offset-2"
           >
             Nolan George
           </a>
@@ -27,18 +27,18 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
   }
 
   return (
-    <footer style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: '#06090F' }}>
+    <footer style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
       <div className="max-w-5xl mx-auto px-6 py-14 grid md:grid-cols-[1fr_auto] gap-12 items-start">
         <div>
           <Logo size="sm" wordmarkClass="inline" />
-          <p className="mt-5 text-sm text-white/35 leading-relaxed max-w-[420px]">
-            Release Point was designed and built by <strong className="text-white/70 font-medium">Nolan George</strong> — a pitcher who competed at San Jose State University, the University of Nevada Las Vegas, and with the Boise Hawks. His career at the intersection of high-level amateur and independent baseball sparked a deep interest in AI and data-driven development.
+          <p className="mt-5 text-sm text-slate-500 leading-relaxed max-w-[420px]">
+            Release Point was designed and built by <strong className="text-slate-700 font-medium">Nolan George</strong> — a pitcher who competed at San Jose State University, the University of Nevada Las Vegas, and with the Boise Hawks. His career at the intersection of high-level amateur and independent baseball sparked a deep interest in AI and data-driven development.
           </p>
           <a
             href="https://www.linkedin.com/in/nolangeorge12"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-5 text-xs text-white/40 hover:text-white/70 transition-colors font-medium"
+            className="inline-flex items-center gap-2 mt-5 text-xs text-slate-500 hover:text-slate-800 transition-colors font-medium"
             style={os}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -49,7 +49,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          <p className="text-[10px] text-white/20 tracking-widest mb-1" style={os}>Links</p>
+          <p className="text-[10px] text-slate-400 tracking-widest mb-1" style={os}>Links</p>
           {[
             { href: '/auth/signup', label: 'Coach Sign Up' },
             { href: '/auth/login',  label: 'Player Login'  },
@@ -57,18 +57,18 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
             { href: '/privacy',     label: 'Privacy'        },
             { href: '/terms',       label: 'Terms'          },
           ].map(l => (
-            <Link key={l.href} href={l.href} className="text-xs text-white/30 hover:text-white/65 transition-colors" style={os}>
+            <Link key={l.href} href={l.href} className="text-xs text-slate-500 hover:text-slate-800 transition-colors" style={os}>
               {l.label}
             </Link>
           ))}
         </div>
       </div>
 
-      <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-xs text-white/20">
+      <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
+        <p className="text-xs text-slate-400">
           &copy; {new Date().getFullYear()} Release Point &mdash; Designed &amp; built by Nolan George
         </p>
-        <p className="text-xs text-white/15">Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-slate-300">Pitching &amp; hitting mechanics analyzer</p>
       </div>
     </footer>
   )

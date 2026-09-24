@@ -4,24 +4,24 @@
 
 :root {
   /* Backgrounds */
-  --bg:        #06090F;
-  --surface-1: #0D1520;
-  --surface-2: #131E2E;
+  --bg:        #ffffff;
+  --surface-1: #f8fafc;
+  --surface-2: #f1f5f9;
 
   /* Text */
-  --text-1: #EDF2F7;
-  --text-2: #8BA3BC;
-  --text-3: #4D6278;
+  --text-1: #0f172a;
+  --text-2: #64748b;
+  --text-3: #94a3b8;
 
   /* Accent */
   --accent:     #E8102A;
   --accent-dim: #A50D1E;
 
-  /* Glass */
-  --glass-bg:     rgba(255,255,255,0.04);
-  --glass-border: rgba(255,255,255,0.08);
+  /* Light surfaces */
+  --glass-bg:     rgba(0,0,0,0.02);
+  --glass-border: #e2e8f0;
 
-  /* Legacy (kept for older components still referencing them) */
+  /* Legacy */
   --navy:    #0B1E36;
   --navy-2:  #14304F;
   --navy-3:  #20486F;
@@ -29,10 +29,10 @@
   --red-dim: #A50D1E;
   --white:   #FFFFFF;
   --bone:    #F6F5F1;
-  --ink:     #EDF2F7;
-  --slate:   #8BA3BC;
-  --line:    rgba(255,255,255,0.08);
-  --card:    rgba(255,255,255,0.04);
+  --ink:     #0f172a;
+  --slate:   #64748b;
+  --line:    #e2e8f0;
+  --card:    rgba(0,0,0,0.02);
 }
 
 @theme inline {
@@ -86,17 +86,48 @@ h1, h2, h3, .display {
 /* ─── Glass utilities ────────────────────────────────────────────────────── */
 
 .glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .glass-strong {
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+/* ─── Shimmer skeleton ───────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 25%,
+    #e2e8f0 50%,
+    #f1f5f9 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ─── Grain / noise overlay ──────────────────────────────────────────────── */
+
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
 }
 
 /* ─── Fade-up animation ──────────────────────────────────────────────────── */

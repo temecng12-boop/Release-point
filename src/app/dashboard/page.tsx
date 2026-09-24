@@ -13,12 +13,12 @@ import SiteFooter from '@/components/SiteFooter'
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 const glass = {
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: '#ffffff',
+  border: '1px solid #e2e8f0',
 }
 const glassDark = {
-  background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(255,255,255,0.07)',
+  background: '#f8fafc',
+  border: '1px solid #e2e8f0',
 }
 
 export default async function DashboardPage() {
@@ -149,22 +149,22 @@ export default async function DashboardPage() {
   const dashNav = (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
-        <span className="text-xs text-white/40 hidden sm:block truncate max-w-[140px]">
+        <span className="text-xs text-slate-500 hidden sm:block truncate max-w-[140px]">
           {profile?.full_name ?? user.email}
         </span>
         <span
           className="text-xs px-2 py-0.5 rounded"
-          style={{ ...os, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)' }}
+          style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
         >
           {profile?.role ?? user.user_metadata?.role ?? 'coach'}
         </span>
       </div>
-      <Link href="/about" className="text-xs text-white/35 hover:text-white/65 transition-colors hidden sm:block" style={os}>
+      <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block" style={os}>
         About
       </Link>
       <Link
         href={isCoach ? '/profile' : '/player-settings'}
-        className="text-xs text-white/35 hover:text-white/65 transition-colors"
+        className="text-xs text-slate-400 hover:text-slate-700 transition-colors"
         style={os}
       >
         {isCoach ? 'Profile' : 'My Profile'}
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-[#06090F]">
+    <div className="min-h-screen bg-slate-50">
       <AppHeader right={dashNav} showSignOut />
 
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
@@ -181,16 +181,13 @@ export default async function DashboardPage() {
           <>
             {/* ── Coach Hero ── */}
             <div className="relative rounded-2xl overflow-hidden" style={{
-              background: 'linear-gradient(135deg, #0A1020 0%, #0D1828 50%, #111E30 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-                backgroundSize: '48px 48px',
-              }} />
+              <div className="h-px bg-[#E8102A]" />
               <div className="absolute top-0 right-0 w-80 h-80 pointer-events-none" style={{
-                background: 'radial-gradient(circle, rgba(232,16,42,0.07) 0%, transparent 65%)',
+                background: 'radial-gradient(circle, rgba(232,16,42,0.04) 0%, transparent 65%)',
               }} />
 
               <div className="relative px-7 py-7">
@@ -198,17 +195,17 @@ export default async function DashboardPage() {
                   {/* Avatar */}
                   <div
                     className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl text-white shrink-0 font-bold"
-                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)', boxShadow: '0 8px 24px rgba(232,16,42,0.25)' }}
+                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)', boxShadow: '0 4px 12px rgba(232,16,42,0.2)' }}
                   >
                     {(profile?.full_name ?? user.email ?? 'C').split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-0.5" style={os}>Head Coach</p>
-                    <h1 className="text-2xl text-white truncate leading-tight tracking-tight" style={os}>
+                    <h1 className="text-2xl text-slate-950 truncate leading-tight tracking-tight" style={os}>
                       {profile?.full_name ?? user.email?.split('@')[0] ?? 'Coach'}
                     </h1>
                     {profile?.team_name && (
-                      <p className="text-sm text-white/40 mt-0.5">{profile.team_name}</p>
+                      <p className="text-sm text-slate-500 mt-0.5">{profile.team_name}</p>
                     )}
                   </div>
                   <div className="flex gap-5 shrink-0">
@@ -218,8 +215,8 @@ export default async function DashboardPage() {
                       { n: (allClips ?? []).length,     l: 'Clips'   },
                     ].map(s => (
                       <div key={s.l} className="text-center">
-                        <p className="text-2xl text-white leading-none tracking-tight" style={os}>{s.n}</p>
-                        <p className="text-[11px] text-white/30 mt-0.5" style={os}>{s.l}</p>
+                        <p className="text-2xl text-slate-950 leading-none tracking-tight" style={os}>{s.n}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5" style={os}>{s.l}</p>
                       </div>
                     ))}
                   </div>
@@ -229,8 +226,8 @@ export default async function DashboardPage() {
                   <CreateTeamButton />
                   <Link
                     href="/profile"
-                    className="flex items-center gap-2 text-[12px] px-4 py-2 rounded-lg transition-colors text-white/50 hover:text-white/80"
-                    style={{ ...os, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)' }}
+                    className="flex items-center gap-2 text-[12px] px-4 py-2 rounded-lg transition-colors text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                    style={{ ...os, border: '1px solid #e2e8f0' }}
                   >
                     Edit Profile
                   </Link>
@@ -256,17 +253,17 @@ export default async function DashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-[12px] tracking-[0.2em] text-[#E8102A]" style={os}>Your Teams</p>
-                  <span className="text-[11px] text-white/25" style={os}>{teams?.length ?? 0} total</span>
+                  <span className="text-[11px] text-slate-400" style={os}>{teams?.length ?? 0} total</span>
                 </div>
 
                 {!teams || teams.length === 0 ? (
                   <div className="rounded-xl px-5 py-10 text-center" style={glass}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <svg className="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-slate-100">
+                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     </div>
-                    <p className="text-sm text-white/35 mb-4">No teams yet.</p>
+                    <p className="text-sm text-slate-500 mb-4">No teams yet.</p>
                     <CreateTeamButton />
                   </div>
                 ) : (
@@ -283,19 +280,19 @@ export default async function DashboardPage() {
                         >
                           <div className="pl-2 flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="text-[14px] text-white truncate font-semibold" style={os}>{team.name}</p>
+                              <p className="text-[14px] text-slate-950 truncate font-semibold" style={os}>{team.name}</p>
                               {team.age_group && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-full shrink-0 text-white/40" style={{ ...os, border: '1px solid rgba(255,255,255,0.12)' }}>
+                                <span className="text-[11px] px-2 py-0.5 rounded-full shrink-0 text-slate-500" style={{ ...os, border: '1px solid #e2e8f0' }}>
                                   {team.age_group}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[12px] text-white/35">
+                            <p className="text-[12px] text-slate-500">
                               {count} {count === 1 ? 'player' : 'players'}
                               {clips > 0 ? ` · ${clips} clips` : ''}
                             </p>
                           </div>
-                          <svg className="w-4 h-4 text-white/20 group-hover:text-white/60 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </Link>
@@ -310,18 +307,18 @@ export default async function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <p className="text-[12px] tracking-[0.2em] text-[#E8102A]" style={os}>Recent Clips</p>
                   {(recentClips ?? []).length > 0 && (
-                    <span className="text-[11px] text-white/25" style={os}>{(allClips ?? []).length} total</span>
+                    <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total</span>
                   )}
                 </div>
 
                 {!recentClips || recentClips.length === 0 ? (
                   <div className="rounded-xl px-5 py-10 text-center" style={glass}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <svg className="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-slate-100">
+                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                       </svg>
                     </div>
-                    <p className="text-sm text-white/35">No clips yet — add players and upload their first session.</p>
+                    <p className="text-sm text-slate-500">No clips yet — add players and upload their first session.</p>
                   </div>
                 ) : (
                   <div className="rounded-xl overflow-hidden" style={glass}>
@@ -335,25 +332,24 @@ export default async function DashboardPage() {
                           key={clip.id}
                           href={`/clips/${clip.id}`}
                           transitionTypes={['nav-forward']}
-                          className="group flex items-center gap-4 px-5 py-3.5 transition-colors"
-                          style={{ borderBottom: i < (recentClips?.length ?? 1) - 1 ? '1px solid rgba(255,255,255,0.06)' : undefined }}
+                          className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-slate-50"
+                          style={{ borderBottom: i < (recentClips?.length ?? 1) - 1 ? '1px solid #f1f5f9' : undefined }}
                         >
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: 'linear-gradient(135deg, #0D1828, #1A2E44)' }}>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
                             <svg className="w-4 h-4 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                             </svg>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[14px] text-white/80 truncate font-medium group-hover:text-white transition-colors">{clip.title}</p>
-                            <p className="text-[12px] text-white/30 mt-0.5">
+                            <p className="text-[14px] text-slate-700 truncate font-medium group-hover:text-slate-950 transition-colors">{clip.title}</p>
+                            <p className="text-[12px] text-slate-400 mt-0.5">
                               {player?.full_name ?? 'Unknown'} · {sessionLabel}
                             </p>
                           </div>
                           {i === 0 && (
                             <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
                           )}
-                          <svg className="w-3.5 h-3.5 text-white/15 group-hover:text-white/50 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </Link>
@@ -385,30 +381,27 @@ export default async function DashboardPage() {
           <div className="space-y-6">
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
-              background: 'linear-gradient(135deg, #0A1020 0%, #0D1828 60%, #0A1020 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }} />
+              <div className="h-px bg-[#E8102A]" />
               <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(232,16,42,0.08) 0%, transparent 70%)' }} />
+                style={{ background: 'radial-gradient(circle, rgba(232,16,42,0.04) 0%, transparent 70%)' }} />
 
               <div className="relative px-4 sm:px-7 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <div
                   className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl text-white shrink-0"
-                  style={{ ...os, background: '#E8102A', boxShadow: '0 8px 24px rgba(232,16,42,0.25)' }}
+                  style={{ ...os, background: '#E8102A', boxShadow: '0 4px 12px rgba(232,16,42,0.2)' }}
                 >
                   {(playerRow?.full_name ?? 'P').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
-                  <h1 className="text-2xl text-white leading-tight truncate tracking-tight" style={os}>
+                  <h1 className="text-2xl text-slate-950 leading-tight truncate tracking-tight" style={os}>
                     {playerRow?.full_name ?? 'Pitcher'}
                   </h1>
-                  <p className="text-sm text-white/35 mt-1">
+                  <p className="text-sm text-slate-500 mt-1">
                     {(myClips?.length ?? 0) === 0
                       ? 'Ready to start your development journey?'
                       : `${myClips!.length} clip${myClips!.length === 1 ? '' : 's'} uploaded · Keep grinding.`}
@@ -419,15 +412,15 @@ export default async function DashboardPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 divide-x" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="grid grid-cols-3 divide-x divide-slate-100" style={{ borderTop: '1px solid #e2e8f0' }}>
                 {[
                   { label: 'Clips',           value: myClips?.length ?? 0 },
                   { label: 'Pitches Tracked', value: myMetrics?.length ?? 0 },
                   { label: 'Best Velo',        value: bestVelo ? `${bestVelo}` : '—' },
                 ].map(s => (
-                  <div key={s.label} className="px-5 py-4 text-center" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                    <p className="text-xl text-white tracking-tight" style={os}>{s.value}</p>
-                    <p className="text-xs text-white/30 mt-0.5">{s.label}</p>
+                  <div key={s.label} className="px-5 py-4 text-center">
+                    <p className="text-xl text-slate-950 tracking-tight" style={os}>{s.value}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -472,8 +465,8 @@ export default async function DashboardPage() {
                         style={{ background: 'rgba(232,16,42,0.1)' }}>
                         {card.icon}
                       </div>
-                      <h3 className="text-sm text-white mb-2 tracking-tight" style={os}>{card.title}</h3>
-                      <p className="text-sm text-white/35 leading-relaxed">{card.desc}</p>
+                      <h3 className="text-sm text-slate-950 mb-2 tracking-tight" style={os}>{card.title}</h3>
+                      <p className="text-sm text-slate-500 leading-relaxed">{card.desc}</p>
                     </div>
                   ))}
                 </div>
@@ -481,34 +474,32 @@ export default async function DashboardPage() {
                 {playerRow && (
                   <div className="rounded-xl px-6 py-10 text-center transition-colors"
                     style={{ ...glassDark, borderStyle: 'dashed' }}>
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <svg className="w-7 h-7 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 bg-slate-100">
+                      <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                       </svg>
                     </div>
-                    <h3 className="text-base text-white mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
-                    <p className="text-sm text-white/35 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
+                    <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
+                    <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
                     <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
                   </div>
                 )}
 
                 <Link
                   href="/player-settings"
-                  className="flex items-center gap-4 rounded-xl px-5 py-4 transition-colors group"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  className="flex items-center gap-4 rounded-xl px-5 py-4 transition-colors group hover:bg-slate-50"
+                  style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
                 >
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.07)' }}>
-                    <svg className="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
+                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-white/80 font-medium tracking-tight" style={os}>Complete Your Profile</p>
-                    <p className="text-xs text-white/30 mt-0.5">Add height, weight, high school, travel team, and college interests.</p>
+                    <p className="text-sm text-slate-800 font-medium tracking-tight" style={os}>Complete Your Profile</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Add height, weight, high school, travel team, and college interests.</p>
                   </div>
-                  <svg className="w-5 h-5 text-white/20 group-hover:text-white/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-slate-300 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </Link>
@@ -518,7 +509,7 @@ export default async function DashboardPage() {
               <div className="space-y-4">
                 {(myMetrics?.length ?? 0) === 0 && (
                   <div className="rounded-xl px-5 py-4 text-center" style={glass}>
-                    <p className="text-xs text-white/35">No pitch metrics yet — upload a Rapsodo CSV on any clip to start tracking.</p>
+                    <p className="text-xs text-slate-500">No pitch metrics yet — upload a Rapsodo CSV on any clip to start tracking.</p>
                   </div>
                 )}
                 {(myMetrics?.length ?? 0) > 0 && (
@@ -535,8 +526,8 @@ export default async function DashboardPage() {
                             { label: 'Best Spin',       value: bestSpin ? `${bestSpin.toLocaleString()} rpm` : '—' },
                           ].map(stat => (
                             <div key={stat.label} className="text-center">
-                              <p className="text-xl text-white tracking-tight" style={os}>{stat.value}</p>
-                              <p className="text-xs text-white/30 mt-1">{stat.label}</p>
+                              <p className="text-xl text-slate-950 tracking-tight" style={os}>{stat.value}</p>
+                              <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
                             </div>
                           ))}
                         </div>
@@ -545,24 +536,23 @@ export default async function DashboardPage() {
 
                     {bestPitch && (
                       <div className="relative rounded-xl overflow-hidden" style={{
-                        background: 'linear-gradient(135deg, #0A1020 0%, #0D1828 100%)',
-                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
                       }}>
-                        <div className="absolute inset-0 pointer-events-none"
-                          style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, rgba(232,16,42,0.08) 0%, transparent 60%)' }} />
+                        <div className="h-px bg-[#E8102A]" />
                         <div className="relative p-5">
                           <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
                           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                             <div>
-                              <p className="text-3xl sm:text-4xl text-white leading-none tracking-tight" style={os}>
+                              <p className="text-3xl sm:text-4xl text-slate-950 leading-none tracking-tight" style={os}>
                                 {bestPitch.velocity}
-                                <span className="text-base text-white/30 ml-1">mph</span>
+                                <span className="text-base text-slate-400 ml-1">mph</span>
                               </p>
-                              <p className="text-xs text-white/45 mt-2">
+                              <p className="text-xs text-slate-500 mt-2">
                                 {bestPitch.pitch_type ?? 'Unknown pitch'}
                                 {bestPitch.spin_rate ? ` · ${bestPitch.spin_rate.toLocaleString()} rpm` : ''}
                               </p>
-                              <p className="text-xs text-white/25 mt-1 truncate max-w-[200px]">
+                              <p className="text-xs text-slate-400 mt-1 truncate max-w-[200px]">
                                 {myClipTitleMap[bestPitch.clip_id] ?? ''}
                               </p>
                             </div>
@@ -570,14 +560,14 @@ export default async function DashboardPage() {
                               <div className="flex gap-4 ml-auto">
                                 {bestPitch.horizontal_break != null && (
                                   <div className="text-center">
-                                    <p className="text-lg text-white tracking-tight" style={os}>{bestPitch.horizontal_break}</p>
-                                    <p className="text-[13px] text-white/30">HB</p>
+                                    <p className="text-lg text-slate-950 tracking-tight" style={os}>{bestPitch.horizontal_break}</p>
+                                    <p className="text-[13px] text-slate-400">HB</p>
                                   </div>
                                 )}
                                 {bestPitch.vertical_break != null && (
                                   <div className="text-center">
-                                    <p className="text-lg text-white tracking-tight" style={os}>{bestPitch.vertical_break}</p>
-                                    <p className="text-[13px] text-white/30">VB</p>
+                                    <p className="text-lg text-slate-950 tracking-tight" style={os}>{bestPitch.vertical_break}</p>
+                                    <p className="text-[13px] text-slate-400">VB</p>
                                   </div>
                                 )}
                               </div>
@@ -591,7 +581,7 @@ export default async function DashboardPage() {
 
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-[#E8102A] tracking-[0.3em]" style={os}>Your Clips ({myClips.length})</p>
-                  <Link href="/player-settings" className="text-xs text-white/30 hover:text-white/60 transition-colors" style={os}>
+                  <Link href="/player-settings" className="text-xs text-slate-400 hover:text-slate-700 transition-colors" style={os}>
                     Edit Profile →
                   </Link>
                 </div>
@@ -605,22 +595,20 @@ export default async function DashboardPage() {
                       className="group flex items-center gap-3 sm:gap-4 rounded-xl px-4 sm:px-5 py-3 sm:py-4 transition-all"
                       style={glass}
                     >
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
                         <svg className="w-5 h-5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white/80 group-hover:text-white truncate font-medium transition-colors">{clip.title}</p>
-                        <p className="text-xs text-white/30 mt-0.5">
+                        <p className="text-sm text-slate-700 group-hover:text-slate-950 truncate font-medium transition-colors">{clip.title}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
                           {fmtDate((clip as { session_date?: string | null }).session_date ?? null, clip.created_at)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {(clip as { voice_path?: string | null }).voice_path && (
-                          <span className="flex items-center gap-1 text-[10px] text-white/40 px-2 py-0.5 rounded-full"
-                            style={{ background: 'rgba(255,255,255,0.07)' }}>
+                          <span className="flex items-center gap-1 text-[10px] text-slate-500 px-2 py-0.5 rounded-full bg-slate-100">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
                             </svg>
@@ -631,7 +619,7 @@ export default async function DashboardPage() {
                           <span className="text-xs bg-[#E8102A] text-white px-2 py-0.5 rounded" style={os}>Latest</span>
                         )}
                       </div>
-                      <svg className="w-4 h-4 text-white/15 group-hover:text-white/45 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </Link>

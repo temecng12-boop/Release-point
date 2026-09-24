@@ -45,7 +45,7 @@ export default function Logo({
           ...oswald,
           fontSize: wordSz[size],
           letterSpacing: '0.15em',
-          color: dark ? '#3D5A75' : '#EDF2F7',
+          color: dark ? '#94a3b8' : '#0f172a',
         }}
       >
         Release Point
