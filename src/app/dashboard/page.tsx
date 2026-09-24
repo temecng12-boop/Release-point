@@ -387,7 +387,7 @@ export default async function DashboardPage() {
                 background: 'radial-gradient(circle, #C8102E 0%, transparent 70%)',
               }} />
 
-              <div className="relative px-7 py-8 flex items-center gap-6">
+              <div className="relative px-4 sm:px-7 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 {/* Avatar */}
                 <div
                   className="w-16 h-16 rounded-xl bg-[#C8102E] flex items-center justify-center text-2xl text-white shrink-0 shadow-lg"
@@ -547,9 +547,9 @@ export default async function DashboardPage() {
                         }} />
                         <div className="relative p-5">
                           <p className="text-[13px] text-[#C8102E] tracking-[0.2em] mb-3" style={oswald}>Best Pitch</p>
-                          <div className="flex items-end gap-6">
+                          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                             <div>
-                              <p className="text-4xl text-white leading-none" style={oswald}>
+                              <p className="text-3xl sm:text-4xl text-white leading-none" style={oswald}>
                                 {bestPitch.velocity}
                                 <span className="text-base text-[#3D5166] ml-1">mph</span>
                               </p>
@@ -596,7 +596,7 @@ export default async function DashboardPage() {
                     <Link
                       key={clip.id}
                       href={`/clips/${clip.id}`}
-                      className="flex items-center gap-4 bg-white border border-[#DDE4ED] rounded-xl px-5 py-4 hover:bg-[#F0F4F8] hover:border-[#456080] transition-all shadow-sm group"
+                      className="flex items-center gap-3 sm:gap-4 bg-white border border-[#DDE4ED] rounded-xl px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#F0F4F8] hover:border-[#456080] transition-all shadow-sm group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-[#EEF2F7] border border-[#DDE4ED] flex items-center justify-center shrink-0">
                         <svg className="w-5 h-5 text-[#C8102E]" fill="currentColor" viewBox="0 0 20 20">

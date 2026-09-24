@@ -16,6 +16,14 @@ type PhaseRow    = { name: string; rating: 'good' | 'needs_work' | 'critical' | 
 type Tab         = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
 
 const TABS: Tab[] = ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
+const TAB_SHORT: Record<Tab, string> = {
+  'Timestamps': 'Times',
+  'Notes': 'Notes',
+  'Voice': 'Voice',
+  'Mechanics': 'Mech',
+  'Metrics': 'Stats',
+  'AI Coach': 'AI',
+}
 
 export default function ClipTabs({
   clipId,
@@ -47,19 +55,20 @@ export default function ClipTabs({
   return (
     <div>
       {/* Tab bar */}
-      <div className="relative z-10 flex border-b border-[#DDE4ED] overflow-x-auto">
+      <div className="relative z-10 flex border-b border-[#DDE4ED]">
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActive(tab)}
-            className={`px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] tracking-wider transition-colors border-b-2 -mb-px whitespace-nowrap ${
+            className={`flex-1 px-1 sm:px-4 py-2 sm:py-2.5 text-[10px] sm:text-[13px] tracking-wider transition-colors border-b-2 -mb-px text-center ${
               active === tab
                 ? 'border-[#C8102E] text-[#0F1F33]'
                 : 'border-transparent text-[#3D5166] hover:text-[#456080]'
             }`}
             style={oswald}
           >
-            {tab}
+            <span className="hidden sm:inline">{tab}</span>
+            <span className="sm:hidden">{TAB_SHORT[tab]}</span>
           </button>
         ))}
       </div>
