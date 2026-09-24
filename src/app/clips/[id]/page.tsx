@@ -92,7 +92,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
         showSignOut
       />
 
-      <main className="max-w-5xl mx-auto px-4 md:px-6 py-5">
+      <main className="max-w-5xl mx-auto px-4 md:px-6 py-5 pb-24">
         {/* Compare button */}
         <div className="flex justify-end mb-3">
           <Link

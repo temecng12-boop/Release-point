@@ -33,47 +33,28 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   redirect('/dashboard')
 }
 
-export async function signUpPlayer(_prevState: { error?: string } | undefined, formData: FormData) {
+export async function signUpPlayer(
+  _prevState: { error?: string; sent?: boolean; email?: string } | undefined,
+  formData: FormData
+) {
   const supabase = await createClient()
 
-  if (!formData.get('tos')) return { error: 'You must accept the Terms of Service to continue.' }
-
-  const email    = formData.get('email') as string
-  const password = formData.get('password') as string
+  const email = formData.get('email') as string
   let fullName = formData.get('full_name') as string
   if (fullName) fullName = toTitleCase(fullName)
 
-  const { data, error } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signInWithOtp({
     email,
-    password,
-    options: { data: { role: 'player', full_name: fullName } },
+    options: {
+      shouldCreateUser: true,
+      data: { role: 'player', full_name: fullName },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/confirm`,
+    },
   })
 
   if (error) return { error: error.message }
 
-  if (data.user) {
-    await supabaseAdmin.from('profiles').upsert({ id: data.user.id, full_name: fullName || '', role: 'player' })
-
-    // Link to existing player record if a coach already invited this email
-    const { data: linked } = await supabaseAdmin
-      .from('players')
-      .update({ user_id: data.user.id, accepted_at: new Date().toISOString() })
-      .eq('email', email)
-      .is('user_id', null)
-      .select('id')
-
-    // No invite found — create a standalone player row so the user can upload clips
-    if (!linked || linked.length === 0) {
-      await supabaseAdmin.from('players').insert({
-        user_id:     data.user.id,
-        full_name:   fullName || '',
-        email,
-        accepted_at: new Date().toISOString(),
-      })
-    }
-  }
-
-  redirect('/dashboard')
+  return { sent: true, email }
 }
 
 export async function signIn(_prevState: { error?: string } | undefined, formData: FormData) {
@@ -100,11 +81,43 @@ export async function linkPlayerRow() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) return
 
+  const role     = (user.user_metadata?.role ?? 'player') as string
+  const fullName = (user.user_metadata?.full_name ?? '') as string
+  const now      = new Date().toISOString()
+
+  // Ensure profile row exists
   await supabaseAdmin
+    .from('profiles')
+    .upsert({ id: user.id, full_name: fullName, role }, { onConflict: 'id', ignoreDuplicates: true })
+
+  if (role !== 'player') return
+
+  // Link to an existing invited player record
+  const { data: linked } = await supabaseAdmin
     .from('players')
-    .update({ user_id: user.id, accepted_at: new Date().toISOString() })
+    .update({ user_id: user.id, accepted_at: now, consent_given_at: now })
     .eq('email', user.email)
     .is('user_id', null)
+    .select('id')
+
+  // No invite — create a standalone player row
+  if (!linked || linked.length === 0) {
+    const { data: existing } = await supabaseAdmin
+      .from('players')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!existing) {
+      await supabaseAdmin.from('players').insert({
+        user_id:          user.id,
+        full_name:        fullName,
+        email:            user.email,
+        accepted_at:      now,
+        consent_given_at: now,
+      })
+    }
+  }
 }
 
 export async function deleteAccount() {

@@ -34,7 +34,7 @@ export default function InviteForm({ teams }: Props) {
             </div>
           </div>
 
-          {teams.length > 0 && (
+          {(teams?.length ?? 0) > 0 && (
             <div>
               <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Assign to Teams</label>
               <div className="flex flex-wrap gap-2">

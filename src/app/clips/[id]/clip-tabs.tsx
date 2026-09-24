@@ -47,7 +47,7 @@ export default function ClipTabs({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex border-b border-[#DDE4ED] overflow-x-auto">
+      <div className="relative z-10 flex border-b border-[#DDE4ED] overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab}

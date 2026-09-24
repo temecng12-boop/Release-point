@@ -32,7 +32,12 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute  = pathname.startsWith('/auth')
   const isPublicPath = pathname === '/' || pathname === '/about' || isAuthRoute
 
-  if (!user && !isPublicPath) {
+  // Never redirect server action requests — they carry a `next-action` header
+  // and expect either an RSC response or an `x-action-redirect` header.
+  // A plain HTTP redirect causes "An unexpected response was received from the server."
+  const isServerAction = Boolean(request.headers.get('next-action'))
+
+  if (!user && !isPublicPath && !isServerAction) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)

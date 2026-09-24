@@ -60,7 +60,26 @@ function CoachForm({ onBack }: { onBack: () => void }) {
 
 function PlayerForm({ onBack }: { onBack: () => void }) {
   const [state, action, pending] = useActionState(signUpPlayer, undefined)
-  const [tosAccepted, setTosAccepted] = useState(false)
+
+  if (state?.sent) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-[#EEF2F7] flex items-center justify-center mx-auto">
+          <svg className="w-6 h-6 text-[#1C3A5C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm text-[#0F1F33] mb-1" style={oswald}>Check Your Email</p>
+          <p className="text-xs text-[#3D5166] leading-relaxed">We sent a sign-in link to <strong>{state.email}</strong>. Click it to finish setting up your account.</p>
+        </div>
+        <button type="button" onClick={onBack} className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors" style={oswald}>
+          ← Back
+        </button>
+      </div>
+    )
+  }
+
   return (
     <form action={action} className="space-y-4">
       <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#456080] transition-colors mb-2" style={oswald}>
@@ -75,32 +94,18 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="your@email.com" className={inputClass} />
         <p className="text-[11px] text-[#3D5166] mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
       </div>
-      <div>
-        <label className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={oswald}>Password</label>
-        <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputClass} />
-      </div>
-      <label className="flex items-start gap-3 cursor-pointer group">
-        <input
-          type="checkbox"
-          name="tos"
-          checked={tosAccepted}
-          onChange={(e) => setTosAccepted(e.target.checked)}
-          className="mt-0.5 w-4 h-4 accent-[#C8102E] shrink-0"
-        />
-        <span className="text-xs text-[#456080] leading-relaxed">
-          I agree to the{' '}
-          <a href="/terms" target="_blank" className="text-[#1C3A5C] hover:underline">Terms of Service</a>
-          {' '}and{' '}
-          <a href="/privacy" target="_blank" className="text-[#1C3A5C] hover:underline">Privacy Policy</a>
-        </span>
-      </label>
       {state?.error && (
         <div className="bg-[#C8102E]/10 border border-[#C8102E]/30 rounded-lg px-4 py-3">
           <p className="text-sm text-[#C8102E]">{state.error}</p>
         </div>
       )}
-      <button type="submit" disabled={pending || !tosAccepted} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
-        {pending ? 'Creating Account…' : 'Create Player Account'}
+      <p className="text-[11px] text-[#3D5166] leading-relaxed">
+        By continuing you agree to our{' '}
+        <a href="/terms" target="_blank" className="text-[#1C3A5C] hover:underline">Terms of Service</a>
+        {' '}and consent to video storage for coaching purposes.
+      </p>
+      <button type="submit" disabled={pending} className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50 mt-2" style={oswald}>
+        {pending ? 'Sending Link…' : 'Send Sign-in Link'}
       </button>
     </form>
   )
