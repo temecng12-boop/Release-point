@@ -6,6 +6,7 @@ interface Props {
   href?: string
   className?: string
   wordmarkClass?: string
+  dark?: boolean
 }
 
 const oswald: React.CSSProperties = {
@@ -15,7 +16,7 @@ const oswald: React.CSSProperties = {
 }
 
 // rp-icon.png native dimensions: 665 × 347 (ratio 1.916)
-const iconH  = { sm: 30, md: 38, lg: 52 }
+const iconH  = { sm: 28, md: 34, lg: 48 }
 const wordSz = { sm: 11, md: 13, lg: 18 }
 
 export default function Logo({
@@ -23,6 +24,7 @@ export default function Logo({
   href,
   className = '',
   wordmarkClass = 'hidden sm:inline',
+  dark = false,
 }: Props) {
   const h = iconH[size]
   const w = Math.round(h * 1.916)
@@ -39,7 +41,12 @@ export default function Logo({
       />
       <span
         className={wordmarkClass}
-        style={{ ...oswald, fontSize: wordSz[size], letterSpacing: '0.15em', color: '#1C2E4A' }}
+        style={{
+          ...oswald,
+          fontSize: wordSz[size],
+          letterSpacing: '0.15em',
+          color: dark ? '#3D5A75' : '#EDF2F7',
+        }}
       >
         Release Point
       </span>

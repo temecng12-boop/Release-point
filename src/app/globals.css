@@ -1,17 +1,38 @@
 @import "tailwindcss";
 
+/* ─── Design tokens ─────────────────────────────────────────────────────── */
+
 :root {
+  /* Backgrounds */
+  --bg:        #06090F;
+  --surface-1: #0D1520;
+  --surface-2: #131E2E;
+
+  /* Text */
+  --text-1: #EDF2F7;
+  --text-2: #8BA3BC;
+  --text-3: #4D6278;
+
+  /* Accent */
+  --accent:     #E8102A;
+  --accent-dim: #A50D1E;
+
+  /* Glass */
+  --glass-bg:     rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+
+  /* Legacy (kept for older components still referencing them) */
   --navy:    #0B1E36;
   --navy-2:  #14304F;
   --navy-3:  #20486F;
-  --red:     #C8102E;
-  --red-dim: #9E0E24;
+  --red:     #E8102A;
+  --red-dim: #A50D1E;
   --white:   #FFFFFF;
   --bone:    #F6F5F1;
-  --ink:     #16202E;
-  --slate:   #5B6B7F;
-  --line:    #DCE1E7;
-  --card:    #FFFFFF;
+  --ink:     #EDF2F7;
+  --slate:   #8BA3BC;
+  --line:    rgba(255,255,255,0.08);
+  --card:    rgba(255,255,255,0.04);
 }
 
 @theme inline {
@@ -25,17 +46,21 @@
   --color-line:   var(--line);
   --color-card:   var(--card);
   --font-oswald:  var(--font-oswald);
-  --font-inter:   var(--font-inter);
+  --font-geist:   var(--font-geist-sans);
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+
 html {
-  font-size: 22px;
+  font-size: 16px;
 }
 
 body {
-  font-family: var(--font-inter, Inter, sans-serif);
-  background-color: #060F1A;
-  color: #E8EDF5;
+  font-family: var(--font-geist-sans, 'Geist', system-ui, sans-serif);
+  background-color: var(--bg);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Minimum tap targets */
@@ -43,7 +68,7 @@ button, a {
   min-height: 36px;
 }
 
-/* Header links must not inherit min-height — prevents vertical misalignment */
+/* Header links must not inherit min-height */
 header a,
 header button,
 header span {
@@ -58,6 +83,37 @@ h1, h2, h3, .display {
   letter-spacing: 0.02em;
 }
 
+/* ─── Glass utilities ────────────────────────────────────────────────────── */
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-strong {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+}
+
+/* ─── Fade-up animation ──────────────────────────────────────────────────── */
+
+@keyframes fade-up {
+  from { opacity: 0; translate: 0 22px; }
+  to   { opacity: 1; translate: 0 0;    }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-fade-up-1 { animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 100ms both; }
+.animate-fade-up-2 { animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 200ms both; }
+.animate-fade-up-3 { animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 320ms both; }
+.animate-fade-up-4 { animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 440ms both; }
+
 /* ─── View Transitions ─────────────────────────────────────────────────── */
 
 :root {
@@ -66,7 +122,6 @@ h1, h2, h3, .display {
   --vt-move:  350ms;
 }
 
-/* Directional slides: nav-forward (push deeper) */
 ::view-transition-old(.nav-forward) {
   animation: var(--vt-exit) ease-in both vt-fade reverse,
              var(--vt-move) ease-in-out both vt-slide-left reverse;
@@ -76,7 +131,6 @@ h1, h2, h3, .display {
              var(--vt-move) ease-in-out both vt-slide-left;
 }
 
-/* Directional slides: nav-back (pop up) */
 ::view-transition-old(.nav-back) {
   animation: var(--vt-exit) ease-in both vt-fade reverse,
              var(--vt-move) ease-in-out both vt-slide-right reverse;
@@ -86,7 +140,6 @@ h1, h2, h3, .display {
              var(--vt-move) ease-in-out both vt-slide-right;
 }
 
-/* Suspense reveals: skeleton exits down, content enters up */
 ::view-transition-old(.reveal-out) {
   animation: var(--vt-exit) ease-out both vt-fade reverse,
              var(--vt-exit) ease-out both vt-slide-down reverse;
@@ -117,19 +170,21 @@ h1, h2, h3, .display {
   to   { translate: 0 10px; }
 }
 
-/* Keep the sticky header stationary during page slides */
 ::view-transition-group(site-header) { animation: none; z-index: 100; }
 ::view-transition-old(site-header)   { display: none; }
 ::view-transition-new(site-header)   { animation: none; }
 
-/* Let pointer events pass through the overlay (keeps app interactive mid-transition) */
 ::view-transition { pointer-events: none; }
 
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(*),
   ::view-transition-new(*),
-  ::view-transition-group(*) {
+  ::view-transition-group(*),
+  .animate-fade-up,
+  .animate-fade-up-1,
+  .animate-fade-up-2,
+  .animate-fade-up-3,
+  .animate-fade-up-4 {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
   }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Oswald, Inter } from "next/font/google";
+import { Oswald } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 const oswald = Oswald({
@@ -8,16 +9,11 @@ const oswald = Oswald({
   weight: ["400", "500", "600", "700"],
 });
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  themeColor: '#06090F',
 }
 
 export const metadata: Metadata = {
@@ -44,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${oswald.variable} ${inter.variable} h-full`}>
+    <html lang="en" className={`${oswald.variable} ${GeistSans.variable} h-full`}>
       <body className="min-h-full antialiased">
         {children}
         <script
