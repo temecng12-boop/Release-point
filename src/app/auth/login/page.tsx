@@ -1,6 +1,8 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { signIn } from '@/app/actions/auth'
@@ -14,7 +16,9 @@ const inputCls = [
   'bg-white border border-slate-200 focus:border-slate-400 focus:ring-1 focus:ring-slate-200',
 ].join(' ')
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const urlError = searchParams.get('error')
   const [state, action, pending] = useActionState(signIn, undefined)
   const [magicMode, setMagicMode]   = useState(false)
   const [magicEmail, setMagicEmail] = useState('')
@@ -127,6 +131,16 @@ export default function LoginPage() {
                 })}
               </div>
 
+              {urlError && (
+                <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                  <p className="text-sm text-[#E8102A]">
+                    {urlError === 'confirmation_failed'
+                      ? 'That sign-in link has expired or already been used. Request a new one below.'
+                      : 'Sign-in failed. Please try again.'}
+                  </p>
+                </div>
+              )}
+
               {!magicMode ? (
                 <form action={action} className="space-y-4">
                   <div>
@@ -137,6 +151,7 @@ export default function LoginPage() {
                     <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Password</label>
                     <input type="password" name="password" required placeholder="Your password" className={inputCls} />
                   </div>
+                  <p className="text-[11px] text-slate-400">Players — use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2">Email Link</button> tab instead.</p>
                   {state?.error && (
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{state.error}</p>
@@ -241,5 +256,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
