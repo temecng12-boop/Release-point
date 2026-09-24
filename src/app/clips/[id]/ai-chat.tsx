@@ -16,7 +16,8 @@ function renderMarkdown(text: string) {
     </Fragment>
   ))
 }
-type Metric  = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
+type Metric   = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
+type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
 
 export default function AIChat({
   clipId,
@@ -25,6 +26,8 @@ export default function AIChat({
   playerAgeGroup,
   playerPosition,
   metrics = [],
+  checklist = null,
+  coachNotes = null,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -32,6 +35,8 @@ export default function AIChat({
   playerAgeGroup: string | null
   playerPosition: string | null
   metrics?: Metric[]
+  checklist?: PhaseRow[] | null
+  coachNotes?: string | null
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -71,6 +76,8 @@ export default function AIChat({
             clipId,
             viewerRole: role,
             metrics,
+            checklist,
+            coachNotes,
           },
         }),
       })

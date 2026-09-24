@@ -105,6 +105,8 @@ export default function ClipTabs({
             playerAgeGroup={playerAgeGroup}
             playerPosition={playerPosition}
             metrics={initialMetrics}
+            checklist={initialChecklist}
+            coachNotes={initialNotes}
           />
         )}
       </div>
