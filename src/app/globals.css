@@ -57,3 +57,80 @@ h1, h2, h3, .display {
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
+
+/* ─── View Transitions ─────────────────────────────────────────────────── */
+
+:root {
+  --vt-exit:  150ms;
+  --vt-enter: 210ms;
+  --vt-move:  350ms;
+}
+
+/* Directional slides: nav-forward (push deeper) */
+::view-transition-old(.nav-forward) {
+  animation: var(--vt-exit) ease-in both vt-fade reverse,
+             var(--vt-move) ease-in-out both vt-slide-left reverse;
+}
+::view-transition-new(.nav-forward) {
+  animation: var(--vt-enter) ease-out var(--vt-exit) both vt-fade,
+             var(--vt-move) ease-in-out both vt-slide-left;
+}
+
+/* Directional slides: nav-back (pop up) */
+::view-transition-old(.nav-back) {
+  animation: var(--vt-exit) ease-in both vt-fade reverse,
+             var(--vt-move) ease-in-out both vt-slide-right reverse;
+}
+::view-transition-new(.nav-back) {
+  animation: var(--vt-enter) ease-out var(--vt-exit) both vt-fade,
+             var(--vt-move) ease-in-out both vt-slide-right;
+}
+
+/* Suspense reveals: skeleton exits down, content enters up */
+::view-transition-old(.reveal-out) {
+  animation: var(--vt-exit) ease-out both vt-fade reverse,
+             var(--vt-exit) ease-out both vt-slide-down reverse;
+}
+::view-transition-new(.reveal-in) {
+  animation: var(--vt-enter) ease-in var(--vt-exit) both vt-fade,
+             var(--vt-move) ease-in both vt-slide-up;
+}
+
+@keyframes vt-fade {
+  from { opacity: 0; filter: blur(2px); }
+  to   { opacity: 1; filter: blur(0);   }
+}
+@keyframes vt-slide-left {
+  from { translate: 50px; }
+  to   { translate: 0;    }
+}
+@keyframes vt-slide-right {
+  from { translate: -50px; }
+  to   { translate: 0;     }
+}
+@keyframes vt-slide-up {
+  from { translate: 0 10px; }
+  to   { translate: 0 0;    }
+}
+@keyframes vt-slide-down {
+  from { translate: 0 0;    }
+  to   { translate: 0 10px; }
+}
+
+/* Keep the sticky header stationary during page slides */
+::view-transition-group(site-header) { animation: none; z-index: 100; }
+::view-transition-old(site-header)   { display: none; }
+::view-transition-new(site-header)   { animation: none; }
+
+/* Let pointer events pass through the overlay (keeps app interactive mid-transition) */
+::view-transition { pointer-events: none; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

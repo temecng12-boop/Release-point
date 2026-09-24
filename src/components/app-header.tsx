@@ -23,6 +23,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
         backgroundColor: 'rgba(255,255,255,0.97)',
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid #DDE4ED',
+        viewTransitionName: 'site-header',
       }}
     >
       <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
@@ -33,6 +34,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
             {crumb.href ? (
               <Link
                 href={crumb.href}
+                transitionTypes={['nav-back']}
                 className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors shrink-0 hidden sm:inline"
                 style={oswald}
               >

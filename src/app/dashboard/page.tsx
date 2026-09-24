@@ -326,6 +326,7 @@ export default async function DashboardPage() {
                         <Link
                           key={clip.id}
                           href={`/clips/${clip.id}`}
+                          transitionTypes={['nav-forward']}
                           className="group flex items-center gap-4 px-5 py-3.5 border-b border-[#F0F4F8] last:border-0 hover:bg-[#F8FAFC] transition-colors"
                         >
                           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#0F1F33] to-[#1C3A5C] flex items-center justify-center shrink-0 shadow-sm">
@@ -596,6 +597,7 @@ export default async function DashboardPage() {
                     <Link
                       key={clip.id}
                       href={`/clips/${clip.id}`}
+                      transitionTypes={['nav-forward']}
                       className="flex items-center gap-3 sm:gap-4 bg-white border border-[#DDE4ED] rounded-xl px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#F0F4F8] hover:border-[#456080] transition-all shadow-sm group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-[#EEF2F7] border border-[#DDE4ED] flex items-center justify-center shrink-0">

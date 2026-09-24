@@ -31,7 +31,15 @@ export const metadata: Metadata = {
     siteName: "Release Point",
     type: "website",
   },
-  icons: { icon: "/rp-icon.png", apple: "/rp-icon.png" },
+  icons: {
+    icon: "/rp-icon.png",
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Release Point",
+  },
 };
 
 export default function RootLayout({
@@ -43,6 +51,11 @@ export default function RootLayout({
     <html lang="en" className={`${oswald.variable} ${inter.variable} h-full`}>
       <body className="min-h-full antialiased">
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
+          }}
+        />
       </body>
     </html>
   );
