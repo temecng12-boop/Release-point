@@ -1,10 +1,63 @@
 /**
- * Coaching philosophy configuration for Release Point's AI Coach.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * COACHING PHILOSOPHIES — Release Point AI Coach
+ * ─────────────────────────────────────────────────────────────────────────────
  *
- * Each philosophy is a named, structured principle that gets injected into
- * the AI system prompt. Toggle `active` to include or exclude it.
+ * This file is the single source of truth for the biomechanical principles
+ * the AI Coach evaluates against. Every active philosophy is injected verbatim
+ * into the system prompt for each conversation, so changes here take effect
+ * immediately — no deploy needed beyond saving the file.
  *
- * Categories: lower_half | arm_action | sequencing | lead_leg | release | pitch_design
+ * HOW TO ADD A NEW PHILOSOPHY
+ * ───────────────────────────
+ * Append a new object to the PHILOSOPHIES array. Required fields:
+ *
+ *   id            Unique snake_case string. Convention: "<category>_<concept>"
+ *                 e.g. "lower_half_hip_drive"
+ *
+ *   name          Human-readable title shown in the AI prompt.
+ *                 e.g. "Hip Drive Before Rotation"
+ *
+ *   category      One of: 'lower_half' | 'arm_action' | 'sequencing' |
+ *                 'lead_leg' | 'release' | 'pitch_design'
+ *                 Philosophies are grouped by category in the prompt.
+ *
+ *   description   One sentence. The core principle. This is the "headline"
+ *                 the AI reads first before seeing cues/flags.
+ *
+ *   cues          String[]. Word-for-word coaching cues you use on the mound.
+ *                 The AI will reference these when recommending corrections.
+ *
+ *   redFlags      String[]. Specific observable violations to watch for.
+ *                 The more precise, the more useful — "knee caves" beats "bad lead leg".
+ *
+ *   metricsRelation  How Rapsodo/TrackMan data signals a violation of this principle.
+ *                 The AI uses this to correlate checklist findings with pitch data.
+ *
+ *   active        true → included in every AI Coach conversation.
+ *                 false → stored but ignored. Use to pause a philosophy without
+ *                 deleting it (e.g., during rehab when you're temporarily working
+ *                 around a structural limitation).
+ *
+ * HOW TO MODIFY AN EXISTING PHILOSOPHY
+ * ──────────────────────────────────────
+ * Edit in place. Every field is hot-swappable. Common patterns:
+ *   - Update cues as your language evolves
+ *   - Add a red flag you've observed that isn't listed
+ *   - Set active: false to suppress a philosophy for a specific situation
+ *   - Update metricsRelation as you gather more Rapsodo data patterns
+ *
+ * HOW TO ADD A NEW CATEGORY
+ * ──────────────────────────
+ * 1. Add the new string literal to the `category` union type below
+ * 2. Add an entry to `categoryLabels` inside `formatPhilosophiesForPrompt()`
+ * 3. Philosophies with the new category will be grouped automatically
+ *
+ * SANITY TEST
+ * ───────────
+ * Run: npx tsx src/lib/__tests__/ai-coach.test.ts
+ * This validates all philosophy fields, active filtering, and prompt generation.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 export type Philosophy = {
