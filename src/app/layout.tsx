@@ -31,10 +31,6 @@ export const metadata: Metadata = {
     siteName: "Release Point",
     type: "website",
   },
-  icons: {
-    icon: "/rp-icon.png",
-    apple: [{ url: "/icons/icon-192.png", sizes: "192x192" }],
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
