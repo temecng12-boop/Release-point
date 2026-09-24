@@ -98,7 +98,7 @@ export async function saveAnnotation(data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  const { error } = await supabaseAdmin.from('annotations').insert({
+  const { data: inserted, error } = await supabaseAdmin.from('annotations').insert({
     clip_id:    data.clip_id,
     created_by: user.id,
     type:       data.type,
@@ -107,8 +107,41 @@ export async function saveAnnotation(data: {
     start_pt:   data.start_pt,
     end_pt:     data.end_pt,
     origin_time: data.origin_time,
-  })
+  }).select('id').single()
 
+  if (error) return { error: error.message }
+  return { success: true, id: inserted.id as string }
+}
+
+export async function deleteAnnotation(annotationId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: ann } = await supabaseAdmin
+    .from('annotations')
+    .select('created_by')
+    .eq('id', annotationId)
+    .single()
+  if (!ann || ann.created_by !== user.id) return { error: 'Not authorized' }
+
+  const { error } = await supabaseAdmin.from('annotations').delete().eq('id', annotationId)
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function clearAnnotations(clipId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  if (!clip) return { error: 'Not found' }
+
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+
+  const { error } = await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId).eq('created_by', user.id)
   if (error) return { error: error.message }
   return { success: true }
 }

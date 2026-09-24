@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { saveAnnotation } from '@/app/actions/clips'
+import { saveAnnotation, deleteAnnotation, clearAnnotations } from '@/app/actions/clips'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -23,6 +23,7 @@ const INK_WIDTH = 7
 type Point = { x: number; y: number }
 type ShapeType = 'freehand' | 'line' | 'rect' | 'circle'
 type Shape = {
+  id?: string
   type: ShapeType
   color: string
   points?: Point[]
@@ -207,6 +208,7 @@ function fmtTime(t: number) { return (isFinite(t) ? t : 0).toFixed(2) + 's' }
 
 function dbToShape(a: DbAnnotation): Shape {
   const shape: Shape = {
+    id: a.id,
     type: a.type as ShapeType,
     color: a.color,
     points: a.points ?? undefined,
@@ -289,12 +291,15 @@ export default function VideoPlayer({
   const [markerCount,     setMarkerCount]     = useState(0)
   const [trackingEnabled, setTrackingEnabled] = useState(true)
   const [videoError,      setVideoError]      = useState(false)
+  type MarkItem = { ref: Shape; type: string; color: string; time: number }
+  const [markList,        setMarkList]        = useState<MarkItem[]>([])
 
   // load initial annotations from DB
   useEffect(() => {
     const shapes = initialAnnotations.map(dbToShape)
     annotationsRef.current = shapes
     setMarkerCount(shapes.length)
+    setMarkList(shapes.map(s => ({ ref: s, type: s.type, color: s.color, time: s.originTime ?? 0 })))
     // Use rAF so canvas is sized after video layout
     requestAnimationFrame(() => { resizeCanvas(); drawFrame() })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,8 +471,10 @@ export default function VideoPlayer({
         if (frame) d.template = extractPatch(frame.imgData, anchor.x, anchor.y, frame.w, frame.h)
         annotationsRef.current = [...annotationsRef.current, d]
         setMarkerCount(c => c + 1)
+        const item = { ref: d, type: d.type, color: d.color, time: d.originTime ?? 0 }
+        setMarkList(prev => [...prev, item])
 
-        // persist to DB (fire-and-forget)
+        // persist to DB — update id when it comes back
         saveAnnotation({
           clip_id:     clipId,
           type:        d.type,
@@ -478,11 +485,13 @@ export default function VideoPlayer({
           origin_time: d.originTime ?? 0,
         }).then(result => {
           if (result?.error) {
-            console.error('annotation save failed:', result.error)
-            // Remove the annotation from UI if save failed
-            annotationsRef.current = annotationsRef.current.slice(0, -1)
+            annotationsRef.current = annotationsRef.current.filter(s => s !== d)
+            setMarkList(prev => prev.filter(m => m.ref !== d))
             setMarkerCount(c => c - 1)
             drawFrame()
+          } else if (result?.id) {
+            d.id = result.id
+            setMarkList(prev => prev.map(m => m.ref === d ? { ...m } : m))
           }
         })
       }
@@ -578,9 +587,18 @@ export default function VideoPlayer({
   }
   function selectTool(t: string)  { toolRef.current = t;     setTool(t) }
   function selectColor(c: string) { inkColorRef.current = c; setInkColor(c) }
-  function clearMarks() {
+  async function removeAnnotation(shape: Shape) {
+    if (shape.id) await deleteAnnotation(shape.id)
+    annotationsRef.current = annotationsRef.current.filter(s => s !== shape)
+    setMarkList(prev => prev.filter(m => m.ref !== shape))
+    setMarkerCount(c => c - 1)
+    drawFrame()
+  }
+
+  async function clearMarks() {
+    await clearAnnotations(clipId)
     annotationsRef.current = []; draftRef.current = null
-    setMarkerCount(0); drawFrame()
+    setMarkList([]); setMarkerCount(0); drawFrame()
   }
   function toggleTracking() {
     const next = !trackingEnabledRef.current
@@ -691,6 +709,29 @@ export default function VideoPlayer({
           <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
             Clear marks
           </button>
+        </div>
+      )}
+
+      {/* Per-mark list (coach only) */}
+      {isCoach && markList.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[#DDE4ED]">
+          <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1.5" style={oswald}>Marks — tap ✕ to remove from player view</p>
+          <div className="space-y-0.5 max-h-36 overflow-y-auto">
+            {markList.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 text-[0.72rem] text-[#456080] py-0.5 px-1 rounded hover:bg-[#F0F4F8]">
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, border: '1px solid rgba(0,0,0,0.15)', flexShrink: 0, display: 'inline-block' }} />
+                <span style={oswald} className="capitalize">{m.type}</span>
+                <span className="text-[#8096AE] tabular-nums">{m.time.toFixed(2)}s</span>
+                <button
+                  onClick={() => removeAnnotation(m.ref)}
+                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none"
+                  title="Remove annotation"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

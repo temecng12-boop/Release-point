@@ -1,9 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+  return m ? m[1] : null
+}
 
 interface Clip {
   id: string
@@ -20,6 +26,14 @@ interface Props {
 
 export default function ClipPicker({ sourceClipId, sourceClipTitle, clips }: Props) {
   const router = useRouter()
+  const [ytUrl, setYtUrl]     = useState('')
+  const [ytError, setYtError] = useState('')
+
+  function handleYouTube() {
+    const id = extractYouTubeId(ytUrl.trim())
+    if (!id) { setYtError('Paste a valid YouTube URL (youtube.com/watch or youtu.be)'); return }
+    router.push(`/clips/compare?a=${sourceClipId}&b=yt:${id}`)
+  }
 
   return (
     <div className="max-w-xl mx-auto space-y-5">
@@ -31,9 +45,39 @@ export default function ClipPicker({ sourceClipId, sourceClipTitle, clips }: Pro
         </div>
       </div>
 
+      {/* YouTube URL option */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-[#C8102E] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            <p className="text-xs text-[#0F1F33] tracking-[0.15em]" style={oswald}>Compare with YouTube</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={ytUrl}
+              onChange={e => { setYtUrl(e.target.value); setYtError('') }}
+              onKeyDown={e => { if (e.key === 'Enter') handleYouTube() }}
+              placeholder="Paste a YouTube URL…"
+              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-lg px-3 py-2 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+            />
+            <button
+              onClick={handleYouTube}
+              className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0"
+              style={oswald}
+            >
+              Use
+            </button>
+          </div>
+          {ytError && <p className="text-xs text-[#C8102E]">{ytError}</p>}
+        </div>
+      </div>
+
       <div>
         <p className="text-xs text-[#3D5166] tracking-[0.2em] mb-3" style={oswald}>
-          Select a clip to compare against
+          Or select a clip to compare against
         </p>
 
         {clips.length === 0 ? (

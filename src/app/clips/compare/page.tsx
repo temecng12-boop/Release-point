@@ -140,7 +140,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     )
   }
 
-  const clipB = await loadClip(b)
+  const clipB = b.startsWith('yt:')
+    ? { id: '', title: 'YouTube Video', videoUrl: '', playerName: 'YouTube', sessionDate: '', youtubeId: b.slice(3) }
+    : await loadClip(b)
   if (!clipB) notFound()
 
   return (
