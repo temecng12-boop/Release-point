@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { getSignedUploadUrl, saveVoicePath } from '@/app/actions/clips'
+import { getSignedUploadUrl, saveVoicePath, deleteVoicePath } from '@/app/actions/clips'
 import { createClient } from '@/lib/supabase/client'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -21,6 +21,7 @@ export default function VoiceNote({
   const [voiceUrl, setVoiceUrl] = useState<string | null>(initialVoiceUrl)
   const [recording, setRecording] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [recordError, setRecordError] = useState<string | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -107,7 +108,7 @@ export default function VoiceNote({
       </p>
 
       {isCoach && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {recording ? (
             <button
               onClick={stopRecording}
@@ -120,7 +121,7 @@ export default function VoiceNote({
           ) : (
             <button
               onClick={startRecording}
-              disabled={uploading}
+              disabled={uploading || deleting}
               className="flex items-center gap-2 text-xs bg-[#E8102A] hover:bg-[#C80E24] text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50"
               style={oswald}
             >
@@ -129,7 +130,19 @@ export default function VoiceNote({
             </button>
           )}
           {!recording && !uploading && voiceUrl && (
-            <span className="text-xs text-slate-400">Re-record to overwrite</span>
+            <button
+              onClick={async () => {
+                setDeleting(true)
+                const res = await deleteVoicePath(clipId)
+                if (!res?.error) setVoiceUrl(null)
+                setDeleting(false)
+              }}
+              disabled={deleting}
+              className="text-xs text-slate-400 hover:text-[#E8102A] transition-colors disabled:opacity-50"
+              style={oswald}
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
           )}
         </div>
       )}

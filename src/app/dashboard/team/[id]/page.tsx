@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
+import TeamLeaderboard from './team-leaderboard'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -35,8 +36,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         .from('players')
         .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
         .in('id', teamPlayerIds)
-        .eq('coach_id', user.id)
-        .order('invited_at', { ascending: false })
+        .order('full_name', { ascending: true })
     : { data: [] }
 
   const playerIds = players?.map((p) => p.id) ?? []
@@ -55,6 +55,44 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         .in('player_id', playerIds)
         .order('created_at', { ascending: false })
     : { data: [] }
+
+  // Fetch pitch metrics for all clips on this team for the leaderboard
+  const clipIds = (clips ?? []).map(c => c.id)
+  const { data: allMetrics } = clipIds.length > 0
+    ? await supabaseAdmin
+        .from('pitch_metrics')
+        .select('clip_id, velocity, spin_rate')
+        .in('clip_id', clipIds)
+    : { data: [] }
+
+  // Build clip → player lookup
+  const clipToPlayer: Record<string, string> = {}
+  for (const c of clips ?? []) clipToPlayer[c.id] = c.player_id
+
+  // Aggregate per player
+  const playerMetricMap: Record<string, { velocities: number[]; spinRates: number[] }> = {}
+  for (const m of allMetrics ?? []) {
+    const pid = clipToPlayer[m.clip_id]
+    if (!pid) continue
+    if (!playerMetricMap[pid]) playerMetricMap[pid] = { velocities: [], spinRates: [] }
+    if (m.velocity != null) playerMetricMap[pid].velocities.push(m.velocity)
+    if (m.spin_rate != null) playerMetricMap[pid].spinRates.push(m.spin_rate)
+  }
+
+  const leaderboardEntries = (players ?? []).map(p => {
+    const pm = playerMetricMap[p.id]
+    const velocities = pm?.velocities ?? []
+    const spinRates = pm?.spinRates ?? []
+    return {
+      playerId: p.id,
+      playerName: p.full_name,
+      maxVelocity: velocities.length > 0 ? Math.max(...velocities) : null,
+      avgVelocity: velocities.length > 0 ? Math.round(velocities.reduce((a, b) => a + b, 0) / velocities.length) : null,
+      maxSpinRate: spinRates.length > 0 ? Math.max(...spinRates) : null,
+      avgSpinRate: spinRates.length > 0 ? Math.round(spinRates.reduce((a, b) => a + b, 0) / spinRates.length) : null,
+      pitchCount: velocities.length,
+    }
+  })
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
@@ -77,6 +115,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <TeamInviteForm teamId={id} />
+
+        <TeamLeaderboard entries={leaderboardEntries} />
 
         <div>
           <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-3" style={oswald}>

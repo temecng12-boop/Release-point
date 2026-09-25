@@ -31,6 +31,7 @@ export async function createClip(data: {
     player_id:    data.player_id,
     storage_path: data.storage_path,
     title:        data.title,
+    session_date: data.session_date,
     uploaded_by:  user.id,
   }).select('id').single()
 
@@ -41,6 +42,30 @@ export async function createClip(data: {
 
   // Email the coach when a player uploads (fire-and-forget)
   if (newClip?.id) {
+    // Auto-link player to coach if coach uploaded for a player with no coach yet
+    try {
+      const { data: uploaderProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (uploaderProfile?.role === 'coach') {
+        const { data: playerCheck } = await supabaseAdmin
+          .from('players')
+          .select('coach_id')
+          .eq('id', data.player_id)
+          .single()
+
+        if (playerCheck && !playerCheck.coach_id) {
+          await supabaseAdmin
+            .from('players')
+            .update({ coach_id: user.id })
+            .eq('id', data.player_id)
+        }
+      }
+    } catch { /* non-critical */ }
+
     try {
       const { data: player } = await supabaseAdmin
         .from('players')
@@ -150,6 +175,7 @@ export async function saveTimestampNote(data: {
   clip_id: string
   time_seconds: number
   body: string
+  drawing_data?: unknown[] | null
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -171,8 +197,8 @@ export async function saveTimestampNote(data: {
 
   const { data: note, error } = await supabaseAdmin
     .from('timestamp_notes')
-    .insert({ clip_id: data.clip_id, created_by: user.id, time_seconds: data.time_seconds, body: data.body })
-    .select('id, time_seconds, body')
+    .insert({ clip_id: data.clip_id, created_by: user.id, time_seconds: data.time_seconds, body: data.body, drawing_data: data.drawing_data ?? null })
+    .select('id, time_seconds, body, drawing_data')
     .single()
 
   if (error) return { error: error.message }
@@ -191,6 +217,54 @@ export async function deleteTimestampNote(noteId: string) {
     .eq('created_by', user.id)
 
   if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function saveLessonPath(clipId: string, lessonPath: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+  const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
+  if (error) return { error: error.message }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
+export async function deleteLessonPath(clipId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+  if (clip.lesson_path) {
+    await supabaseAdmin.storage.from('clips').remove([clip.lesson_path])
+  }
+  await supabaseAdmin.from('clips').update({ lesson_path: null }).eq('id', clipId)
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
+export async function deleteVoicePath(clipId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, voice_path').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+
+  if (clip.voice_path) {
+    await supabaseAdmin.storage.from('clips').remove([clip.voice_path])
+  }
+  await supabaseAdmin.from('clips').update({ voice_path: null }).eq('id', clipId)
+  revalidatePath(`/clips/${clipId}`)
   return { success: true }
 }
 
@@ -294,6 +368,8 @@ export async function addPitchMetric(clipId: string, data: {
   spin_axis: number | null
   horizontal_break: number | null
   vertical_break: number | null
+  extension: number | null
+  vaa: number | null
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -313,12 +389,50 @@ export async function addPitchMetric(clipId: string, data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  const { data: row, error } = await supabaseAdmin
+  // extension and vaa are new columns — insert fault-tolerantly
+  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
+  let row: Record<string, unknown> | null = null
+  let insertError: { message: string } | null = null
+
+  const full = await supabaseAdmin
     .from('pitch_metrics')
-    .insert({ clip_id: clipId, created_by: user.id, ...data })
-    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+    .insert(baseInsert)
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
     .single()
 
-  if (error) return { error: error.message }
+  if (full.error?.code === 'PGRST204' || full.error?.message?.includes('extension') || full.error?.message?.includes('vaa')) {
+    // Columns don't exist yet — insert without them
+    const { extension: _ext, vaa: _vaa, ...coreData } = baseInsert as typeof baseInsert & { extension: unknown; vaa: unknown }
+    void _ext; void _vaa
+    const fallback = await supabaseAdmin
+      .from('pitch_metrics')
+      .insert(coreData)
+      .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+      .single()
+    row = fallback.data as Record<string, unknown> | null
+    insertError = fallback.error
+  } else {
+    row = full.data as Record<string, unknown> | null
+    insertError = full.error
+  }
+
+  if (insertError) return { error: insertError.message }
   return { metric: row }
+}
+
+export async function saveReframe(clipId: string, reframe: { zoom: number; panX: number; panY: number } | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+
+  const { error } = await supabaseAdmin.from('clips').update({ reframe }).eq('id', clipId)
+  if (error) return { error: error.message }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
 }

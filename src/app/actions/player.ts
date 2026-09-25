@@ -114,6 +114,8 @@ export async function updatePlayerSelfProfile(data: {
   bats?: string
   college_interests?: string[]
   college_offers?: string[]
+  showcases?: { name: string; date: string; location: string }[]
+  career_stats?: Record<string, string>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -128,6 +130,29 @@ export async function updatePlayerSelfProfile(data: {
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard')
+  revalidatePath('/player-settings')
+  return { success: true }
+}
+
+export async function updatePlayerAthleteProfile(playerId: string, data: {
+  college_interests?: string[]
+  college_offers?: string[]
+  showcases?: { name: string; date: string; location: string }[]
+  career_stats?: Record<string, string>
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // Allow coach of this player OR the player themselves
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', playerId).single()
+  if (!player) return { error: 'Player not found' }
+  if (player.coach_id !== user.id && player.user_id !== user.id) return { error: 'Not authorized' }
+
+  const { error } = await supabaseAdmin.from('players').update(data).eq('id', playerId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/profile/${playerId}`)
   revalidatePath('/player-settings')
   return { success: true }
 }

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { background: #111; display: flex; gap: 40px; padding: 40px; font-family: sans-serif; }
+.card { background: #222; padding: 16px; border-radius: 12px; }
+h3 { color: white; margin: 0 0 8px; font-size: 12px; }
+.img-wrap { position: relative; overflow: hidden; }
+.img-wrap img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.img-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* Grid crosshair every 10% */
+.grid-line { stroke: rgba(255,255,0,0.15); stroke-width: 0.5; }
+.label { fill: rgba(255,255,0,0.5); font-size: 8px; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<!-- FINISH CARD: 400x267 (66.67% padding = 3:2) -->
+<div class="card">
+  <h3>Finish (400×267, 66.67% pad, object-cover, no objectPosition)</h3>
+  <div class="img-wrap" style="width:400px; padding-bottom:66.67%; position:relative;">
+    <img src="/media/nolan-finish.jpg" style="position:absolute;inset:0;object-fit:cover;" />
+    <svg viewBox="0 0 400 267" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;">
+      <!-- Grid lines every 25px -->
+      <line x1="0" y1="25" x2="400" y2="25" class="grid-line"/>
+      <line x1="0" y1="50" x2="400" y2="50" class="grid-line"/>
+      <line x1="0" y1="75" x2="400" y2="75" class="grid-line"/>
+      <line x1="0" y1="100" x2="400" y2="100" class="grid-line"/>
+      <line x1="0" y1="125" x2="400" y2="125" class="grid-line"/>
+      <line x1="0" y1="150" x2="400" y2="150" class="grid-line"/>
+      <line x1="0" y1="175" x2="400" y2="175" class="grid-line"/>
+      <line x1="0" y1="200" x2="400" y2="200" class="grid-line"/>
+      <line x1="0" y1="225" x2="400" y2="225" class="grid-line"/>
+      <line x1="0" y1="250" x2="400" y2="250" class="grid-line"/>
+      <line x1="50" y1="0" x2="50" y2="267" class="grid-line"/>
+      <line x1="100" y1="0" x2="100" y2="267" class="grid-line"/>
+      <line x1="150" y1="0" x2="150" y2="267" class="grid-line"/>
+      <line x1="200" y1="0" x2="200" y2="267" class="grid-line"/>
+      <line x1="250" y1="0" x2="250" y2="267" class="grid-line"/>
+      <line x1="300" y1="0" x2="300" y2="267" class="grid-line"/>
+      <line x1="350" y1="0" x2="350" y2="267" class="grid-line"/>
+      <!-- Labels -->
+      <text x="52" y="12" class="label">x=50</text>
+      <text x="102" y="12" class="label">x=100</text>
+      <text x="152" y="12" class="label">x=150</text>
+      <text x="202" y="12" class="label">x=200</text>
+      <text x="252" y="12" class="label">x=250</text>
+      <text x="302" y="12" class="label">x=300</text>
+      <text x="352" y="12" class="label">x=350</text>
+      <text x="2" y="52" class="label">y=50</text>
+      <text x="2" y="102" class="label">y=100</text>
+      <text x="2" y="152" class="label">y=150</text>
+      <text x="2" y="202" class="label">y=200</text>
+      <text x="2" y="252" class="label">y=250</text>
+      <!-- Glove tuck after release -->
+      <circle cx="230" cy="107" r="15" fill="none" stroke="#E8102A" stroke-width="2.2" opacity="0.95"/>
+      <circle cx="230" cy="107" r="4" fill="#E8102A" opacity="0.95"/>
+      <!-- Trail leg shoe — raised behind in follow-through -->
+      <circle cx="110" cy="72" r="14" fill="none" stroke="#3B82F6" stroke-width="1.8" opacity="0.88"/>
+    </svg>
+  </div>
+</div>
+
+<!-- WINDUP HERO: 400x225 (56.25% = 16:9) -->
+<div class="card">
+  <h3>Windup (400×225, 56.25% pad, object-cover, objectPosition 50% 40%)</h3>
+  <div class="img-wrap" style="width:400px; padding-bottom:56.25%; position:relative;">
+    <img src="/media/nolan-windup.jpg" style="position:absolute;inset:0;object-fit:cover;object-position:50% 40%;" />
+    <svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;">
+      <!-- Grid lines every 25px -->
+      <line x1="0" y1="25" x2="400" y2="25" class="grid-line"/>
+      <line x1="0" y1="50" x2="400" y2="50" class="grid-line"/>
+      <line x1="0" y1="75" x2="400" y2="75" class="grid-line"/>
+      <line x1="0" y1="100" x2="400" y2="100" class="grid-line"/>
+      <line x1="0" y1="125" x2="400" y2="125" class="grid-line"/>
+      <line x1="0" y1="150" x2="400" y2="150" class="grid-line"/>
+      <line x1="0" y1="175" x2="400" y2="175" class="grid-line"/>
+      <line x1="0" y1="200" x2="400" y2="200" class="grid-line"/>
+      <line x1="50" y1="0" x2="50" y2="225" class="grid-line"/>
+      <line x1="100" y1="0" x2="100" y2="225" class="grid-line"/>
+      <line x1="150" y1="0" x2="150" y2="225" class="grid-line"/>
+      <line x1="200" y1="0" x2="200" y2="225" class="grid-line"/>
+      <line x1="250" y1="0" x2="250" y2="225" class="grid-line"/>
+      <line x1="300" y1="0" x2="300" y2="225" class="grid-line"/>
+      <line x1="350" y1="0" x2="350" y2="225" class="grid-line"/>
+      <!-- Labels -->
+      <text x="52" y="12" class="label">x=50</text>
+      <text x="102" y="12" class="label">x=100</text>
+      <text x="152" y="12" class="label">x=150</text>
+      <text x="202" y="12" class="label">x=200</text>
+      <text x="252" y="12" class="label">x=250</text>
+      <text x="302" y="12" class="label">x=300</text>
+      <text x="352" y="12" class="label">x=350</text>
+      <text x="2" y="52" class="label">y=50</text>
+      <text x="2" y="102" class="label">y=100</text>
+      <text x="2" y="152" class="label">y=150</text>
+      <text x="2" y="202" class="label">y=200</text>
+      <!-- Current annotations -->
+      <circle cx="169" cy="116" r="16" fill="none" stroke="#E8102A" stroke-width="2.2" opacity="0.92"/>
+      <circle cx="169" cy="116" r="4" fill="#E8102A" opacity="0.92"/>
+      <line x1="169" y1="100" x2="169" y2="132" stroke="#E8102A" stroke-width="1.4" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.60"/>
+      <circle cx="169" cy="66" r="13" fill="none" stroke="#3B82F6" stroke-width="1.8" opacity="0.88"/>
+    </svg>
+  </div>
+</div>
+
+</body>
+</html>

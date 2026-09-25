@@ -40,6 +40,25 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   if (!player) notFound()
   if (player.coach_id !== null && player.coach_id !== user.id) notFound()
 
+  // Fetch athlete profile fields separately — fault-tolerant in case columns are new
+  let athleteData: Record<string, unknown> = {}
+  {
+    const { data: ad } = await supabaseAdmin
+      .from('players')
+      .select('height, weight, throws, bats, graduation_year, high_school, travel_team, college_interests, college_offers')
+      .eq('id', id)
+      .single()
+    if (ad) athleteData = ad as Record<string, unknown>
+  }
+  {
+    const { data: sd } = await supabaseAdmin
+      .from('players')
+      .select('showcases, career_stats')
+      .eq('id', id)
+      .single()
+    if (sd) athleteData = { ...athleteData, ...(sd as Record<string, unknown>) }
+  }
+
   // Fetch all clips for this player
   const { data: clips } = await supabaseAdmin
     .from('clips')
@@ -173,6 +192,19 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
           clips={clips ?? []}
           metrics={metrics}
           notes={notes}
+          athleteProfile={{
+            height: athleteData.height as string | null ?? null,
+            weight: athleteData.weight as string | null ?? null,
+            throws: athleteData.throws as string | null ?? null,
+            bats: athleteData.bats as string | null ?? null,
+            graduation_year: athleteData.graduation_year as number | null ?? null,
+            high_school: athleteData.high_school as string | null ?? null,
+            travel_team: athleteData.travel_team as string | null ?? null,
+            college_interests: athleteData.college_interests as string[] | null ?? null,
+            college_offers: athleteData.college_offers as string[] | null ?? null,
+            showcases: athleteData.showcases as { name: string; date: string; location: string }[] | null ?? null,
+            career_stats: athleteData.career_stats as Record<string, string> | null ?? null,
+          }}
         />
       </main>
     </div>

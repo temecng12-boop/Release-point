@@ -11,8 +11,8 @@ import PhaseChecklist from './phase-checklist'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-type TSNote   = { id: string; time_seconds: number; body: string }
-type Metric   = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
+type TSNote   = { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
+export type Metric = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null; extension?: number | null; vaa?: number | null }
 type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
 type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
 

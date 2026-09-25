@@ -114,8 +114,8 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
                 <span className="text-[9px] bg-[#1C3A5C] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">{sessions.length}</span>
               )}
             </button>
-            <RecordButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
-            <UploadButton playerId={player.id} playerName={player.full_name} consentGiven={!!player.consent_given_at} />
+            <RecordButton playerId={player.id} playerName={player.full_name} consentGiven={true} />
+            <UploadButton playerId={player.id} playerName={player.full_name} consentGiven={true} />
           </div>
         </div>
 

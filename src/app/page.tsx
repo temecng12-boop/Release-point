@@ -1,9 +1,11 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import SiteFooter from '@/components/SiteFooter'
 import SpotlightCard from '@/components/spotlight-card'
 import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
+import PhotoGallery from '@/components/photo-gallery'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -124,7 +126,7 @@ export default function HomePage() {
                   <div className="flex-1 rounded-md px-3 py-1 flex items-center gap-2"
                     style={{ background: '#060B12', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
-                    <span className="text-[10px] text-white/30 font-mono truncate">releasepointai.com/clips/jake-morrison</span>
+                    <span className="text-[10px] text-white/30 font-mono truncate">releasepointai.com/clips/nolan-george</span>
                   </div>
                 </div>
 
@@ -134,7 +136,7 @@ export default function HomePage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/rp-icon.png" alt="RP" style={{ height: 14, width: 'auto', objectFit: 'contain' }} />
                     <span className="text-white/20 text-xs">/</span>
-                    <span className="text-[10px] text-white/40" style={os}>Jake Morrison</span>
+                    <span className="text-[10px] text-white/40" style={os}>Nolan George</span>
                     <span className="text-white/20 text-xs">/</span>
                     <span className="text-[10px] text-white/60" style={os}>Sep 14, 2026</span>
                   </div>
@@ -143,48 +145,56 @@ export default function HomePage() {
 
                 {/* Content */}
                 <div className="grid" style={{ background: '#06090F', gridTemplateColumns: '1fr 185px' }}>
-                  {/* Video */}
+                  {/* Video — real pitch clip */}
                   <div className="border-r" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-                    <div className="relative" style={{ paddingBottom: '56.25%' }}>
-                      <div className="absolute inset-0 bg-[#020510]">
-                        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 225" preserveAspectRatio="none">
-                          <line x1="115" y1="192" x2="298" y2="52" stroke="#E8102A" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                          <circle cx="115" cy="192" r="6" fill="#E8102A" opacity="0.95" />
-                          <circle cx="298" cy="52" r="6" fill="#E8102A" opacity="0.95" />
-                          <circle cx="255" cy="75" r="20" fill="none" stroke="#3B82F6" strokeWidth="2" opacity="0.9" />
-                          <circle cx="255" cy="75" r="4" fill="#3B82F6" opacity="0.9" />
-                          <line x1="72" y1="185" x2="188" y2="162" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="5,3" strokeLinecap="round" opacity="0.8" />
-                        </svg>
-                        <div className="absolute top-2 left-2">
-                          <span className="text-[9px] bg-[#E8102A] text-white px-1.5 py-0.5 rounded font-mono">0:02.4</span>
-                        </div>
-                        <div className="absolute top-2 right-2">
-                          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>Early shoulder</span>
-                        </div>
-                      </div>
+                    <div className="relative overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+                    <Image
+                      src="/media/nolan-windup.jpg"
+                      alt="Pitch clip"
+                      fill
+                      className="object-cover"
+                      style={{ objectPosition: '50% 40%', filter: 'brightness(1.05)' }}
+                      sizes="400px"
+                      priority
+                    />
+                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice">
+                      {/* Lead knee — peak of leg kick / balance point */}
+                      <circle cx="169" cy="116" r="16" fill="none" stroke="#E8102A" strokeWidth="2.2" opacity="0.92" />
+                      <circle cx="169" cy="116" r="4" fill="#E8102A" opacity="0.92" />
+                      {/* Short vertical tick at knee showing height of leg drive */}
+                      <line x1="169" y1="100" x2="169" y2="132" stroke="#E8102A" strokeWidth="1.4" strokeDasharray="4,3" strokeLinecap="round" opacity="0.60" />
+                      {/* Glove — front-side arm tucked at chest */}
+                      <circle cx="169" cy="66" r="13" fill="none" stroke="#3B82F6" strokeWidth="1.8" opacity="0.88" />
+                    </svg>
+                    <div className="absolute top-2 left-2">
+                      <span className="text-[9px] bg-[#E8102A] text-white px-1.5 py-0.5 rounded font-mono">0:01.2</span>
                     </div>
+                    <div className="absolute top-2 right-2">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}>Balance pt</span>
+                    </div>
+                  </div>
                     <div className="px-3 py-2.5 flex items-center gap-2.5 border-t" style={{ background: '#0A0F1A', borderColor: 'rgba(255,255,255,0.07)' }}>
                       <div className="w-6 h-6 rounded-full bg-[#E8102A] flex items-center justify-center shrink-0">
                         <span className="text-white text-[8px] ml-px">▶</span>
                       </div>
                       <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                        <div className="h-full w-1/5 bg-[#E8102A] rounded-full" />
+                        <div className="h-full w-[18%] bg-[#E8102A] rounded-full" />
                       </div>
-                      <span className="text-[9px] text-white/30 font-mono shrink-0">0:02 / 0:11</span>
+                      <span className="text-[9px] text-white/30 font-mono shrink-0">0:01 / 0:09</span>
                     </div>
                   </div>
 
-                  {/* Metrics */}
+                  {/* Metrics — Nolan's real Trackman numbers */}
                   <div className="flex flex-col">
                     <div className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
                       <p className="text-[9px] tracking-[0.2em] text-[#E8102A]" style={os}>Pitch Metrics</p>
-                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Sep 14</p>
+                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Jan 22</p>
                     </div>
                     {[
-                      { label: 'Velocity',  value: '93 mph',  pct: 88, color: '#E8102A' },
-                      { label: 'Spin Rate', value: '2,480',   pct: 72, color: '#3B82F6' },
-                      { label: 'V. Break',  value: '18.2"',   pct: 90, color: '#10B981' },
-                      { label: 'H. Break',  value: '9.1"',    pct: 75, color: '#8B5CF6' },
+                      { label: 'Velocity',  value: '89 mph',  pct: 80, color: '#E8102A' },
+                      { label: 'Spin Rate', value: '2,248',   pct: 68, color: '#3B82F6' },
+                      { label: 'IVB',       value: '+18.7"',  pct: 88, color: '#10B981' },
+                      { label: 'H. Break',  value: '+8.1"',   pct: 62, color: '#8B5CF6' },
                     ].map((m) => (
                       <div key={m.label} className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
                         <div className="flex justify-between mb-1.5">
@@ -197,17 +207,17 @@ export default function HomePage() {
                       </div>
                     ))}
                     <div className="px-3 py-2 border-b flex justify-between items-center" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}>
-                      <span className="text-[9px] text-white/30" style={os}>16U</span>
+                      <span className="text-[9px] text-white/30" style={os}>College</span>
                       <span className="text-[9px] font-medium" style={{ ...os, color: '#10B981' }}>Elite ↑</span>
                     </div>
                     <div className="flex-1 p-3 space-y-2 overflow-hidden">
                       <p className="text-[9px] tracking-[0.15em] text-white/25 mb-2" style={os}>AI Coach</p>
                       <div className="bg-[#E8102A] rounded-xl rounded-br-none px-2 py-1.5 ml-2 text-[9px] text-white leading-snug">
-                        Compare to 16U avg?
+                        Is his IVB elite?
                       </div>
                       <div className="rounded-xl rounded-bl-none px-2 py-1.5 mr-2 text-[9px] leading-snug"
                         style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
-                        At 2,480rpm he&apos;s <span className="text-white font-medium">elite</span> for 16U.
+                        +18.7" puts him <span className="text-white font-medium">top 10%</span> at college level.
                       </div>
                     </div>
                   </div>
@@ -223,7 +233,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-slate-100">
           {[
             { n: 'All Levels', sub: 'Youth → Pro',          color: '#E8102A' },
-            { n: 'Rapsodo',    sub: 'Native CSV import',     color: '#3B82F6' },
+            { n: 'Any Device', sub: 'CSV & PDF import',       color: '#3B82F6' },
             { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#10B981' },
           ].map((s) => (
             <div key={s.n} className="py-8 text-center px-4 group cursor-default">
@@ -245,43 +255,56 @@ export default function HomePage() {
 
         <div className="grid lg:grid-cols-3 gap-4">
 
-          {/* Video Analysis — tall */}
+          {/* Video Analysis */}
           <SpotlightCard
-            className="lg:row-span-2 rounded-2xl flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
+            className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
-            <div className="p-8 flex-1 flex flex-col">
+            <div className="p-8">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(232,16,42,0.08)' }}>
                 <svg className="w-5 h-5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                 </svg>
               </div>
               <p className="text-[10px] tracking-[0.2em] text-[#E8102A] mb-4" style={os}>01 — Video Analysis</p>
-              <h3 className="text-[clamp(26px,3.5vw,40px)] leading-[0.9] text-slate-950 mb-5 tracking-tight" style={os}>
+              <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-4 tracking-tight" style={os}>
                 Annotate<br />Every<br />Frame.
               </h3>
               <p className="text-sm text-slate-500 leading-[1.85]">
                 Draw directly on video. Mark arm angles, hip rotation, and release points. Every annotation timestamped and shared instantly.
               </p>
-            </div>
-            <div className="mx-6 mb-6 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
-              <div className="relative aspect-video bg-[#020510]">
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 225" preserveAspectRatio="none">
-                  <line x1="80" y1="180" x2="300" y2="60" stroke="#E8102A" strokeWidth="2.5" strokeLinecap="round" />
-                  <circle cx="80" cy="180" r="5" fill="#E8102A" />
-                  <circle cx="300" cy="60" r="5" fill="#E8102A" />
-                  <circle cx="210" cy="120" r="8" fill="none" stroke="#3B82F6" strokeWidth="2" />
-                  <line x1="160" y1="140" x2="260" y2="90" stroke="#10B981" strokeWidth="1.5" strokeDasharray="4,3" strokeLinecap="round" />
-                </svg>
-              </div>
-              <div className="px-4 py-3 flex items-center gap-3 border-t" style={{ background: '#0A0F1A', borderColor: 'rgba(255,255,255,0.07)' }}>
-                <div className="w-6 h-6 rounded-full bg-[#E8102A] flex items-center justify-center shrink-0">
-                  <span className="text-white text-[8px]">▶</span>
+              <div className="mt-6 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+                <div className="relative overflow-hidden" style={{ paddingBottom: '66.67%' }}>
+                  <Image
+                    src="/media/nolan-finish.jpg"
+                    alt="Pitch delivery"
+                    fill
+                    className="object-cover"
+                    sizes="400px"
+                  />
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 267" preserveAspectRatio="xMidYMid slice">
+                    {/* Glove tuck after release */}
+                    <circle cx="230" cy="107" r="15" fill="none" stroke="#E8102A" strokeWidth="2.2" opacity="0.95" />
+                    <circle cx="230" cy="107" r="4" fill="#E8102A" opacity="0.95" />
+                    {/* Trail leg shoe — raised behind in follow-through */}
+                    <circle cx="110" cy="72" r="14" fill="none" stroke="#3B82F6" strokeWidth="1.8" opacity="0.88" />
+                  </svg>
+                  <div className="absolute top-2 left-2">
+                    <span className="text-[9px] bg-[#E8102A] text-white px-1.5 py-0.5 rounded font-mono">0:06.4</span>
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}>Follow-through</span>
+                  </div>
                 </div>
-                <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                  <div className="h-full w-1/3 bg-[#E8102A] rounded-full" />
+                <div className="px-4 py-2.5 flex items-center gap-3 border-t" style={{ background: '#0A0F1A', borderColor: 'rgba(255,255,255,0.07)' }}>
+                  <div className="w-5 h-5 rounded-full bg-[#E8102A] flex items-center justify-center shrink-0">
+                    <span className="text-white text-[7px]">▶</span>
+                  </div>
+                  <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                    <div className="h-full w-[72%] bg-[#E8102A] rounded-full" />
+                  </div>
+                  <span className="text-[10px] text-white/30 font-mono shrink-0">0:06 / 0:09</span>
                 </div>
-                <span className="text-[10px] text-white/30 font-mono shrink-0">0:34 / 1:47</span>
               </div>
             </div>
           </SpotlightCard>
@@ -297,22 +320,27 @@ export default function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 — Rapsodo</p>
-              <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-4 tracking-tight" style={os}>
+              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 — Pitch Analytics</p>
+              <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
-              <div className="space-y-3 mt-6">
+              <p className="text-[10px] text-slate-400 mb-5">TrackMan · Rapsodo · Hawk-Eye · CSV · PDF</p>
+              <div className="space-y-2.5 mt-2">
                 {[
-                  { label: 'Velocity',  value: '93 mph',    pct: 88, color: '#E8102A' },
-                  { label: 'Spin Rate', value: '2,480 rpm', pct: 72, color: '#3B82F6' },
-                  { label: 'V. Break',  value: '18.2"',     pct: 90, color: '#10B981' },
+                  { label: 'Velocity',   value: '89 mph',    pct: 80, color: '#E8102A' },
+                  { label: 'Spin Rate',  value: '2,248 rpm', pct: 68, color: '#3B82F6' },
+                  { label: 'IVB',        value: '+18.7"',    pct: 88, color: '#10B981' },
+                  { label: 'H-Break',    value: '+8.1"',     pct: 62, color: '#8B5CF6' },
+                  { label: 'Spin Axis',  value: '1:00',      pct: 55, color: '#F59E0B' },
+                  { label: 'Extension',  value: '6.4 ft',    pct: 74, color: '#06B6D4' },
+                  { label: 'VAA',        value: '-4.2°',     pct: 70, color: '#EC4899' },
                 ].map((m) => (
                   <div key={m.label}>
                     <div className="flex justify-between mb-1">
-                      <span className="text-[11px] text-slate-500" style={os}>{m.label}</span>
-                      <span className="text-[11px] font-mono text-slate-700 font-medium">{m.value}</span>
+                      <span className="text-[10px] text-slate-500" style={os}>{m.label}</span>
+                      <span className="text-[10px] font-mono text-slate-700 font-medium">{m.value}</span>
                     </div>
-                    <div className="h-1.5 rounded-full overflow-hidden bg-slate-100">
+                    <div className="h-1 rounded-full overflow-hidden bg-slate-100">
                       <div className="h-full rounded-full" style={{ width: `${m.pct}%`, backgroundColor: m.color }} />
                     </div>
                   </div>
@@ -339,12 +367,24 @@ export default function HomePage() {
               <div className="space-y-2.5">
                 <div className="flex justify-end">
                   <div className="max-w-[88%] bg-[#E8102A] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
-                    His spin axis is 55°. What does that mean?
+                    His curveball movement has been all over the place lately.
                   </div>
                 </div>
                 <div className="flex justify-start">
-                  <div className="max-w-[92%] rounded-xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed bg-slate-50 border border-slate-200 text-slate-600">
-                    At 55° expect a tight 1-to-7 break. At 2,480 rpm for 16U — <span className="text-slate-900 font-semibold">elite tier</span>.
+                  <div className="max-w-[96%] rounded-xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed bg-slate-50 border border-slate-200 text-slate-600 space-y-1.5">
+                    <p>Spin rate is consistent — <span className="text-slate-900 font-semibold">2,340–2,380 rpm across all 4 sessions.</span> That&apos;s not the problem.</p>
+                    <p>His spin axis is drifting <span className="text-slate-900 font-semibold">from 6:30 to 8:00</span> rep to rep. When it&apos;s at 6:30 the break is tight. When it climbs toward 8, the ball flattens out and rolls instead of biting.</p>
+                    <p className="text-slate-900 font-semibold">He&apos;s got two different releases on what he thinks is one pitch.</p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <div className="max-w-[88%] bg-[#E8102A] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
+                    How do I get him to feel the difference?
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="max-w-[96%] rounded-xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed bg-slate-50 border border-slate-200 text-slate-600">
+                    Cue him to feel his middle finger <span className="text-slate-900 font-semibold">pulling straight down the 12 o&apos;clock seam</span> — not around it. One focused pen, 10–12 reps at full intent. Watch the axis lock in.
                   </div>
                 </div>
               </div>
@@ -361,7 +401,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-10">
             {[
               { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. Guardian consent handled automatically.' },
-              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, import Rapsodo CSVs. Everything linked to the player.' },
+              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, import pitch data files. Everything linked to the player.' },
               { n: '03', t: 'Players Get It All',   d: 'Every annotation, metric, and AI insight is shared with the player instantly.' },
             ].map((s, i) => (
               <div key={s.n} className="group">
@@ -389,6 +429,60 @@ export default function HomePage() {
               {age}
             </span>
           ))}
+        </div>
+      </section>
+
+      {/* ── Founder ── */}
+      <section style={{ borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+        <div className="max-w-5xl mx-auto px-6 py-24 md:py-36">
+          <div className="grid md:grid-cols-2 gap-16 md:gap-24 items-start">
+
+            {/* Story */}
+            <div className="space-y-6 md:sticky md:top-24">
+              <p className="text-[10px] tracking-[0.35em] text-[#E8102A]" style={os}>Built by a pitcher</p>
+              <h2 className="text-[clamp(32px,4vw,52px)] leading-[0.92] text-slate-950 tracking-tight" style={os}>
+                This tool didn&apos;t exist.<br />
+                <span className="text-[#E8102A]">So I built it.</span>
+              </h2>
+              <p className="text-base text-slate-500 leading-relaxed">
+                I spent years on the mound collecting data — velocity readings, spin numbers, video from bullpens — and none of it was connected. Coaches couldn&apos;t share it easily. Players couldn&apos;t access it. Every insight lived in someone&apos;s notes app or a spreadsheet no one could find.
+              </p>
+              <p className="text-base text-slate-500 leading-relaxed">
+                Release Point is everything I wished existed when I was playing. One place for coaches to upload, annotate, and analyze — and for players to actually receive what their coach sees in real time.
+              </p>
+
+              {/* Career stats — longevity & control */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {[
+                  { label: 'Innings Pitched', val: '71.0 IP', sub: '2025 season · 21 appearances' },
+                  { label: 'Command', val: '3.11 K/BB', sub: '56 K · 18 BB' },
+                  { label: 'Strikeouts', val: '56 K', sub: 'San Jose State Spartans' },
+                  { label: 'Control', val: '18 BB', sub: 'in 71 innings pitched' },
+                ].map(s => (
+                  <div key={s.label} className="rounded-xl p-3 border border-[#DDE4ED]">
+                    <p className="text-[10px] text-[#C8102E] tracking-widest mb-1" style={os}>{s.label}</p>
+                    <p className="text-sm font-semibold text-slate-900">{s.val}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{s.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-4 pt-2">
+                <div className="w-10 h-10 rounded-full overflow-hidden relative shrink-0 border-2 border-[#E8102A]/20">
+                  <Image src="/media/nolan-followthrough.jpg" alt="Nolan George" fill className="object-cover object-top" sizes="40px" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-950 font-semibold" style={os}>Nolan George</p>
+                  <p className="text-xs text-slate-400">Founder · Former Professional Pitcher</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive photo gallery */}
+            <div>
+              <PhotoGallery />
+            </div>
+          </div>
         </div>
       </section>
 

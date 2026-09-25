@@ -8,6 +8,12 @@ const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTrans
 const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors'
 const labelClass = 'block text-xs text-[#456080] mb-1.5 tracking-wide'
 
+export interface Showcase {
+  name: string
+  date: string
+  location: string
+}
+
 interface Player {
   id: string | null
   full_name: string | null
@@ -20,6 +26,8 @@ interface Player {
   bats: string | null
   college_interests: string[] | null
   college_offers: string[] | null
+  showcases: Showcase[] | null
+  career_stats: Record<string, string> | null
   age_group: string | null
   position: string | null
 }
@@ -50,7 +58,6 @@ function CollegePicker({
     <div>
       <label className={labelClass} style={oswald}>{label}</label>
 
-      {/* Selected tags */}
       {value.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2 max-h-36 overflow-y-auto p-2 bg-[#F8FAFC] rounded-lg border border-[#DDE4ED]">
           {value.map(p => (
@@ -62,7 +69,6 @@ function CollegePicker({
         </div>
       )}
 
-      {/* Search */}
       <div className="relative">
         <input
           type="text"
@@ -91,6 +97,28 @@ function CollegePicker({
   )
 }
 
+const PITCH_STATS = [
+  { key: 'era', label: 'ERA' },
+  { key: 'w', label: 'W' },
+  { key: 'l', label: 'L' },
+  { key: 'ip', label: 'IP' },
+  { key: 'k', label: 'K' },
+  { key: 'bb', label: 'BB' },
+  { key: 'whip', label: 'WHIP' },
+  { key: 'sv', label: 'SV' },
+]
+
+const HIT_STATS = [
+  { key: 'avg', label: 'AVG' },
+  { key: 'obp', label: 'OBP' },
+  { key: 'slg', label: 'SLG' },
+  { key: 'hr', label: 'HR' },
+  { key: 'rbi', label: 'RBI' },
+  { key: 'sb', label: 'SB' },
+  { key: 'r', label: 'R' },
+  { key: 'h', label: 'H' },
+]
+
 export default function PlayerSettingsForm({ player }: { player: Player | null }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -111,6 +139,19 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
   const [bats, setBats] = useState(player?.bats ?? '')
   const [interests, setInterests] = useState<string[]>(player?.college_interests ?? [])
   const [offers, setOffers] = useState<string[]>(player?.college_offers ?? [])
+  const [showcases, setShowcases] = useState<Showcase[]>(player?.showcases ?? [])
+  const [careerStats, setCareerStats] = useState<Record<string, string>>(player?.career_stats ?? {})
+
+  // Showcase helpers
+  function addShowcase() {
+    setShowcases(prev => [...prev, { name: '', date: '', location: '' }])
+  }
+  function removeShowcase(i: number) {
+    setShowcases(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateShowcase(i: number, field: keyof Showcase, val: string) {
+    setShowcases(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -128,6 +169,8 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
       bats: bats || undefined,
       college_interests: interests,
       college_offers: offers,
+      showcases: showcases.filter(s => s.name.trim()),
+      career_stats: careerStats,
     })
 
     setSaving(false)
@@ -196,13 +239,101 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
         </div>
       </div>
 
-      {/* College interests — no overflow-hidden so the search dropdown isn't clipped */}
+      {/* College interests */}
       <div className="bg-white border border-[#DDE4ED] rounded-xl shadow-sm">
         <div className="h-1 bg-[#C8102E] rounded-t-xl" />
         <div className="p-6 space-y-6">
           <p className="text-[13px] text-[#C8102E] tracking-[0.2em]" style={oswald}>College Recruiting</p>
           <CollegePicker label="Schools I'm Interested In" value={interests} onChange={setInterests} />
           <CollegePicker label="Offers Received" value={offers} onChange={setOffers} />
+        </div>
+      </div>
+
+      {/* Showcases */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div className="h-1 bg-[#1C3A5C]" />
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] text-[#1C3A5C] tracking-[0.2em]" style={oswald}>Upcoming Showcases</p>
+            <button
+              type="button"
+              onClick={addShowcase}
+              className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors"
+              style={oswald}
+            >
+              + Add
+            </button>
+          </div>
+
+          {showcases.length === 0 && (
+            <p className="text-xs text-[#3D5166]">No showcases added yet. Add events you&apos;re attending to help coaches follow your schedule.</p>
+          )}
+
+          {showcases.map((s, i) => (
+            <div key={i} className="grid sm:grid-cols-3 gap-3 p-3 bg-[#F8FAFC] rounded-lg border border-[#DDE4ED]">
+              <div>
+                <label className={labelClass} style={oswald}>Event Name</label>
+                <input type="text" value={s.name} onChange={e => updateShowcase(i, 'name', e.target.value)} placeholder="e.g. Perfect Game National" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass} style={oswald}>Date</label>
+                <input type="text" value={s.date} onChange={e => updateShowcase(i, 'date', e.target.value)} placeholder="e.g. July 2025" className={inputClass} />
+              </div>
+              <div className="relative">
+                <label className={labelClass} style={oswald}>Location</label>
+                <div className="flex gap-2">
+                  <input type="text" value={s.location} onChange={e => updateShowcase(i, 'location', e.target.value)} placeholder="e.g. Marietta, GA" className={inputClass} />
+                  <button type="button" onClick={() => removeShowcase(i)} className="text-xs text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0 px-2">✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Career Stats */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div className="h-1 bg-[#456080]" />
+        <div className="p-6 space-y-5">
+          <p className="text-[13px] text-[#456080] tracking-[0.2em]" style={oswald}>Career / Season Stats</p>
+
+          <div>
+            <p className="text-[10px] text-[#3D5166] tracking-widest mb-3" style={oswald}>Pitching</p>
+            <div className="grid grid-cols-4 gap-3">
+              {PITCH_STATS.map(({ key, label }) => (
+                <div key={key}>
+                  <label className={labelClass} style={oswald}>{label}</label>
+                  <input
+                    type="text"
+                    value={careerStats[key] ?? ''}
+                    onChange={e => setCareerStats(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder="—"
+                    className={inputClass}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-[#3D5166] tracking-widest mb-3" style={oswald}>Hitting</p>
+            <div className="grid grid-cols-4 gap-3">
+              {HIT_STATS.map(({ key, label }) => (
+                <div key={key}>
+                  <label className={labelClass} style={oswald}>{label}</label>
+                  <input
+                    type="text"
+                    value={careerStats[key] ?? ''}
+                    onChange={e => setCareerStats(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder="—"
+                    className={inputClass}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-xs text-[#3D5166]">Enter season totals or career stats — your coach can see everything here.</p>
         </div>
       </div>
 

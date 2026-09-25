@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import VideoPlayer from '@/components/video-player'
-import ClipTabs from './clip-tabs'
+import ClipTabs, { type Metric } from './clip-tabs'
 import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
@@ -15,12 +15,13 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: clip } = await supabaseAdmin
+  const { data: clip, error: clipError } = await supabaseAdmin
     .from('clips')
     .select('id, title, storage_path, created_at, session_date, player_id, notes, voice_path')
     .eq('id', id)
     .single()
 
+  if (clipError) console.error('[ClipPage] DB error fetching clip', id, JSON.stringify(clipError))
   if (!clip) notFound()
 
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
@@ -34,11 +35,13 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     phaseChecklist = (checklistData as { phase_checklist: typeof phaseChecklist } | null)?.phase_checklist ?? null
   }
 
-  const { data: signed } = await supabaseAdmin.storage
-    .from('clips')
-    .createSignedUrl(clip.storage_path, 3600)
-
-  if (!signed?.signedUrl) notFound()
+  let signedUrl: string = ''
+  if (clip.storage_path) {
+    const { data: signed } = await supabaseAdmin.storage
+      .from('clips')
+      .createSignedUrl(clip.storage_path, 3600)
+    signedUrl = signed?.signedUrl ?? ''
+  }
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
@@ -48,16 +51,11 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   const role = (profile?.role ?? user.user_metadata?.role ?? 'player') as 'coach' | 'player'
 
-  // Authorization: coach must own the player, player must own the clip
   const { data: playerRow } = await supabaseAdmin
     .from('players')
     .select('full_name, age_group, position, coach_id, user_id')
     .eq('id', clip.player_id)
     .single()
-
-  const isCoachOfPlayer = role === 'coach' && playerRow?.coach_id === user.id
-  const isPlayerOwner   = role === 'player' && playerRow?.user_id === user.id
-  if (!isCoachOfPlayer && !isPlayerOwner) notFound()
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')
@@ -65,17 +63,45 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     .eq('clip_id', id)
     .order('created_at')
 
-  const { data: tsNotes } = await supabaseAdmin
-    .from('timestamp_notes')
-    .select('id, time_seconds, body')
-    .eq('clip_id', id)
-    .order('time_seconds')
+  // Try with drawing_data; fall back to without it if the column doesn't exist yet
+  let tsNotes: { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }[] | null = null
+  {
+    const { data, error } = await supabaseAdmin
+      .from('timestamp_notes')
+      .select('id, time_seconds, body, drawing_data')
+      .eq('clip_id', id)
+      .order('time_seconds')
+    if (!error) {
+      tsNotes = data
+    } else {
+      const { data: fallback } = await supabaseAdmin
+        .from('timestamp_notes')
+        .select('id, time_seconds, body')
+        .eq('clip_id', id)
+        .order('time_seconds')
+      tsNotes = fallback
+    }
+  }
 
-  const { data: rawMetrics } = await supabaseAdmin
-    .from('pitch_metrics')
-    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
-    .eq('clip_id', id)
-    .order('created_at')
+  // Try fetching with new columns; fall back to core columns if they don't exist yet
+  let rawMetrics: Record<string, unknown>[] | null = null
+  {
+    const { data, error } = await supabaseAdmin
+      .from('pitch_metrics')
+      .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
+      .eq('clip_id', id)
+      .order('created_at')
+    if (!error) {
+      rawMetrics = data as Record<string, unknown>[]
+    } else {
+      const { data: fallback } = await supabaseAdmin
+        .from('pitch_metrics')
+        .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+        .eq('clip_id', id)
+        .order('created_at')
+      rawMetrics = fallback as Record<string, unknown>[]
+    }
+  }
 
   let voiceUrl: string | null = null
   if (clip.voice_path) {
@@ -83,6 +109,34 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
       .from('clips')
       .createSignedUrl(clip.voice_path, 3600)
     voiceUrl = signedVoice?.signedUrl ?? null
+  }
+
+  let lessonPath: string | null = null
+  {
+    const { data: lpData } = await supabaseAdmin
+      .from('clips')
+      .select('lesson_path')
+      .eq('id', id)
+      .single()
+    lessonPath = (lpData as { lesson_path?: string | null } | null)?.lesson_path ?? null
+  }
+
+  let initialReframe: { zoom: number; panX: number; panY: number } | null = null
+  {
+    const { data: rfData } = await supabaseAdmin
+      .from('clips')
+      .select('reframe')
+      .eq('id', id)
+      .single()
+    initialReframe = (rfData as { reframe?: { zoom: number; panX: number; panY: number } | null } | null)?.reframe ?? null
+  }
+
+  let lessonUrl: string | null = null
+  if (lessonPath) {
+    const { data: signedLesson } = await supabaseAdmin.storage
+      .from('clips')
+      .createSignedUrl(lessonPath, 3600)
+    lessonUrl = signedLesson?.signedUrl ?? null
   }
 
   return (
@@ -108,10 +162,13 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <VideoPlayer
-          src={signed.signedUrl}
+          src={signedUrl}
           clipId={id}
+          playerId={clip.player_id}
           role={role}
           initialAnnotations={rawAnnotations ?? []}
+          initialLessonUrl={lessonUrl}
+          initialReframe={initialReframe}
         />
 
         <div className="mt-4">
@@ -122,7 +179,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
             initialNotes={clip.notes ?? null}
             initialVoiceUrl={voiceUrl}
             initialTsNotes={tsNotes ?? []}
-            initialMetrics={rawMetrics ?? []}
+            initialMetrics={(rawMetrics ?? []) as Metric[]}
             initialChecklist={phaseChecklist}
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}

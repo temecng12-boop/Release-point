@@ -22,17 +22,38 @@ interface Props {
   sourceClipId: string
   sourceClipTitle: string
   clips: Clip[]
+  /** Which URL slot this picker is filling. Defaults to 'b'. */
+  targetSlot?: 'b' | 'c' | 'd'
+  /** Existing slot values to preserve in the URL when navigating. */
+  existingParams?: Partial<Record<'a' | 'b' | 'c' | 'd', string>>
 }
 
-export default function ClipPicker({ sourceClipId, sourceClipTitle, clips }: Props) {
+export default function ClipPicker({ sourceClipId, sourceClipTitle, clips, targetSlot = 'b', existingParams }: Props) {
   const router = useRouter()
   const [ytUrl, setYtUrl]     = useState('')
   const [ytError, setYtError] = useState('')
 
+  function buildUrl(slotValue: string): string {
+    const params = new URLSearchParams()
+    // Always set a to the source clip
+    params.set('a', sourceClipId)
+    // Merge any existing params except the target slot and 'a'
+    if (existingParams) {
+      const slots = ['b', 'c', 'd'] as const
+      for (const slot of slots) {
+        if (slot !== targetSlot && existingParams[slot]) {
+          params.set(slot, existingParams[slot]!)
+        }
+      }
+    }
+    params.set(targetSlot, slotValue)
+    return `/clips/compare?${params.toString()}`
+  }
+
   function handleYouTube() {
     const id = extractYouTubeId(ytUrl.trim())
     if (!id) { setYtError('Paste a valid YouTube URL (youtube.com/watch or youtu.be)'); return }
-    router.push(`/clips/compare?a=${sourceClipId}&b=yt:${id}`)
+    router.push(buildUrl(`yt:${id}`))
   }
 
   return (
@@ -89,7 +110,7 @@ export default function ClipPicker({ sourceClipId, sourceClipTitle, clips }: Pro
             {clips.map(clip => (
               <button
                 key={clip.id}
-                onClick={() => router.push(`/clips/compare?a=${sourceClipId}&b=${clip.id}`)}
+                onClick={() => router.push(buildUrl(clip.id))}
                 className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-[#F0F4F8] transition-colors group text-left"
               >
                 <div className="min-w-0">

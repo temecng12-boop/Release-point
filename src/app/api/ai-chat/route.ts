@@ -29,7 +29,7 @@ type PhaseRow = {
 }
 
 function formatMetrics(metrics: Metric[]): string {
-  if (!metrics.length) return 'No Rapsodo metrics uploaded for this session.'
+  if (!metrics.length) return 'No pitch metrics uploaded for this session.'
   return metrics.map(m => {
     const parts: string[] = []
     if (m.pitch_type) parts.push(`Pitch: ${m.pitch_type}`)
@@ -84,10 +84,12 @@ ${benchmarks ? `BENCHMARKS FOR ${ageGroup} LEVEL:
 - Fastball velocity: Avg ${benchmarks.velocity.avg} mph | Good ${benchmarks.velocity.good}+ mph | Elite ${benchmarks.velocity.elite}+ mph
 - Spin rate: Avg ${benchmarks.spin.avg} rpm | Good ${benchmarks.spin.good}+ rpm | Elite ${benchmarks.spin.elite}+ rpm
 - Spin efficiency: Avg ${benchmarks.spinEff.avg}% | Good ${benchmarks.spinEff.good}%+
-- Calibrated per level: Youth = travel ball 10-12, Middle School = 12-14, High School = 14-18, Amateur = college/indy, Professional = affiliated/MLB. Sources: Baseball Savant, Rapsodo, Driveline, TopVelocity.` : ''}
+- Calibrated per level: Youth = travel ball 10-12, Middle School = 12-14, High School = 14-18, Amateur = college/indy, Professional = affiliated/MLB. Sources: Baseball Savant, TrackMan, Driveline, TopVelocity.
+- KEY DEVELOPMENT METRICS: velocity trend (workload vs. peak), spin rate stability (consistent grip = consistent axis), IVB (induced vertical break — elite 4-seam is 18"+), spin axis (clock-face tilt consistency = repeatable release point), extension (closer to plate = perceived velo gain), VAA (steeper negative angle = harder to square up), break profile (determines tunneling potential with other pitches).
+- SPIN AXIS CLOCK GUIDE (RHP): 4-seam ideal 12:00–1:00; curveball 6:30–8:00; slider 9:00–10:30; changeup 1:00–2:00. Axis drift rep-to-rep = grip inconsistency, not arm fatigue.` : ''}
 
 ═══════════════════════════════════════
-RAPSODO DATA FOR THIS SESSION
+PITCH DATA FOR THIS SESSION
 ═══════════════════════════════════════
 ${metricsText}
 

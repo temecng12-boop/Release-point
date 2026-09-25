@@ -15,7 +15,7 @@ const oswald: React.CSSProperties = {
   fontWeight: 700,
 }
 
-// rp-icon.png native dimensions: 665 × 347 (ratio 1.916)
+// rp-icon.png native dimensions: 937 × 582 (ratio 1.610)
 const iconH  = { sm: 28, md: 34, lg: 48 }
 const wordSz = { sm: 11, md: 13, lg: 18 }
 
@@ -27,7 +27,7 @@ export default function Logo({
   dark = false,
 }: Props) {
   const h = iconH[size]
-  const w = Math.round(h * 1.916)
+  const w = Math.round(h * 1.610)
 
   const mark = (
     <div className={`inline-flex items-center gap-2.5 ${className}`}>

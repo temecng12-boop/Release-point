@@ -29,8 +29,8 @@ export default function InviteForm({ teams }: Props) {
               <input type="text" name="full_name" placeholder="Full name" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Guardian Email</label>
-              <input type="email" name="guardian_email" placeholder="Guardian's email" required className={inputClass} />
+              <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player / Guardian Email</label>
+              <input type="email" name="guardian_email" placeholder="Email address" required className={inputClass} />
             </div>
           </div>
 

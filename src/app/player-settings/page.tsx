@@ -22,7 +22,7 @@ export default async function PlayerSettingsPage() {
 
   const { data: player } = await supabaseAdmin
     .from('players')
-    .select('id, full_name, height, weight, high_school, travel_team, graduation_year, throws, bats, college_interests, college_offers, age_group, position')
+    .select('id, full_name, height, weight, high_school, travel_team, graduation_year, throws, bats, college_interests, college_offers, showcases, career_stats, age_group, position')
     .eq('user_id', user.id)
     .single()
 

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { updatePlayerAthleteProfile } from '@/app/actions/player'
+import { COLLEGE_PROGRAMS } from '@/data/college-programs'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-type Tab = 'Videos' | 'Metrics' | 'AI Coach' | 'Coaching Notes'
-const TABS: Tab[] = ['Videos', 'Metrics', 'AI Coach', 'Coaching Notes']
+type Tab = 'Videos' | 'Metrics' | 'AI Coach' | 'Coaching Notes' | 'Athlete Profile'
+const TABS: Tab[] = ['Videos', 'Metrics', 'AI Coach', 'Coaching Notes', 'Athlete Profile']
 
 interface Clip {
   id: string
@@ -35,6 +37,26 @@ interface Note {
   time_seconds: number | null
 }
 
+interface Showcase {
+  name: string
+  date: string
+  location: string
+}
+
+interface AthleteProfile {
+  height: string | null
+  weight: string | null
+  throws: string | null
+  bats: string | null
+  graduation_year: number | null
+  high_school: string | null
+  travel_team: string | null
+  college_interests: string[] | null
+  college_offers: string[] | null
+  showcases: Showcase[] | null
+  career_stats: Record<string, string> | null
+}
+
 interface Props {
   playerId: string
   playerName: string
@@ -43,6 +65,7 @@ interface Props {
   clips: Clip[]
   metrics: Metric[]
   notes: Note[]
+  athleteProfile: AthleteProfile
 }
 
 function fmtDate(sessionDate: string | null, createdAt: string) {
@@ -231,7 +254,7 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
   )
 }
 
-// ── Inline sparkline chart ────────────────────────────────────────────────────
+// ── Sparkline ─────────────────────────────────────────────────────────────────
 let _sparklineId = 0
 function Sparkline({ values, color, unit }: { values: number[]; color: string; unit: string }) {
   const [uid] = useState(() => ++_sparklineId)
@@ -275,7 +298,7 @@ function Sparkline({ values, color, unit }: { values: number[]; color: string; u
   )
 }
 
-// ── Metrics aggregation ───────────────────────────────────────────────────────
+// ── Metrics ───────────────────────────────────────────────────────────────────
 function MetricsSummary({ metrics }: { metrics: Metric[] }) {
   if (metrics.length === 0) {
     return (
@@ -286,7 +309,6 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
     )
   }
 
-  // Group by pitch type
   const byType: Record<string, Metric[]> = {}
   for (const m of metrics) {
     const key = m.pitch_type ?? 'Unknown'
@@ -304,7 +326,6 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Trend charts for all pitches combined */}
       {metrics.length >= 3 && (() => {
         const veloSeries = nonNull(metrics.map(m => m.velocity))
         const spinSeries = nonNull(metrics.map(m => m.spin_rate))
@@ -332,7 +353,6 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
         )
       })()}
 
-      {/* Per-pitch-type breakdowns */}
       {Object.entries(byType).map(([type, ms]) => (
         <div key={type} className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-[#DDE4ED]">
@@ -370,8 +390,244 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
   )
 }
 
+// ── Athlete Profile Editor ────────────────────────────────────────────────────
+const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-lg px-3 py-2.5 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors'
+const labelClass = 'block text-xs text-[#456080] mb-1.5 tracking-wide'
+
+const PITCH_STATS = [
+  { key: 'era', label: 'ERA' }, { key: 'w', label: 'W' }, { key: 'l', label: 'L' },
+  { key: 'ip', label: 'IP' }, { key: 'k', label: 'K' }, { key: 'bb', label: 'BB' },
+  { key: 'whip', label: 'WHIP' }, { key: 'sv', label: 'SV' },
+]
+const HIT_STATS = [
+  { key: 'avg', label: 'AVG' }, { key: 'obp', label: 'OBP' }, { key: 'slg', label: 'SLG' },
+  { key: 'hr', label: 'HR' }, { key: 'rbi', label: 'RBI' }, { key: 'sb', label: 'SB' },
+  { key: 'r', label: 'R' }, { key: 'h', label: 'H' },
+]
+
+function CollegePicker({ label, value, onChange }: { label: string; value: string[]; onChange: (v: string[]) => void }) {
+  const [search, setSearch] = useState('')
+  const [results, setResults] = useState<string[]>([])
+
+  useEffect(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) { setResults([]); return }
+    setResults(COLLEGE_PROGRAMS.filter(p => p.toLowerCase().includes(q)).slice(0, 10))
+  }, [search])
+
+  function toggle(p: string) {
+    if (value.includes(p)) onChange(value.filter(x => x !== p))
+    else onChange([...value, p])
+  }
+
+  return (
+    <div>
+      <label className={labelClass} style={oswald}>{label}</label>
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {value.map(p => (
+            <span key={p} className="flex items-center gap-1 text-xs bg-[#1C3A5C] text-white px-2.5 py-1 rounded-full">
+              {p}
+              <button type="button" onClick={() => toggle(p)} className="opacity-60 hover:opacity-100">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search programs…" className={inputClass} />
+        {results.length > 0 && (
+          <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-white border border-[#DDE4ED] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            {results.map(p => (
+              <button key={p} type="button" onClick={() => { toggle(p); setSearch('') }}
+                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F4F8] transition-colors ${value.includes(p) ? 'text-[#C8102E] font-medium' : 'text-[#0F1F33]'}`}>
+                {value.includes(p) ? '✓ ' : ''}{p}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AthleteProfileEditor({ playerId, initial }: { playerId: string; initial: AthleteProfile }) {
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [interests, setInterests] = useState<string[]>(initial.college_interests ?? [])
+  const [offers, setOffers] = useState<string[]>(initial.college_offers ?? [])
+  const [showcases, setShowcases] = useState<Showcase[]>(initial.showcases ?? [])
+  const [careerStats, setCareerStats] = useState<Record<string, string>>(initial.career_stats ?? {})
+
+  useEffect(() => {
+    if (!saved) return
+    const t = setTimeout(() => setSaved(false), 3000)
+    return () => clearTimeout(t)
+  }, [saved])
+
+  function addShowcase() {
+    setShowcases(prev => [...prev, { name: '', date: '', location: '' }])
+  }
+  function removeShowcase(i: number) {
+    setShowcases(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateShowcase(i: number, field: keyof Showcase, val: string) {
+    setShowcases(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    const result = await updatePlayerAthleteProfile(playerId, {
+      college_interests: interests,
+      college_offers: offers,
+      showcases: showcases.filter(s => s.name.trim()),
+      career_stats: careerStats,
+    })
+    setSaving(false)
+    if (result?.error) setError(result.error)
+    else setSaved(true)
+  }
+
+  // Read-only display fields
+  const infoFields = [
+    { label: 'Height', value: initial.height },
+    { label: 'Weight', value: initial.weight },
+    { label: 'Throws', value: initial.throws },
+    { label: 'Bats', value: initial.bats },
+    { label: 'Grad Year', value: initial.graduation_year?.toString() ?? null },
+    { label: 'High School', value: initial.high_school },
+    { label: 'Travel Team', value: initial.travel_team },
+  ].filter(f => f.value)
+
+  const hasSomeStats = PITCH_STATS.some(s => careerStats[s.key]) || HIT_STATS.some(s => careerStats[s.key])
+
+  return (
+    <div className="space-y-5">
+      {/* Physical / school info (read-only from player's own form) */}
+      {infoFields.length > 0 && (
+        <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+          <div className="px-4 py-3 border-b border-[#DDE4ED]">
+            <p className="text-sm text-[#0F1F33]" style={oswald}>Physical Info</p>
+            <p className="text-xs text-[#3D5166] mt-0.5">Updated by the player — view only</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#DDE4ED]">
+            {infoFields.map(({ label, value }) => (
+              <div key={label} className="bg-white px-4 py-3">
+                <p className="text-[10px] text-[#3D5166] tracking-wide" style={oswald}>{label}</p>
+                <p className="text-sm text-[#0F1F33] mt-1 font-medium">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Editable: college recruiting */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl shadow-sm">
+        <div className="h-1 bg-[#C8102E] rounded-t-xl" />
+        <div className="p-5 space-y-5">
+          <p className="text-[13px] text-[#C8102E] tracking-[0.2em]" style={oswald}>College Recruiting</p>
+          <CollegePicker label="Schools Interested In" value={interests} onChange={setInterests} />
+          <CollegePicker label="Offers Received" value={offers} onChange={setOffers} />
+        </div>
+      </div>
+
+      {/* Editable: showcases */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div className="h-1 bg-[#1C3A5C]" />
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] text-[#1C3A5C] tracking-[0.2em]" style={oswald}>Upcoming Showcases</p>
+            <button type="button" onClick={addShowcase} className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors" style={oswald}>+ Add</button>
+          </div>
+          {showcases.length === 0 && (
+            <p className="text-xs text-[#3D5166]">No showcases added yet.</p>
+          )}
+          {showcases.map((s, i) => (
+            <div key={i} className="grid sm:grid-cols-3 gap-3 p-3 bg-[#F8FAFC] rounded-lg border border-[#DDE4ED]">
+              <div>
+                <label className={labelClass} style={oswald}>Event Name</label>
+                <input type="text" value={s.name} onChange={e => updateShowcase(i, 'name', e.target.value)} placeholder="e.g. Perfect Game National" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass} style={oswald}>Date</label>
+                <input type="text" value={s.date} onChange={e => updateShowcase(i, 'date', e.target.value)} placeholder="e.g. July 2025" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass} style={oswald}>Location</label>
+                <div className="flex gap-2">
+                  <input type="text" value={s.location} onChange={e => updateShowcase(i, 'location', e.target.value)} placeholder="e.g. Marietta, GA" className={inputClass} />
+                  <button type="button" onClick={() => removeShowcase(i)} className="text-xs text-[#3D5166] hover:text-[#C8102E] shrink-0 px-2">✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Editable: career stats */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div className="h-1 bg-[#456080]" />
+        <div className="p-5 space-y-5">
+          <p className="text-[13px] text-[#456080] tracking-[0.2em]" style={oswald}>Career / Season Stats</p>
+
+          <div>
+            <p className="text-[10px] text-[#3D5166] tracking-widest mb-3" style={oswald}>Pitching</p>
+            <div className="grid grid-cols-4 gap-3">
+              {PITCH_STATS.map(({ key, label }) => (
+                <div key={key}>
+                  <label className={labelClass} style={oswald}>{label}</label>
+                  <input type="text" value={careerStats[key] ?? ''} onChange={e => setCareerStats(prev => ({ ...prev, [key]: e.target.value }))} placeholder="—" className={inputClass} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-[#3D5166] tracking-widest mb-3" style={oswald}>Hitting</p>
+            <div className="grid grid-cols-4 gap-3">
+              {HIT_STATS.map(({ key, label }) => (
+                <div key={key}>
+                  <label className={labelClass} style={oswald}>{label}</label>
+                  <input type="text" value={careerStats[key] ?? ''} onChange={e => setCareerStats(prev => ({ ...prev, [key]: e.target.value }))} placeholder="—" className={inputClass} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {!hasSomeStats && <p className="text-xs text-[#3D5166]">No stats entered yet. You or the player can add season totals or career stats here.</p>}
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+          <span className="text-[#C8102E] text-sm">✕</span>
+          <p className="text-sm text-[#C8102E]">{error}</p>
+        </div>
+      )}
+      {saved && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+          <span className="text-green-600 text-sm">✓</span>
+          <p className="text-sm text-green-700">Profile updated.</p>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full bg-[#1C3A5C] hover:bg-[#223F63] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
+        style={oswald}
+      >
+        {saving ? 'Saving…' : 'Save Athlete Profile'}
+      </button>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
-export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition, clips, metrics, notes }: Props) {
+export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition, clips, metrics, notes, athleteProfile, playerId }: Props) {
   const [active, setActive] = useState<Tab>('Videos')
 
   return (
@@ -430,10 +686,8 @@ export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition
         </>
       )}
 
-      {/* Metrics */}
       {active === 'Metrics' && <MetricsSummary metrics={metrics} />}
 
-      {/* AI Coach */}
       {active === 'AI Coach' && (
         <PlayerAIChat
           playerName={playerName}
@@ -443,7 +697,6 @@ export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition
         />
       )}
 
-      {/* Coaching Notes */}
       {active === 'Coaching Notes' && (
         <>
           {notes.length === 0 ? (
@@ -474,6 +727,10 @@ export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition
             </div>
           )}
         </>
+      )}
+
+      {active === 'Athlete Profile' && (
+        <AthleteProfileEditor playerId={playerId} initial={athleteProfile} />
       )}
     </div>
   )

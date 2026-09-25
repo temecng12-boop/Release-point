@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         .order('created_at')
     : { data: null }
 
-  const { data: players } = isCoach
+  const { data: directPlayers } = isCoach
     ? await supabaseAdmin
         .from('players')
         .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
@@ -54,7 +54,36 @@ export default async function DashboardPage() {
         .order('full_name')
     : { data: null }
 
-  const playerIds = players?.map(p => p.id) ?? []
+  // Also get players linked via team membership (players who joined a team but have no coach_id set)
+  const teamIds = teams?.map(t => t.id) ?? []
+  let allTeamMemberIds: string[] = []
+  if (isCoach && teamIds.length > 0) {
+    const { data: teamLinks } = await supabaseAdmin
+      .from('player_teams')
+      .select('player_id')
+      .in('team_id', teamIds)
+    allTeamMemberIds = teamLinks?.map(l => l.player_id) ?? []
+  }
+
+  // Get team-only players (those not already in directPlayers)
+  const directPlayerIds = directPlayers?.map(p => p.id) ?? []
+  const teamOnlyIds = allTeamMemberIds.filter(id => !directPlayerIds.includes(id))
+
+  const { data: teamOnlyPlayers } = isCoach && teamOnlyIds.length > 0
+    ? await supabaseAdmin
+        .from('players')
+        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
+        .in('id', teamOnlyIds)
+        .order('full_name')
+    : { data: null }
+
+  // Merge all players
+  const players = [
+    ...(directPlayers ?? []),
+    ...(teamOnlyPlayers ?? []),
+  ]
+
+  const playerIds = players.map(p => p.id)
 
   let playerTeams: { player_id: string; team_id: string }[] = []
   if (isCoach && playerIds.length > 0) {

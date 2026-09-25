@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { saveTimestampNote, deleteTimestampNote } from '@/app/actions/clips'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -11,7 +11,15 @@ function fmtTime(s: number) {
   return `${m}:${sec}`
 }
 
-type TSNote = { id: string; time_seconds: number; body: string }
+type StampShape = {
+  type: string
+  color: string
+  points?: { x: number; y: number }[]
+  start?: { x: number; y: number }
+  end?: { x: number; y: number }
+}
+
+type TSNote = { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
 
 export default function TimestampNotes({
   clipId,
@@ -28,9 +36,24 @@ export default function TimestampNotes({
   const [adding, setAdding] = useState(false)
   const [error, setError]   = useState<string | null>(null)
 
-  function seekTo(t: number) {
+  // Listen for stamps saved by the video player (coach side)
+  useEffect(() => {
+    function onStampCreated(e: Event) {
+      const note = (e as CustomEvent).detail as TSNote
+      setNotes(prev => [...prev, note].sort((a, b) => a.time_seconds - b.time_seconds))
+    }
+    window.addEventListener('rp:stamp-created', onStampCreated)
+    return () => window.removeEventListener('rp:stamp-created', onStampCreated)
+  }, [])
+
+  function seekAndShow(n: TSNote) {
     const v = document.querySelector('video')
-    if (v) { v.pause(); v.currentTime = t }
+    if (v) { v.pause(); v.currentTime = n.time_seconds }
+    if (n.drawing_data?.length) {
+      window.dispatchEvent(new CustomEvent('rp:show-stamp', {
+        detail: { shapes: n.drawing_data as StampShape[], time: n.time_seconds }
+      }))
+    }
   }
 
   async function addNote() {
@@ -89,7 +112,7 @@ export default function TimestampNotes({
       {notes.length === 0 ? (
         <p className="text-sm text-[#3D5166]">
           {isCoach
-            ? 'Pause the video, type a note, and click Add.'
+            ? 'Pause the video, draw on the frame, then press Stamp — or type a note above.'
             : 'No timestamp notes from your coach yet.'}
         </p>
       ) : (
@@ -97,9 +120,14 @@ export default function TimestampNotes({
           {notes.map(n => (
             <li key={n.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
               <button
-                onClick={() => seekTo(n.time_seconds)}
-                className="shrink-0 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED]"
+                onClick={() => seekAndShow(n)}
+                className="shrink-0 flex items-center gap-1 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED]"
               >
+                {n.drawing_data?.length ? (
+                  <svg className="w-3 h-3 text-[#C8102E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                ) : null}
                 {fmtTime(n.time_seconds)}
               </button>
               <span className="text-sm text-[#0F1F33] flex-1">{n.body}</span>

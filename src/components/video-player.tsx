@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { saveAnnotation, deleteAnnotation, clearAnnotations } from '@/app/actions/clips'
+import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
+import { createClient } from '@/lib/supabase/client'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -44,6 +45,14 @@ export type DbAnnotation = {
   start_pt: Point | null
   end_pt: Point | null
   origin_time: number
+}
+
+export type StampShape = {
+  type: string
+  color: string
+  points?: Point[]
+  start?: Point
+  end?: Point
 }
 
 // ── tracker functions ──────────────────────────────────────────────────────
@@ -257,13 +266,19 @@ const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border 
 export default function VideoPlayer({
   src,
   clipId,
+  playerId,
   role,
   initialAnnotations = [],
+  initialLessonUrl = null,
+  initialReframe = null,
 }: {
   src: string
   clipId: string
+  playerId: string
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
+  initialLessonUrl?: string | null
+  initialReframe?: { zoom: number; panX: number; panY: number } | null
 }) {
   const isCoach = role === 'coach'
 
@@ -293,6 +308,39 @@ export default function VideoPlayer({
   const [videoError,      setVideoError]      = useState(false)
   type MarkItem = { ref: Shape; type: string; color: string; time: number }
   const [markList,        setMarkList]        = useState<MarkItem[]>([])
+
+  // video aspect ratio — used to constrain portrait videos
+  const [videoAspect,    setVideoAspect]      = useState<number | null>(null)
+
+  // stamp overlay
+  const stampOverlayRef  = useRef<StampShape[]>([])
+  const stampTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [stampMode,      setStampMode]        = useState(false)
+  const [stampText,      setStampText]        = useState('')
+  const [stampSaving,    setStampSaving]      = useState(false)
+
+  // reframe
+  const [reframeMode,    setReframeMode]      = useState(false)
+  const [reframeDragging,setReframeDragging]  = useState(false)
+  const [zoom,           setZoom]             = useState(initialReframe?.zoom ?? 1)
+  const [panX,           setPanX]             = useState(initialReframe?.panX ?? 0)
+  const [panY,           setPanY]             = useState(initialReframe?.panY ?? 0)
+  const [reframeSaved,   setReframeSaved]     = useState(false)
+  const [reframeSaveErr, setReframeSaveErr]   = useState<string | null>(null)
+  const stageRef        = useRef<HTMLDivElement>(null)
+  const reframeModeRef  = useRef(false)
+  const reframeDragRef  = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null)
+
+  // lesson recording
+  const [lessonUrl,      setLessonUrl]        = useState<string | null>(initialLessonUrl)
+  const [lessonPhase,    setLessonPhase]      = useState<'idle' | 'recording' | 'saving'>('idle')
+  const [lessonSecs,     setLessonSecs]       = useState(0)
+  const [lessonError,    setLessonError]      = useState<string | null>(null)
+  const lessonCanvasRef  = useRef<HTMLCanvasElement | null>(null)
+  const lessonRecRef     = useRef<MediaRecorder | null>(null)
+  const lessonChunksRef  = useRef<Blob[]>([])
+  const lessonRafRef     = useRef<number | null>(null)
+  const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -406,6 +454,30 @@ export default function VideoPlayer({
 
     annotationsRef.current.forEach(drawShape)
     if (draftRef.current) drawShape(draftRef.current)
+
+    // stamp overlay — drawn at original coords with no tracking offset
+    if (stampOverlayRef.current.length) {
+      ctx.save()
+      ctx.globalAlpha = 0.85
+      stampOverlayRef.current.forEach(s => {
+        ctx!.strokeStyle = s.color; ctx!.lineWidth = INK_WIDTH
+        ctx!.lineCap = 'round';     ctx!.lineJoin  = 'round'
+        if (s.type === 'freehand' && s.points) {
+          ctx!.beginPath()
+          s.points.forEach((p, i) => i === 0 ? ctx!.moveTo(p.x, p.y) : ctx!.lineTo(p.x, p.y))
+          ctx!.stroke()
+        } else if (s.type === 'line' && s.start && s.end) {
+          ctx!.beginPath(); ctx!.moveTo(s.start.x, s.start.y); ctx!.lineTo(s.end.x, s.end.y); ctx!.stroke()
+        } else if (s.type === 'rect' && s.start && s.end) {
+          ctx!.strokeRect(Math.min(s.start.x, s.end.x), Math.min(s.start.y, s.end.y), Math.abs(s.end.x - s.start.x), Math.abs(s.end.y - s.start.y))
+        } else if (s.type === 'circle' && s.start && s.end) {
+          ctx!.beginPath()
+          ctx!.ellipse((s.start.x + s.end.x) / 2, (s.start.y + s.end.y) / 2, Math.abs(s.end.x - s.start.x) / 2, Math.abs(s.end.y - s.start.y) / 2, 0, 0, Math.PI * 2)
+          ctx!.stroke()
+        }
+      })
+      ctx.restore()
+    }
   }, [])
 
   const resizeCanvas = useCallback(() => {
@@ -524,6 +596,9 @@ export default function VideoPlayer({
     function onLoadedMetadata() {
       setDuration(video!.duration)
       scrub!.max = String(Math.floor(video!.duration * 1000) || 1000)
+      if (video!.videoWidth && video!.videoHeight) {
+        setVideoAspect(video!.videoWidth / video!.videoHeight)
+      }
       resizeCanvas()
     }
     function onTimeUpdate() {
@@ -553,6 +628,24 @@ export default function VideoPlayer({
     }
   }, [src, drawFrame, resizeCanvas])
 
+  // ── stamp overlay listener ───────────────────────────────────────────────
+  useEffect(() => {
+    function clearStamp() {
+      stampOverlayRef.current = []
+      if (stampTimerRef.current) clearTimeout(stampTimerRef.current)
+      drawFrame()
+    }
+    function onShowStamp(e: Event) {
+      const { shapes } = (e as CustomEvent).detail as { shapes: StampShape[]; time: number }
+      stampOverlayRef.current = shapes
+      drawFrame()
+      if (stampTimerRef.current) clearTimeout(stampTimerRef.current)
+      stampTimerRef.current = setTimeout(clearStamp, 4000)
+    }
+    window.addEventListener('rp:show-stamp', onShowStamp)
+    return () => window.removeEventListener('rp:show-stamp', onShowStamp)
+  }, [drawFrame])
+
   // ── render loop ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!playing) return
@@ -565,7 +658,7 @@ export default function VideoPlayer({
   // ── controls ─────────────────────────────────────────────────────────────
   function togglePlay() {
     const v = videoRef.current; if (!v) return
-    v.paused ? v.play() : v.pause()
+    if (v.paused) { clearStampOverlay(); v.play() } else { v.pause() }
   }
   function stepBack() {
     const v = videoRef.current; if (!v) return
@@ -575,8 +668,13 @@ export default function VideoPlayer({
     const v = videoRef.current; if (!v) return
     v.pause(); v.currentTime = Math.min(v.duration || 0, v.currentTime + FRAME)
   }
+  function clearStampOverlay() {
+    if (stampTimerRef.current) clearTimeout(stampTimerRef.current)
+    stampOverlayRef.current = []
+  }
   function onScrubInput() {
     scrubbingRef.current = true
+    clearStampOverlay()
     if (videoRef.current && scrubRef.current)
       videoRef.current.currentTime = Number(scrubRef.current.value) / 1000
   }
@@ -600,6 +698,181 @@ export default function VideoPlayer({
     annotationsRef.current = []; draftRef.current = null
     setMarkList([]); setMarkerCount(0); drawFrame()
   }
+  async function saveStamp() {
+    if (!stampText.trim()) return
+    const t = videoRef.current?.currentTime ?? 0
+    const shapes: StampShape[] = annotationsRef.current.map(s => ({
+      type: s.type,
+      color: s.color,
+      points: s.points ? s.points.map(p => ({ x: p.x + ((s.currentAnchor?.x ?? 0) - (s.anchor?.x ?? 0)), y: p.y + ((s.currentAnchor?.y ?? 0) - (s.anchor?.y ?? 0)) })) : undefined,
+      start: s.start ? { x: s.start.x + ((s.currentAnchor?.x ?? 0) - (s.anchor?.x ?? 0)), y: s.start.y + ((s.currentAnchor?.y ?? 0) - (s.anchor?.y ?? 0)) } : undefined,
+      end:   s.end   ? { x: s.end.x   + ((s.currentAnchor?.x ?? 0) - (s.anchor?.x ?? 0)), y: s.end.y   + ((s.currentAnchor?.y ?? 0) - (s.anchor?.y ?? 0)) } : undefined,
+    }))
+    setStampSaving(true)
+    const result = await saveTimestampNote({
+      clip_id: clipId,
+      time_seconds: t,
+      body: stampText.trim(),
+      drawing_data: shapes.length ? shapes : null,
+    })
+    setStampSaving(false)
+    if (result?.note) {
+      window.dispatchEvent(new CustomEvent('rp:stamp-created', { detail: result.note }))
+      setStampText('')
+      setStampMode(false)
+    }
+  }
+
+  async function startLessonRecording() {
+    setLessonError(null)
+    const video = videoRef.current
+    const overlay = overlayRef.current
+    if (!video || !overlay) return
+
+    const lw = video.videoWidth || 1280
+    const lh = video.videoHeight || 720
+    const lCanvas = document.createElement('canvas')
+    lCanvas.width = lw; lCanvas.height = lh
+    lessonCanvasRef.current = lCanvas
+    const lCtx = lCanvas.getContext('2d')!
+
+    let micStream: MediaStream
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setLessonError('Microphone access denied — check browser permissions')
+      return
+    }
+
+    function lessonLoop() {
+      lCtx.drawImage(video!, 0, 0, lw, lh)
+      lCtx.drawImage(overlay!, 0, 0, lw, lh)
+      lessonRafRef.current = requestAnimationFrame(lessonLoop)
+    }
+    lessonLoop()
+
+    const canvasStream = lCanvas.captureStream(30)
+    const mixedStream = new MediaStream([
+      canvasStream.getVideoTracks()[0],
+      micStream.getAudioTracks()[0],
+    ])
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4'
+
+    const recorder = new MediaRecorder(mixedStream, { mimeType })
+    lessonChunksRef.current = []
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) lessonChunksRef.current.push(e.data) }
+    recorder.onstop = () => {
+      if (lessonRafRef.current) cancelAnimationFrame(lessonRafRef.current)
+      micStream.getTracks().forEach(t => t.stop())
+      uploadLesson(mimeType)
+    }
+    recorder.start(250)
+    lessonRecRef.current = recorder
+    setLessonSecs(0)
+    setLessonPhase('recording')
+    lessonTimerRef.current = setInterval(() => setLessonSecs(s => s + 1), 1000)
+  }
+
+  function stopLessonRecording() {
+    if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+    lessonRecRef.current?.stop()
+    setLessonPhase('saving')
+  }
+
+  async function uploadLesson(mimeType: string) {
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
+    const path = `${playerId}/${clipId}/lesson.${ext}`
+    const blob = new Blob(lessonChunksRef.current, { type: mimeType })
+
+    const urlResult = await getSignedUploadUrl(path)
+    if ('error' in urlResult) { setLessonError('Upload failed'); setLessonPhase('idle'); return }
+
+    const res = await fetch(urlResult.signedUrl, {
+      method: 'PUT', body: blob, headers: { 'Content-Type': mimeType },
+    })
+    if (!res.ok) { setLessonError('Upload failed — try again'); setLessonPhase('idle'); return }
+
+    await saveLessonPath(clipId, path)
+
+    const supabase = createClient()
+    const { data: signed } = await supabase.storage.from('clips').createSignedUrl(path, 3600)
+    if (signed?.signedUrl) setLessonUrl(signed.signedUrl)
+    setLessonPhase('idle')
+  }
+
+  async function deleteLesson() {
+    await deleteLessonPath(clipId)
+    setLessonUrl(null)
+  }
+
+  // ── reframe helpers ──────────────────────────────────────────────────────
+  // Sync ref so wheel handler closure stays current
+  useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
+
+  // Wheel zoom — must be registered non-passive to call preventDefault
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    function onWheel(e: WheelEvent) {
+      if (!reframeModeRef.current) return
+      e.preventDefault()
+      const delta = e.deltaY < 0 ? 0.15 : -0.15
+      setZoom(z => Math.min(4, Math.max(1, +(z + delta).toFixed(2))))
+    }
+    stage.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage.removeEventListener('wheel', onWheel)
+  }, [])
+
+  // Clamp pan whenever zoom changes
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    const maxX = (stage.offsetWidth  * (zoom - 1)) / 2
+    const maxY = (stage.offsetHeight * (zoom - 1)) / 2
+    setPanX(x => Math.min(maxX, Math.max(-maxX, x)))
+    setPanY(y => Math.min(maxY, Math.max(-maxY, y)))
+  }, [zoom])
+
+  function startReframeDrag(e: React.PointerEvent) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setReframeDragging(true)
+    reframeDragRef.current = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY }
+  }
+
+  function moveReframeDrag(e: React.PointerEvent) {
+    if (!reframeDragRef.current) return
+    const stage = stageRef.current
+    const maxX = stage ? (stage.offsetWidth  * (zoom - 1)) / 2 : 999
+    const maxY = stage ? (stage.offsetHeight * (zoom - 1)) / 2 : 999
+    const nx = reframeDragRef.current.startPanX + (e.clientX - reframeDragRef.current.startX)
+    const ny = reframeDragRef.current.startPanY + (e.clientY - reframeDragRef.current.startY)
+    setPanX(Math.min(maxX, Math.max(-maxX, nx)))
+    setPanY(Math.min(maxY, Math.max(-maxY, ny)))
+  }
+
+  function endReframeDrag() {
+    reframeDragRef.current = null
+    setReframeDragging(false)
+  }
+
+  async function handleSaveReframe() {
+    setReframeSaveErr(null)
+    const result = await saveReframe(clipId, { zoom, panX, panY })
+    if (result?.error) {
+      setReframeSaveErr('Column missing — run: ALTER TABLE clips ADD COLUMN reframe JSONB')
+    } else {
+      setReframeSaved(true)
+      setTimeout(() => setReframeSaved(false), 2500)
+    }
+  }
+
+  function resetReframe() {
+    setZoom(1); setPanX(0); setPanY(0); setReframeSaved(false); setReframeSaveErr(null)
+  }
+
   function toggleTracking() {
     const next = !trackingEnabledRef.current
     trackingEnabledRef.current = next
@@ -613,29 +886,64 @@ export default function VideoPlayer({
   return (
     <div className="bg-white border border-[#DDE4ED] rounded-xl p-3.5 shadow-sm">
       {/* Stage */}
-      <div className="relative bg-black rounded-md overflow-hidden" style={{ lineHeight: 0 }}>
+      <div
+        ref={stageRef}
+        className="relative bg-black rounded-md overflow-hidden mx-auto"
+        style={{
+          lineHeight: 0,
+          ...(videoAspect && videoAspect < 1
+            ? { maxWidth: `min(100%, calc(70vh * ${videoAspect.toFixed(4)}))` }
+            : {}),
+          cursor: reframeMode ? (reframeDragging ? 'grabbing' : 'grab') : undefined,
+          userSelect: reframeMode ? 'none' : undefined,
+        }}
+        onPointerDown={reframeMode ? startReframeDrag : undefined}
+        onPointerMove={reframeMode ? moveReframeDrag : undefined}
+        onPointerUp={reframeMode ? endReframeDrag : undefined}
+        onPointerLeave={reframeMode ? endReframeDrag : undefined}
+      >
         {videoError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
             <p className="text-white text-sm opacity-70">Video unavailable — try refreshing the page.</p>
           </div>
         )}
-        <video
-          ref={videoRef}
-          src={src}
-          playsInline
-          crossOrigin="anonymous"
-          className="w-full block"
-          onError={() => setVideoError(true)}
-        />
-        <canvas
-          ref={overlayRef}
-          className="absolute inset-0 w-full h-full"
+        {zoom > 1 && (
+          <div
+            className="absolute top-2 right-2 z-10 text-white/70 text-[0.65rem] bg-black/40 px-1.5 py-0.5 rounded pointer-events-none"
+            style={oswald}
+          >
+            {zoom.toFixed(1)}x
+          </div>
+        )}
+        {/* Inner stage — receives the zoom/pan transform */}
+        <div
           style={{
-            touchAction: 'none',
-            cursor: isCoach && tool !== 'pointer' ? 'crosshair' : 'default',
-            pointerEvents: isCoach ? 'auto' : 'none',
+            transform: zoom !== 1 || panX !== 0 || panY !== 0
+              ? `translate(${panX}px, ${panY}px) scale(${zoom})`
+              : undefined,
+            transformOrigin: 'center center',
+            lineHeight: 0,
           }}
-        />
+        >
+          <video
+            ref={videoRef}
+            src={src}
+            playsInline
+            crossOrigin="anonymous"
+            className="w-full block"
+            style={videoAspect && videoAspect < 1 ? { maxHeight: '70vh' } : {}}
+            onError={() => setVideoError(true)}
+          />
+          <canvas
+            ref={overlayRef}
+            className="absolute inset-0 w-full h-full"
+            style={{
+              touchAction: 'none',
+              cursor: isCoach && tool !== 'pointer' && !reframeMode ? 'crosshair' : 'default',
+              pointerEvents: isCoach && !reframeMode ? 'auto' : 'none',
+            }}
+          />
+        </div>
       </div>
 
       {/* Scrub */}
@@ -706,9 +1014,138 @@ export default function VideoPlayer({
             </button>
           </div>
 
-          <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
-            Clear marks
+          <div className="flex gap-1">
+            <button
+              onClick={() => { setReframeMode(m => !m); setReframeSaveErr(null) }}
+              className={`${btnBase} border border-[#DDE4ED] ${reframeMode ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`}
+              style={oswald}
+              title="Zoom and pan the video to focus on what matters"
+            >
+              Reframe
+            </button>
+            <button
+              onClick={() => { setStampMode(m => !m); setStampText('') }}
+              className={`${btnBase} border border-[#DDE4ED] ${stampMode ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`}
+              style={oswald}
+              title="Stamp current drawings as a timestamp note"
+            >
+              ✦ Stamp
+            </button>
+            <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
+              Clear marks
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reframe controls */}
+      {isCoach && reframeMode && (
+        <div className="mt-2 pt-2 flex flex-wrap items-center gap-3" style={divider}>
+          <span className="text-[0.72rem] text-[#3D5166] tabular-nums w-8 shrink-0" style={oswald}>
+            {zoom.toFixed(1)}x
+          </span>
+          <input
+            type="range" min="100" max="400" step="5"
+            value={Math.round(zoom * 100)}
+            onChange={e => setZoom(Number(e.target.value) / 100)}
+            className="w-28 accent-[#C8102E]"
+          />
+          <span className="text-[0.65rem] text-[#8096AE]" style={oswald}>
+            Drag to pan · scroll to zoom
+          </span>
+          <div className="flex gap-1 ml-auto">
+            <button onClick={resetReframe} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
+              Reset
+            </button>
+            <button
+              onClick={handleSaveReframe}
+              className={`${btnBase} border border-[#DDE4ED] ${reframeSaved ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`}
+              style={oswald}
+            >
+              {reframeSaved ? 'Saved ✓' : 'Save View'}
+            </button>
+          </div>
+          {reframeSaveErr && (
+            <p className="w-full text-[0.65rem] text-[#C8102E] font-mono break-all">{reframeSaveErr}</p>
+          )}
+        </div>
+      )}
+
+      {/* Stamp input row */}
+      {isCoach && stampMode && (
+        <div className="mt-2 pt-2 flex items-center gap-2" style={divider}>
+          <span className="text-[0.68rem] text-[#8096AE] tabular-nums shrink-0" style={oswald}>{fmtTime(currentTime)}</span>
+          <input
+            autoFocus
+            value={stampText}
+            onChange={e => setStampText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveStamp(); if (e.key === 'Escape') { setStampMode(false); setStampText('') } }}
+            placeholder="Describe this moment…"
+            className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+          />
+          <button
+            onClick={saveStamp}
+            disabled={stampSaving || !stampText.trim()}
+            className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0"
+            style={oswald}
+          >
+            {stampSaving ? 'Saving…' : 'Save'}
           </button>
+          <button
+            onClick={() => { setStampMode(false); setStampText('') }}
+            className="text-xs text-[#8096AE] hover:text-[#C8102E] transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Lesson recording */}
+      {isCoach && lessonPhase !== 'idle' ? (
+        <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
+          <span className="w-2 h-2 rounded-full bg-[#C8102E] animate-pulse shrink-0" />
+          <span className="text-xs text-[#C8102E]" style={oswald}>
+            Recording — {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
+          </span>
+          <button
+            onClick={stopLessonRecording}
+            disabled={lessonPhase === 'saving'}
+            className={`${btnBase} bg-slate-950 text-white ml-auto disabled:opacity-50`}
+            style={oswald}
+          >
+            {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
+          </button>
+        </div>
+      ) : isCoach && (
+        <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>
+          <button
+            onClick={startLessonRecording}
+            className={`${btnBase} border border-[#DDE4ED] bg-[#F0F4F8] ${btnIdle}`}
+            style={oswald}
+            title="Record a lesson: your voice + everything you draw and do on this clip"
+          >
+            ● Record Lesson
+          </button>
+          {lessonError && <span className="text-xs text-[#C8102E]">{lessonError}</span>}
+          {lessonUrl && !lessonError && <span className="text-xs text-slate-400" style={oswald}>Lesson saved</span>}
+        </div>
+      )}
+
+      {/* Lesson playback */}
+      {lessonUrl && lessonPhase === 'idle' && (
+        <div className="mt-3 pt-3" style={divider}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[0.68rem] text-[#8096AE] tracking-widest" style={oswald}>
+              {isCoach ? 'Coach Lesson Recording' : 'Lesson from your coach'}
+            </p>
+            {isCoach && (
+              <div className="flex gap-3">
+                <button onClick={startLessonRecording} className="text-[10px] text-[#456080] hover:text-[#0F1F33] transition-colors" style={oswald}>Re-record</button>
+                <button onClick={deleteLesson} className="text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>Delete</button>
+              </div>
+            )}
+          </div>
+          <video src={lessonUrl} controls playsInline className="w-full rounded-lg" style={{ maxHeight: 300, background: '#000' }} />
         </div>
       )}
 

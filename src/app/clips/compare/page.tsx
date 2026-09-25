@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
-import ComparePlayer from './compare-player'
+import ComparePlayer, { ClipData } from './compare-player'
 import ClipPicker from './clip-picker'
 
-export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string }> }) {
-  const { a, b } = await searchParams
+export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string; c?: string; d?: string }> }) {
+  const { a, b, c, d } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
@@ -22,7 +22,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
 
   const role = (profile?.role ?? user.user_metadata?.role ?? 'player') as 'coach' | 'player'
 
-  async function loadClip(clipId: string) {
+  async function loadClip(clipId: string): Promise<ClipData | null> {
     const { data: clip } = await supabaseAdmin
       .from('clips')
       .select('id, title, storage_path, created_at, session_date, player_id')
@@ -60,10 +60,21 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     }
   }
 
-  const clipA = await loadClip(a)
+  function youtubeClip(ytId: string): ClipData {
+    return { id: '', title: 'YouTube Video', videoUrl: '', playerName: 'YouTube', sessionDate: '', youtubeId: ytId }
+  }
+
+  async function resolveSlot(param: string | undefined): Promise<ClipData | null | undefined> {
+    if (!param) return undefined
+    if (param.startsWith('yt:')) return youtubeClip(param.slice(3))
+    return loadClip(param)
+  }
+
+  const clipA = await resolveSlot(a)
+  // clipA must resolve to a real clip (not undefined, not null)
   if (!clipA) notFound()
 
-  // Picker mode — only clipA loaded
+  // Picker mode — only clipA loaded (b missing)
   if (!b) {
     // Load all accessible clips except the source
     let allClips: { id: string; title: string; created_at: string; session_date: string | null; player_id: string }[] = []
@@ -140,10 +151,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     )
   }
 
-  const clipB = b.startsWith('yt:')
-    ? { id: '', title: 'YouTube Video', videoUrl: '', playerName: 'YouTube', sessionDate: '', youtubeId: b.slice(3) }
-    : await loadClip(b)
+  // Resolve b, c, d slots in parallel
+  const [clipB, clipC, clipD] = await Promise.all([
+    resolveSlot(b),
+    resolveSlot(c),
+    resolveSlot(d),
+  ])
+
   if (!clipB) notFound()
+
+  // Build clips array — only include slots that resolved successfully
+  const clips: ClipData[] = [clipA, clipB]
+  if (clipC) clips.push(clipC)
+  if (clipD) clips.push(clipD)
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
@@ -155,7 +175,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         showSignOut
       />
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6">
-        <ComparePlayer clipA={clipA} clipB={clipB} />
+        <ComparePlayer clips={clips} />
       </main>
       <SiteFooter variant="app" />
     </div>

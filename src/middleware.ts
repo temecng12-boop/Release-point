@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isAuthRoute  = pathname.startsWith('/auth')
-  const isPublicPath = pathname === '/' || pathname === '/about' || isAuthRoute
+  const isPublicPath = pathname === '/' || pathname === '/about' || pathname === '/waitlist' || pathname.startsWith('/privacy') || pathname.startsWith('/terms') || isAuthRoute
 
   // Never redirect server action requests — they carry a `next-action` header
   // and expect either an RSC response or an `x-action-redirect` header.
@@ -61,6 +61,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html)$).*)',
   ],
 }

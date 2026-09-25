@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -15,56 +16,98 @@ export interface ClipData {
 }
 
 interface Props {
-  clipA: ClipData
-  clipB: ClipData
+  clips: ClipData[]
 }
 
-export default function ComparePlayer({ clipA, clipB }: Props) {
-  const aRef = useRef<HTMLVideoElement>(null)
-  const bRef = useRef<HTMLVideoElement>(null)
-  const hasYoutube = !!(clipA.youtubeId || clipB.youtubeId)
+export default function ComparePlayer({ clips }: Props) {
+  const router = useRouter()
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
+  const hasYoutube = clips.some(c => !!c.youtubeId)
   const [synced, setSynced] = useState(!hasYoutube)
   const [playing, setPlaying] = useState(false)
-  const [aProgress, setAProgress] = useState(0)
-  const [bProgress, setBProgress] = useState(0)
+  const [progress, setProgress] = useState<number[]>(clips.map(() => 0))
   const syncingRef = useRef(false)
 
-  function syncOther(source: 'a' | 'b', time: number) {
+  // Add clip inline state
+  const [addYtUrl, setAddYtUrl] = useState('')
+  const [addYtError, setAddYtError] = useState('')
+
+  function setProgressAt(index: number, val: number) {
+    setProgress(prev => {
+      const next = [...prev]
+      next[index] = val
+      return next
+    })
+  }
+
+  function syncAll(sourceIndex: number, time: number) {
     if (!synced || syncingRef.current) return
     syncingRef.current = true
-    const target = source === 'a' ? bRef.current : aRef.current
-    if (target) target.currentTime = time
+    clips.forEach((clip, i) => {
+      if (i !== sourceIndex && !clip.youtubeId) {
+        const v = videoRefs.current[i]
+        if (v) v.currentTime = time
+      }
+    })
     syncingRef.current = false
   }
 
   const handlePlay = useCallback(() => {
     setPlaying(true)
     if (!hasYoutube) {
-      aRef.current?.play()
-      bRef.current?.play()
+      clips.forEach((clip, i) => {
+        if (!clip.youtubeId) videoRefs.current[i]?.play()
+      })
     }
-  }, [hasYoutube])
+  }, [hasYoutube, clips])
 
   const handlePause = useCallback(() => {
     setPlaying(false)
-    aRef.current?.pause()
-    bRef.current?.pause()
-  }, [])
+    clips.forEach((_, i) => {
+      videoRefs.current[i]?.pause()
+    })
+  }, [clips])
 
-  const handleSeek = useCallback((target: 'a' | 'b', val: number) => {
-    const vid = target === 'a' ? aRef.current : bRef.current
+  const handleSeek = useCallback((index: number, val: number) => {
+    const vid = videoRefs.current[index]
     if (vid) vid.currentTime = val
-    if (synced) syncOther(target, val)
+    if (synced) syncAll(index, val)
   }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function togglePlayPause() {
     playing ? handlePause() : handlePlay()
   }
 
-  function renderPanel(side: 'a' | 'b', clip: ClipData, vidRef: React.RefObject<HTMLVideoElement | null>, progress: number, setProgress: (v: number) => void) {
+  function extractYouTubeId(url: string): string | null {
+    const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+    return m ? m[1] : null
+  }
+
+  function handleAddYouTube() {
+    const id = extractYouTubeId(addYtUrl.trim())
+    if (!id) { setAddYtError('Paste a valid YouTube URL (youtube.com/watch or youtu.be)'); return }
+    const params = new URLSearchParams()
+    const slots = ['a', 'b', 'c', 'd'] as const
+    clips.forEach((clip, i) => {
+      const val = clip.youtubeId ? `yt:${clip.youtubeId}` : clip.id
+      params.set(slots[i], val)
+    })
+    const nextSlot = slots[clips.length]
+    if (nextSlot) params.set(nextSlot, `yt:${id}`)
+    router.push(`/clips/compare?${params.toString()}`)
+  }
+
+  // Grid layout based on clip count
+  const gridClass = clips.length === 2
+    ? 'grid-cols-1 md:grid-cols-2'
+    : clips.length === 3
+      ? 'grid-cols-1 md:grid-cols-3'
+      : 'grid-cols-1 md:grid-cols-2'
+
+  function renderPanel(clip: ClipData, index: number) {
     if (clip.youtubeId) {
       return (
-        <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+        <div key={clip.youtubeId + index} className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#DDE4ED] bg-[#F8FAFC]">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
@@ -89,7 +132,7 @@ export default function ComparePlayer({ clipA, clipB }: Props) {
     }
 
     return (
-      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
+      <div key={clip.id + index} className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#DDE4ED] bg-[#F8FAFC]">
           <div className="min-w-0">
             <p className="text-xs text-[#0F1F33] truncate font-medium">{clip.title}</p>
@@ -107,26 +150,79 @@ export default function ComparePlayer({ clipA, clipB }: Props) {
         </div>
         <div className="relative bg-black aspect-video">
           <video
-            ref={vidRef as React.RefObject<HTMLVideoElement>}
+            ref={el => { videoRefs.current[index] = el }}
             src={clip.videoUrl}
             className="w-full h-full object-contain"
             playsInline
             preload="metadata"
             onTimeUpdate={() => {
-              const v = vidRef.current
+              const v = videoRefs.current[index]
               if (!v || !v.duration) return
-              setProgress(v.currentTime / v.duration)
-              if (synced) syncOther(side, v.currentTime)
+              setProgressAt(index, v.currentTime / v.duration)
+              if (synced) syncAll(index, v.currentTime)
             }}
             onEnded={() => setPlaying(false)}
           />
         </div>
         <div className="px-4 py-3">
           <input
-            type="range" min={0} max={1} step={0.001} value={progress}
-            onChange={e => handleSeek(side, parseFloat(e.target.value) * (vidRef.current?.duration ?? 0))}
+            type="range" min={0} max={1} step={0.001} value={progress[index] ?? 0}
+            onChange={e => handleSeek(index, parseFloat(e.target.value) * (videoRefs.current[index]?.duration ?? 0))}
             className="w-full accent-[#C8102E] h-1"
           />
+        </div>
+      </div>
+    )
+  }
+
+  function renderAddPanel() {
+    return (
+      <div className="bg-white border border-dashed border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm flex flex-col">
+        <div className="px-4 py-2.5 border-b border-[#DDE4ED] bg-[#F8FAFC]">
+          <p className="text-xs text-[#3D5166] font-medium" style={oswald}>Add clip</p>
+        </div>
+        <div className="flex-1 flex flex-col justify-center p-5 space-y-4">
+          {/* YouTube URL input */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-[#C8102E] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              <p className="text-[11px] text-[#3D5166] tracking-[0.15em]" style={oswald}>Add YouTube clip</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={addYtUrl}
+                onChange={e => { setAddYtUrl(e.target.value); setAddYtError('') }}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddYouTube() }}
+                placeholder="Paste a YouTube URL…"
+                className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-lg px-3 py-2 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+              />
+              <button
+                onClick={handleAddYouTube}
+                className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                style={oswald}
+              >
+                Add
+              </button>
+            </div>
+            {addYtError && <p className="text-xs text-[#C8102E]">{addYtError}</p>}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-[#DDE4ED]" />
+            <p className="text-[11px] text-[#AAB8C8]" style={oswald}>or</p>
+            <div className="flex-1 h-px bg-[#DDE4ED]" />
+          </div>
+
+          <p className="text-[11px] text-[#3D5166] text-center">
+            Go to{' '}
+            <Link href="/clips" className="text-[#456080] hover:text-[#1C3A5C] underline transition-colors">
+              Clips
+            </Link>{' '}
+            to start a new comparison with a library clip.
+          </p>
         </div>
       </div>
     )
@@ -154,18 +250,22 @@ export default function ComparePlayer({ clipA, clipB }: Props) {
       </div>
 
       {/* Video panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {renderPanel('a', clipA, aRef, aProgress, setAProgress)}
-        {renderPanel('b', clipB, bRef, bProgress, setBProgress)}
+      <div className={`grid ${gridClass} gap-4`}>
+        {clips.map((clip, i) => renderPanel(clip, i))}
+        {clips.length < 4 && renderAddPanel()}
       </div>
 
-      {/* Shared controls — only for non-YouTube pairs */}
+      {/* Shared controls — only for non-YouTube clips */}
       {!hasYoutube && (
         <div className="flex items-center justify-center gap-4 bg-white border border-[#DDE4ED] rounded-xl px-6 py-4 shadow-sm">
           <button
             onClick={() => {
-              if (aRef.current) aRef.current.currentTime = Math.max(0, aRef.current.currentTime - 5)
-              if (bRef.current) bRef.current.currentTime = Math.max(0, bRef.current.currentTime - 5)
+              clips.forEach((clip, i) => {
+                if (!clip.youtubeId) {
+                  const v = videoRefs.current[i]
+                  if (v) v.currentTime = Math.max(0, v.currentTime - 5)
+                }
+              })
             }}
             className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
             title="−5 seconds"
@@ -192,8 +292,12 @@ export default function ComparePlayer({ clipA, clipB }: Props) {
 
           <button
             onClick={() => {
-              if (aRef.current) aRef.current.currentTime = Math.min(aRef.current.duration || 0, aRef.current.currentTime + 5)
-              if (bRef.current) bRef.current.currentTime = Math.min(bRef.current.duration || 0, bRef.current.currentTime + 5)
+              clips.forEach((clip, i) => {
+                if (!clip.youtubeId) {
+                  const v = videoRefs.current[i]
+                  if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5)
+                }
+              })
             }}
             className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
             title="+5 seconds"
