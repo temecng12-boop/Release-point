@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canViewPlayerContent } from '@/lib/clip-access'
+import { canUploadVideo } from '@/lib/consent'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -91,7 +92,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')
-    .select('full_name, age_group, position')
+    .select('full_name, age_group, position, consent_given_at, adult_confirmed_at')
     .eq('id', clip.player_id)
     .single()
 
@@ -287,6 +288,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
           initialAnnotations={rawAnnotations ?? []}
           initialLessonUrl={lessonUrl}
           initialReframe={initialReframe}
+          canAddMedia={canUploadVideo(playerRow)}
         />
 
         <div className="mt-4">
@@ -304,6 +306,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
             aiCoachAvailable={aiCoachAvailable}
+            canAddMedia={canUploadVideo(playerRow)}
           />
         </div>
       </main>

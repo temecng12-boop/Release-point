@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -271,6 +272,7 @@ export default function VideoPlayer({
   initialAnnotations = [],
   initialLessonUrl = null,
   initialReframe = null,
+  canAddMedia,
 }: {
   src: string
   clipId: string
@@ -279,6 +281,8 @@ export default function VideoPlayer({
   initialAnnotations?: DbAnnotation[]
   initialLessonUrl?: string | null
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
+  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
+  canAddMedia: boolean
 }) {
   const isCoach = role === 'coach'
 
@@ -825,7 +829,7 @@ export default function VideoPlayer({
     const urlResult = await getSignedUploadUrl(path, 'lessons')
     if ('error' in urlResult) {
       console.error('[lesson] signed upload URL failed', { path, error: urlResult.error })
-      setLessonError(`Upload failed: ${urlResult.error}`); setLessonPhase('idle'); return
+      setLessonError(urlResult.error ?? 'Upload failed'); setLessonPhase('idle'); return
     }
 
     const res = await fetch(urlResult.signedUrl, {
@@ -1185,6 +1189,10 @@ export default function VideoPlayer({
             {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
           </button>
         </div>
+      ) : isCoach && !canAddMedia ? (
+        <div className="mt-2 pt-2" style={divider}>
+          <UploadBlockedNotice viewer="coach" />
+        </div>
       ) : isCoach && (
         <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>
           <button
@@ -1209,7 +1217,9 @@ export default function VideoPlayer({
             </p>
             {isCoach && (
               <div className="flex gap-3">
-                <button onClick={startLessonRecording} className="text-[10px] text-[#456080] hover:text-[#0F1F33] transition-colors" style={oswald}>Re-record</button>
+                {canAddMedia && (
+                  <button onClick={startLessonRecording} className="text-[10px] text-[#456080] hover:text-[#0F1F33] transition-colors" style={oswald}>Re-record</button>
+                )}
                 <button onClick={deleteLesson} className="text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>Delete</button>
               </div>
             )}
