@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         {[
           {
             title: '1. Who We Are',
-            body: `Release Point ("we," "us," or "our") is a baseball and softball mechanics analysis platform designed for coaches and players. This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepoint.app.`,
+            body: `Release Point ("we," "us," or "our") is operated by [COMPANY_LEGAL_NAME]. Release Point is a baseball and softball mechanics analysis platform designed for coaches and players. This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepoint.app.`,
           },
           {
             title: '2. Information We Collect',
@@ -112,7 +112,7 @@ To exercise any of these rights, contact us at the address below.`,
           },
           {
             title: '11. Contact',
-            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: privacy@releasepoint.app\n\nWe aim to respond to all requests within 5 business days.`,
+            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: [PRIVACY_EMAIL_PLACEHOLDER]\nMail: [COMPANY_LEGAL_NAME], [MAILING_ADDRESS]\nPhone: [PHONE_NUMBER]\n\nWe aim to respond to all requests within 5 business days.`,
           },
         ].map((section) => (
           <div key={section.title}>

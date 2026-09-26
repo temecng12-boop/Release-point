@@ -117,7 +117,7 @@ Upon termination, your content will be deleted within 30 days unless we are requ
           },
           {
             title: '11. Contact',
-            body: `Questions about these Terms:\n\nEmail: legal@releasepoint.app\n\nWe respond to legal inquiries within 5 business days.`,
+            body: `Questions about these Terms:\n\nEmail: [LEGAL_EMAIL_PLACEHOLDER]\n\nWe respond to legal inquiries within 5 business days.`,
           },
         ].map((section) => (
           <div key={section.title}>
