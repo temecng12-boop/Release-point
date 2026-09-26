@@ -65,7 +65,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const { data: players } = ownPlayerIds.length > 0
     ? await supabaseAdmin
         .from('players')
-        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
+        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at, adult_confirmed_at')
         .in('id', ownPlayerIds)
         .order('full_name', { ascending: true })
     : { data: [] }

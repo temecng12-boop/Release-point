@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
+import MarkAdultButton from '@/app/dashboard/mark-adult-button'
+import { canUploadVideo } from '@/lib/consent'
+import { canManagePlayerAge } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -33,7 +36,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   const { data: player } = await supabaseAdmin
     .from('players')
-    .select('id, full_name, email, accepted_at, age_group, position, coach_id, consent_given_at')
+    .select('id, full_name, email, accepted_at, age_group, position, coach_id, consent_given_at, adult_confirmed_at')
     .eq('id', id)
     .single()
 
@@ -42,6 +45,9 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   const access = profilePageAccess(user.id, profile?.role, player)
   if (access === 'redirect-dashboard') redirect('/dashboard')
   if (access !== 'view' || !player) notFound()
+
+  // Offer "Mark as 18+" only when uploads are blocked and this coach may change the player's age status.
+  const showMarkAdult = !canUploadVideo(player) && (await canManagePlayerAge(supabaseAdmin, user.id, player.id))
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -164,7 +170,13 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 </div>
               </div>
               {/* Upload button for coach */}
-              <UploadButton playerId={player.id} playerName={player.full_name} maxFiles={50} />
+              <UploadButton
+                playerId={player.id}
+                playerName={player.full_name}
+                consent={player}
+                maxFiles={50}
+                blockedAction={showMarkAdult ? <MarkAdultButton playerId={player.id} playerName={player.full_name} /> : undefined}
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">

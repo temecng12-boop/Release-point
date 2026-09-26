@@ -12,6 +12,7 @@ import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 import { canDeleteClip, canDeleteClipItem } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
+import { checkUploadConsent } from '@/lib/consent-server'
 
 // Loads the coach and account ids of the player a clip belongs to.
 async function playerForClip(clipId: string) {
@@ -44,6 +45,12 @@ async function checkStorageAccess(action: string, bucket: unknown, storagePath: 
 export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 'lessons' = 'clips') {
   const check = await checkStorageAccess('getSignedUploadUrl', bucket, storagePath, 'write')
   if ('error' in check) return { error: check.error }
+
+  // No media for a player who isn't a confirmed adult and has no guardian consent on record.
+  const pathPlayerId = playerIdFromStoragePath(storagePath)
+  if (!pathPlayerId) return { error: 'Invalid upload path' }
+  const consent = await checkUploadConsent(supabaseAdmin, pathPlayerId)
+  if (!consent.ok) return { error: consent.error }
 
   const { data, error } = await supabaseAdmin.storage
     .from(bucket)
@@ -92,6 +99,8 @@ export async function createClip(data: {
   // player's video).
   if (!(await canUploadForPlayer(user.id, data.player_id))) return { error: 'Not authorized' }
   if (playerIdFromStoragePath(data.storage_path) !== data.player_id) return { error: 'Invalid storage path' }
+  const consent = await checkUploadConsent(supabaseAdmin, data.player_id)
+  if (!consent.ok) return { error: consent.error }
 
   const { data: newClip, error } = await supabaseAdmin.from('clips').insert({
     player_id:    data.player_id,
