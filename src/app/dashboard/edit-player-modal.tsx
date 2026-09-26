@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePlayer, deletePlayer } from '@/app/actions/player'
+import { updatePlayer, deletePlayer, setPlayerAdultConfirmed } from '@/app/actions/player'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
     full_name: string
     age_group: string | null
     position: string | null
+    adult_confirmed_at?: string | null
     teamIds: string[]
   }
   teams: Team[]
@@ -47,6 +48,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [height, setHeight]       = useState('')
   const [weight, setWeight]       = useState('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>(player.teamIds)
+  const [isAdult, setIsAdult]     = useState(!!player.adult_confirmed_at)
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -68,9 +70,14 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
       position:  position || undefined,
       teamIds:   selectedTeams,
     })
+    if (result?.error) { setSaving(false); setError(result.error); return }
+    if (isAdult !== !!player.adult_confirmed_at) {
+      const ageResult = await setPlayerAdultConfirmed(player.id, isAdult)
+      if (ageResult?.error) { setSaving(false); setError(ageResult.error); return }
+    }
     setSaving(false)
-    if (result?.error) setError(result.error)
-    else { onClose(); router.refresh() }
+    onClose()
+    router.refresh()
   }
 
   async function handleDelete() {
@@ -136,6 +143,18 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
               </select>
             </div>
           </div>
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isAdult}
+              onChange={(e) => setIsAdult(e.target.checked)}
+              className="mt-0.5 accent-[#C8102E]"
+            />
+            <span className="text-xs text-[#456080]">
+              Player is 18 or older. Players under 18 need guardian consent on file before video can be added.
+            </span>
+          </label>
 
           {teams.length > 0 && (
             <div>
