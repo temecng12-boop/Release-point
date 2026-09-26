@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
+import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 
 // Signed storage URLs: only for paths belonging to a player the caller may
 // see (read) or write. See src/lib/storage-access.ts.
@@ -71,6 +72,12 @@ export async function createClip(data: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // The caller must be allowed to upload for this player, and the storage path
+  // must live under that player's folder (prevents pointing a clip at another
+  // player's video).
+  if (!(await canUploadForPlayer(user.id, data.player_id))) return { error: 'Not authorized' }
+  if (playerIdFromStoragePath(data.storage_path) !== data.player_id) return { error: 'Invalid storage path' }
 
   const { data: newClip, error } = await supabaseAdmin.from('clips').insert({
     player_id:    data.player_id,
@@ -333,11 +340,14 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   if (!user) return { error: 'Not authenticated' }
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
   if (!isLessonPathFor(lessonPath, clip.player_id, clipId)) {
     console.warn('[saveLessonPath] rejected path', { clipId, lessonPath })
     return { error: 'Invalid lesson file' }
   }
+  // Same rule as lesson upload links (src/lib/storage-access.ts): only the
+  // player's own coach may write lesson files.
+  const decision = await decideStorageAccess(supabaseAdmin, user.id, 'lessons', lessonPath, 'write')
+  if (!decision.allowed || decision.playerId !== clip.player_id.toLowerCase()) return { error: 'Not authorized' }
   const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
   if (error) return { error: error.message }
   // Re-record: remove the previous recording once the new one is attached.
@@ -403,7 +413,9 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
 
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
+  if (playerIdFromStoragePath(voicePath) !== clip.player_id) return { error: 'Invalid storage path' }
 
   const { error } = await supabaseAdmin
     .from('clips')
