@@ -25,6 +25,20 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Name</label>
             <input type="text" name="full_name" placeholder="Player's full name" className={inputClass} />
           </div>
+          <fieldset>
+            <legend className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Age</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="age_status" value="adult" required className="accent-[#C8102E]" />
+                <span className="text-xs text-[#456080]">18 or older</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="age_status" value="minor" required className="accent-[#C8102E]" />
+                <span className="text-xs text-[#456080]">Under 18 (guardian consent pending)</span>
+              </label>
+            </div>
+          </fieldset>
+
           <div>
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Email</label>
             <div className="flex gap-2">
