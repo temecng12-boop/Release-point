@@ -89,7 +89,7 @@ async function ClipContent({ id, clip, userId, userMetadataRole }: {
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')
-    .select('full_name, age_group, position, coach_id, user_id')
+    .select('full_name, age_group, position')
     .eq('id', clip.player_id)
     .single()
 
