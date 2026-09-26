@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
+import { setAdultConfirmation } from '@/lib/consent-server'
 
 export async function uploadAvatar(formData: FormData) {
   const supabase = await createClient()
@@ -100,6 +101,22 @@ export async function updatePlayer(playerId: string, data: {
   }
 
   revalidatePath('/dashboard')
+  return { success: true }
+}
+
+// Coach confirms (or un-confirms) that a player is 18 or older (RP-041).
+// Authorization is checked in setAdultConfirmation.
+export async function setPlayerAdultConfirmed(playerId: string, confirmed: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof playerId !== 'string' || !playerId) return { error: 'Invalid player' }
+
+  const result = await setAdultConfirmation(supabaseAdmin, user.id, playerId, confirmed === true)
+  if ('error' in result) return { error: result.error }
+
+  revalidatePath('/dashboard', 'layout')
+  revalidatePath(`/profile/${playerId}`)
   return { success: true }
 }
 
