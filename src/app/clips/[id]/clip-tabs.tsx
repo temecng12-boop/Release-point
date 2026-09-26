@@ -66,6 +66,7 @@ export default function ClipTabs({
   playerAgeGroup,
   playerPosition,
   aiCoachAvailable = true,
+  canAddMedia,
 }: {
   clipId: string
   playerId: string
@@ -81,6 +82,8 @@ export default function ClipTabs({
   playerPosition: string | null
   /** Whether this viewer may use the AI Coach (own coach or the player). */
   aiCoachAvailable?: boolean
+  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
+  canAddMedia: boolean
 }) {
   const [active, setActive] = useState<Tab>('Timestamps')
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
@@ -134,7 +137,7 @@ export default function ClipTabs({
               <TextNotes clipId={clipId} role={role} initialNotes={initialNotes} />
             )}
             {active === 'Voice' && (
-              <VoiceNote clipId={clipId} playerId={playerId} role={role} initialVoiceUrl={initialVoiceUrl} />
+              <VoiceNote clipId={clipId} playerId={playerId} role={role} initialVoiceUrl={initialVoiceUrl} canAddMedia={canAddMedia} />
             )}
             {active === 'Mechanics' && (
               <PhaseChecklist clipId={clipId} role={role} initial={initialChecklist} isPitcher={isPitcher} />

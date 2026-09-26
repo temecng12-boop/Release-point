@@ -1,10 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
 import BulkUploadModal from './bulk-upload-modal'
+import { canUploadVideo, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 const COMPRESS_THRESHOLD_MB = 30
 const FFMPEG_CORE_VERSION = '0.12.6'
@@ -53,10 +55,21 @@ export default function UploadButton({
   playerId,
   playerName,
   maxFiles = 20,
+  consent,
+  viewer = 'coach',
+  blockedAction,
+  showBlockedNotice = true,
 }: {
   playerId: string
   playerName: string
   maxFiles?: number
+  /** The player's stored consent status (see src/lib/consent.ts). Required. */
+  consent: PlayerConsentFields
+  viewer?: UploadBlockedViewer
+  /** Optional control shown under the blocked message, e.g. "Mark as 18+". */
+  blockedAction?: ReactNode
+  /** Set false when the parent renders its own UploadBlockedNotice. */
+  showBlockedNotice?: boolean
 }) {
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
@@ -133,6 +146,12 @@ export default function UploadButton({
     setPhase('idle')
     if (inputRef.current) inputRef.current.value = ''
     router.refresh()
+  }
+
+  // ── consent gate ──────────────────────────────────────────────────────────
+  if (!canUploadVideo(consent)) {
+    if (!showBlockedNotice) return null
+    return <UploadBlockedNotice viewer={viewer} action={blockedAction} className="max-w-xs" />
   }
 
   // ── naming overlay ───────────────────────────────────────────────────────
