@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         {[
           {
             title: '1. Who We Are',
-            body: `Release Point ("we," "us," or "our") is operated by [COMPANY_LEGAL_NAME]. Release Point is a baseball and softball mechanics analysis platform designed for coaches and players. This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepoint.app.`,
+            body: `Release Point ("we," "us," or "our") is operated by [COMPANY_LEGAL_NAME]. Release Point is a baseball and softball mechanics analysis platform designed for coaches and players. This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepointai.com.`,
           },
           {
             title: '2. Information We Collect',

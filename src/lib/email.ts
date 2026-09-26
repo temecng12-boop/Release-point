@@ -1,7 +1,12 @@
 import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const FROM = 'Release Point <notifications@releasepoint.app>'
+// IMPORTANT: the releasepointai.com domain must be verified in Resend (DNS
+// records added and verified in the Resend dashboard) before this ships.
+// Otherwise Resend rejects every send. Note that resend.emails.send() returns
+// { error } instead of throwing, and the callers below don't check it, so
+// failures would be silent.
+const FROM = 'Release Point <notifications@releasepointai.com>'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://releasepointai.com'
 
 export async function sendPlayerInviteEmail({
