@@ -31,7 +31,7 @@
  *   redFlags      String[]. Specific observable violations to watch for.
  *                 The more precise, the more useful — "knee caves" beats "bad lead leg".
  *
- *   metricsRelation  How Rapsodo/TrackMan data signals a violation of this principle.
+ *   metricsRelation  How pitch-tracking data signals a violation of this principle.
  *                 The AI uses this to correlate checklist findings with pitch data.
  *
  *   active        true → included in every AI Coach conversation.
@@ -45,7 +45,7 @@
  *   - Update cues as your language evolves
  *   - Add a red flag you've observed that isn't listed
  *   - Set active: false to suppress a philosophy for a specific situation
- *   - Update metricsRelation as you gather more Rapsodo data patterns
+ *   - Update metricsRelation as you gather more pitch-tracking data patterns
  *
  * HOW TO ADD A NEW CATEGORY
  * ──────────────────────────
@@ -67,7 +67,7 @@ export type Philosophy = {
   description: string          // one-line principle
   cues: string[]               // coaching cues used with this player
   redFlags: string[]           // what to look for that violates this principle
-  metricsRelation: string      // how Rapsodo/TrackMan data reflects this principle
+  metricsRelation: string      // how pitch-tracking data reflects this principle
   active: boolean
 }
 
@@ -165,7 +165,7 @@ export const PHILOSOPHIES: Philosophy[] = [
       'Changing slot game to game without a structural reason',
       'Forcing a 12-6 slot when hip IR or thoracic structure limits it',
     ],
-    metricsRelation: 'Spin axis from Rapsodo is a direct proxy for arm slot. A 4-seam fastball should show a spin axis of 12:00 (±1 hour) at a true over-the-top slot. Each hour of slot difference shifts axis ~1 hour. Inconsistent spin axis across the session = inconsistent arm slot.',
+    metricsRelation: 'Measured spin axis is a direct proxy for arm slot. A 4-seam fastball should show a spin axis of 12:00 (±1 hour) at a true over-the-top slot. Each hour of slot difference shifts axis ~1 hour. Inconsistent spin axis across the session = inconsistent arm slot.',
     active: true,
   },
 
@@ -247,7 +247,7 @@ export const PHILOSOPHIES: Philosophy[] = [
       'Release point too close to the body (no extension)',
       'Elbow dropping at release',
     ],
-    metricsRelation: 'Good extension shows up as higher "perceived velocity" — ball arrives faster than radar because of release proximity. Rapsodo extension data (if available) should target >6.0 ft for high school players. Poor extension often correlates with lower VB and shorter carry on the fastball.',
+    metricsRelation: 'Good extension shows up as higher "perceived velocity" — ball arrives faster than radar because of release proximity. Extension data (if available) should target >6.0 ft for high school players. Poor extension often correlates with lower VB and shorter carry on the fastball.',
     active: true,
   },
 
@@ -286,7 +286,7 @@ export const PHILOSOPHIES: Philosophy[] = [
       'Velocity gap less than 8 mph between fastball and curveball',
       'Gyro-heavy slider (very low spin efficiency) thrown at high velocity — injury risk pattern',
     ],
-    metricsRelation: 'Rapsodo spin axis is critical here: 4S should be ~12:00, CB ~6:00, SL ~9:00 (RHP) or ~3:00 (LHP), CH can vary but should induce arm-side movement. Velocity separation: FB-CB ≥ 10–12 mph, FB-SL ≥ 6–8 mph, FB-CH ≥ 8–10 mph.',
+    metricsRelation: 'Spin axis is critical here: 4S should be ~12:00, CB ~6:00, SL ~9:00 (RHP) or ~3:00 (LHP), CH can vary but should induce arm-side movement. Velocity separation: FB-CB ≥ 10–12 mph, FB-SL ≥ 6–8 mph, FB-CH ≥ 8–10 mph.',
     active: true,
   },
 ]
