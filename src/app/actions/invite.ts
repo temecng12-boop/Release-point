@@ -29,6 +29,16 @@ export async function invitePlayer(
 
   if (!playerEmail) return { error: 'Player email is required' }
 
+  // Age status is captured once, here (RP-041). 'adult' records the coach's
+  // 18+ confirmation; 'minor' leaves the player pending guardian consent.
+  const ageStatus = formData.get('age_status')
+  if (ageStatus !== 'adult' && ageStatus !== 'minor') {
+    return { error: 'Choose whether the player is 18 or older, or under 18.' }
+  }
+  const adultFields = ageStatus === 'adult'
+    ? { adult_confirmed_at: new Date().toISOString(), adult_confirmed_by: user.id }
+    : {}
+
   // Every team in the invite must belong to this coach. Checked before any
   // player row is created or claimed.
   if (teamIds.length > 0) {
@@ -45,7 +55,7 @@ export async function invitePlayer(
   // Create player row
   const { data: player, error: playerError } = await supabaseAdmin
     .from('players')
-    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail })
+    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail, ...adultFields })
     .select('id')
     .single()
 
@@ -72,6 +82,17 @@ export async function invitePlayer(
         return { error: 'This player is already linked to another coach.' }
       }
     }
+  }
+
+  // Existing player now on this coach's roster: record the 18+ confirmation if
+  // it isn't already on file. (A 'minor' choice never clears an existing one.)
+  if (playerError?.code === '23505' && playerId && ageStatus === 'adult') {
+    await supabaseAdmin
+      .from('players')
+      .update(adultFields)
+      .eq('id', playerId)
+      .eq('coach_id', user.id)
+      .is('adult_confirmed_at', null)
   }
 
   // Assign teams via junction table (new assignments only, ignore duplicates)
