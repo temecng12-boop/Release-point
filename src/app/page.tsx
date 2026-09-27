@@ -6,6 +6,7 @@ import SpotlightCard from '@/components/spotlight-card'
 import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
 import PhotoGallery from '@/components/photo-gallery'
+import PitchMetrics from '@/components/pitch-metrics'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -325,27 +326,7 @@ export default function HomePage() {
                 Data That<br />Means<br />Something.
               </h3>
               <p className="text-[10px] text-slate-400 mb-5">TrackMan · Rapsodo · Hawk-Eye · CSV · PDF</p>
-              <div className="space-y-2.5 mt-2">
-                {[
-                  { label: 'Velocity',   value: '89 mph',    pct: 80, color: '#E8102A' },
-                  { label: 'Spin Rate',  value: '2,248 rpm', pct: 68, color: '#3B82F6' },
-                  { label: 'IVB',        value: '+18.7"',    pct: 88, color: '#10B981' },
-                  { label: 'H-Break',    value: '+8.1"',     pct: 62, color: '#8B5CF6' },
-                  { label: 'Spin Axis',  value: '1:00',      pct: 55, color: '#F59E0B' },
-                  { label: 'Extension',  value: '6.4 ft',    pct: 74, color: '#06B6D4' },
-                  { label: 'VAA',        value: '-4.2°',     pct: 70, color: '#EC4899' },
-                ].map((m) => (
-                  <div key={m.label}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[10px] text-slate-500" style={os}>{m.label}</span>
-                      <span className="text-[10px] font-mono text-slate-700 font-medium">{m.value}</span>
-                    </div>
-                    <div className="h-1 rounded-full overflow-hidden bg-slate-100">
-                      <div className="h-full rounded-full" style={{ width: `${m.pct}%`, backgroundColor: m.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <PitchMetrics />
             </div>
           </SpotlightCard>
 
