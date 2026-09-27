@@ -12,11 +12,9 @@ type Phase = 'idle' | 'preview' | 'recording' | 'uploading'
 export default function RecordButton({
   playerId,
   playerName,
-  consentGiven = true,
 }: {
   playerId: string
   playerName: string
-  consentGiven?: boolean
 }) {
   const [phase, setPhase]     = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
@@ -131,8 +129,6 @@ export default function RecordButton({
     const sec = s % 60
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
-
-  if (!consentGiven) return null
 
   // ── Camera / recording overlay ──────────────────────────────────────────────
   if (phase === 'preview' || phase === 'recording' || phase === 'uploading') {

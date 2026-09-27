@@ -51,11 +51,9 @@ type Phase = 'idle' | 'compressing' | 'uploading'
 export default function UploadButton({
   playerId,
   playerName,
-  consentGiven = true,
 }: {
   playerId: string
   playerName: string
-  consentGiven?: boolean
 }) {
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
@@ -124,23 +122,6 @@ export default function UploadButton({
     setPhase('idle')
     if (inputRef.current) inputRef.current.value = ''
     router.refresh()
-  }
-
-  // ── consent gate ──────────────────────────────────────────────────────────
-  if (!consentGiven) {
-    return (
-      <div className="relative group">
-        <button
-          disabled
-          className="text-xs bg-[#EEF2F7] text-[#3D5166] px-3 py-1.5 rounded-md cursor-not-allowed whitespace-nowrap border border-[#DDE4ED]"
-        >
-          Upload Clip
-        </button>
-        <div className="absolute bottom-full mb-2 right-0 w-52 bg-white border border-[#DDE4ED] shadow-sm rounded px-3 py-2 text-xs text-[#456080] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-          Guardian consent required before uploading clips for this player.
-        </div>
-      </div>
-    )
   }
 
   // ── compressing overlay ───────────────────────────────────────────────────
