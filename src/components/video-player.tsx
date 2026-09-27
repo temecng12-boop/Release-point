@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
-import { createClient } from '@/lib/supabase/client'
+import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -787,7 +786,7 @@ export default function VideoPlayer({
     const path = `${playerId}/${clipId}/lesson.${ext}`
     const blob = new Blob(lessonChunksRef.current, { type: mimeType })
 
-    const urlResult = await getSignedUploadUrl(path)
+    const urlResult = await getSignedUploadUrl(path, 'lessons')
     if ('error' in urlResult) { setLessonError('Upload failed'); setLessonPhase('idle'); return }
 
     const res = await fetch(urlResult.signedUrl, {
@@ -797,9 +796,8 @@ export default function VideoPlayer({
 
     await saveLessonPath(clipId, path)
 
-    const supabase = createClient()
-    const { data: signed } = await supabase.storage.from('clips').createSignedUrl(path, 3600)
-    if (signed?.signedUrl) setLessonUrl(signed.signedUrl)
+    const signedResult = await getLessonSignedUrl(path)
+    if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl)
     setLessonPhase('idle')
   }
 

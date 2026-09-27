@@ -4,17 +4,30 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 
-export async function getSignedUploadUrl(storagePath: string) {
+export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 'lessons' = 'clips') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   const { data, error } = await supabaseAdmin.storage
-    .from('clips')
+    .from(bucket)
     .createSignedUploadUrl(storagePath)
 
   if (error || !data) return { error: error?.message ?? 'Failed to create upload URL' }
   return { signedUrl: data.signedUrl, token: data.token, path: data.path }
+}
+
+export async function getLessonSignedUrl(lessonPath: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('lessons')
+    .createSignedUrl(lessonPath, 3600)
+
+  if (error || !data) return { error: error?.message ?? 'Failed to create signed URL' }
+  return { signedUrl: data.signedUrl }
 }
 
 export async function createClip(data: {
@@ -243,7 +256,7 @@ export async function deleteLessonPath(clipId: string) {
   const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
   if (player?.coach_id !== user.id) return { error: 'Not authorized' }
   if (clip.lesson_path) {
-    await supabaseAdmin.storage.from('clips').remove([clip.lesson_path])
+    await supabaseAdmin.storage.from('lessons').remove([clip.lesson_path])
   }
   await supabaseAdmin.from('clips').update({ lesson_path: null }).eq('id', clipId)
   revalidatePath(`/clips/${clipId}`)

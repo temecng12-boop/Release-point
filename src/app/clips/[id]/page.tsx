@@ -134,7 +134,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   let lessonUrl: string | null = null
   if (lessonPath) {
     const { data: signedLesson } = await supabaseAdmin.storage
-      .from('clips')
+      .from('lessons')
       .createSignedUrl(lessonPath, 3600)
     lessonUrl = signedLesson?.signedUrl ?? null
   }
