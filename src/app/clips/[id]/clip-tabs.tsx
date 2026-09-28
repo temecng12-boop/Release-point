@@ -6,6 +6,7 @@ import TimestampNotes from './timestamp-notes'
 import TextNotes from './text-notes'
 import VoiceNote from './voice-note'
 import MetricsTab from './metrics-tab'
+import HittingMetricsTab from './hitting-metrics-tab'
 import AiChat from './ai-chat'
 import PhaseChecklist from './phase-checklist'
 
@@ -14,16 +15,35 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 type TSNote   = { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
 export type Metric = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null; extension?: number | null; vaa?: number | null }
 type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
+type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
 type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
 
-const TABS: Tab[] = ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
-const TAB_SHORT: Record<Tab, string> = {
-  Timestamps: 'Times',
-  Notes:      'Notes',
-  Voice:      'Voice',
-  Mechanics:  'Mech',
-  Metrics:    'Stats',
-  'AI Coach': 'AI',
+function isPitcherPosition(pos: string | null): boolean {
+  if (!pos) return true
+  const p = pos.toLowerCase()
+  return p === 'pitcher' || p === 'p' || p === 'rhp' || p === 'lhp' || p === 'sp' || p === 'rp' || p === 'cp'
+}
+
+function getTabs(isPitcher: boolean): Tab[] {
+  return ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
+}
+
+const TAB_LABEL: Record<Tab, (isPitcher: boolean) => string> = {
+  Timestamps: () => 'Timestamps',
+  Notes:      () => 'Notes',
+  Voice:      () => 'Voice',
+  Mechanics:  (p) => p ? 'Mechanics' : 'Swing',
+  Metrics:    (p) => p ? 'Metrics' : 'Hit Data',
+  'AI Coach': () => 'AI Coach',
+}
+
+const TAB_SHORT: Record<Tab, (isPitcher: boolean) => string> = {
+  Timestamps: () => 'Times',
+  Notes:      () => 'Notes',
+  Voice:      () => 'Voice',
+  Mechanics:  (p) => p ? 'Mech' : 'Swing',
+  Metrics:    (p) => p ? 'Stats' : 'Data',
+  'AI Coach': () => 'AI',
 }
 
 const tabVariants = {
@@ -41,6 +61,7 @@ export default function ClipTabs({
   initialTsNotes,
   initialMetrics,
   initialChecklist,
+  initialHittingMetrics,
   playerName,
   playerAgeGroup,
   playerPosition,
@@ -53,11 +74,14 @@ export default function ClipTabs({
   initialTsNotes: TSNote[]
   initialMetrics: Metric[]
   initialChecklist: PhaseRow[] | null
+  initialHittingMetrics: HittingMetrics | null
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
 }) {
   const [active, setActive] = useState<Tab>('Timestamps')
+  const isPitcher = isPitcherPosition(playerPosition)
+  const TABS = getTabs(isPitcher)
 
   return (
     <div>
@@ -72,8 +96,8 @@ export default function ClipTabs({
               className="relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center"
               style={{ ...os, color: isActive ? '#0f172a' : '#94a3b8' }}
             >
-              <span className="hidden sm:inline">{tab}</span>
-              <span className="sm:hidden">{TAB_SHORT[tab]}</span>
+              <span className="hidden sm:inline">{TAB_LABEL[tab](isPitcher)}</span>
+              <span className="sm:hidden">{TAB_SHORT[tab](isPitcher)}</span>
 
               {isActive && (
                 <motion.div
@@ -109,17 +133,25 @@ export default function ClipTabs({
               <VoiceNote clipId={clipId} playerId={playerId} role={role} initialVoiceUrl={initialVoiceUrl} />
             )}
             {active === 'Mechanics' && (
-              <PhaseChecklist clipId={clipId} role={role} initial={initialChecklist} />
+              <PhaseChecklist clipId={clipId} role={role} initial={initialChecklist} isPitcher={isPitcher} />
             )}
             {active === 'Metrics' && (
-              <MetricsTab
-                clipId={clipId}
-                role={role}
-                playerId={playerId}
-                playerAgeGroup={playerAgeGroup}
-                playerPosition={playerPosition}
-                initialMetrics={initialMetrics}
-              />
+              isPitcher ? (
+                <MetricsTab
+                  clipId={clipId}
+                  role={role}
+                  playerId={playerId}
+                  playerAgeGroup={playerAgeGroup}
+                  playerPosition={playerPosition}
+                  initialMetrics={initialMetrics}
+                />
+              ) : (
+                <HittingMetricsTab
+                  clipId={clipId}
+                  role={role}
+                  initial={initialHittingMetrics}
+                />
+              )
             )}
             {active === 'AI Coach' && (
               <AiChat

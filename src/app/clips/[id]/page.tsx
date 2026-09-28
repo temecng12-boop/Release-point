@@ -144,6 +144,17 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     lessonUrl = signedLesson?.signedUrl ?? null
   }
 
+  type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
+  let hittingMetrics: HittingMetrics | null = null
+  {
+    const { data: hmData } = await supabaseAdmin
+      .from('clips')
+      .select('hitting_metrics')
+      .eq('id', id)
+      .single()
+    hittingMetrics = (hmData as { hitting_metrics?: HittingMetrics | null } | null)?.hitting_metrics ?? null
+  }
+
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <AppHeader
@@ -188,6 +199,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
             initialTsNotes={tsNotes ?? []}
             initialMetrics={(rawMetrics ?? []) as Metric[]}
             initialChecklist={phaseChecklist}
+            initialHittingMetrics={hittingMetrics}
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}

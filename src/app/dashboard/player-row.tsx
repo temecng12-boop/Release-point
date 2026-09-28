@@ -106,6 +106,7 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
             </button>
             <button
               onClick={() => setBullpenOpen(true)}
+              title="Log a bullpen session — track pitch types, velo, spin, and coach notes"
               className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] whitespace-nowrap flex items-center gap-1"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#1C3A5C] shrink-0" />

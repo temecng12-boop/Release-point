@@ -109,6 +109,25 @@ export async function createClip(data: {
   return { success: true }
 }
 
+type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
+export async function saveHittingMetrics(clipId: string, metrics: HittingMetrics) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  if (!clip) return { error: 'Clip not found' }
+
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
+  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
+
+  const { error } = await supabaseAdmin.from('clips').update({ hitting_metrics: metrics }).eq('id', clipId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
 export async function renameClip(clipId: string, title: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

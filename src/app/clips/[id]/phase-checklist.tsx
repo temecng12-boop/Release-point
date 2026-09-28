@@ -9,7 +9,7 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 type Rating     = 'good' | 'needs_work' | 'critical' | null
 type SaveState  = 'idle' | 'saving' | 'done'
 
-const PHASES = [
+const PITCHING_PHASES = [
   { name: 'Windup / Rocker Step',      desc: 'Balance, tempo, hip hinge initiation' },
   { name: 'Stride / Leg Lift',          desc: 'Height, direction, hip load timing' },
   { name: 'Foot Strike / Hip Load',     desc: 'Stride length, landing angle, hip-glute engagement' },
@@ -17,6 +17,16 @@ const PHASES = [
   { name: 'Hip-Shoulder Separation',    desc: 'Rotation sequence, energy transfer from lower half' },
   { name: 'Release Point',              desc: 'Consistency, height, extension toward plate' },
   { name: 'Follow Through / Decel',     desc: 'Arm deceleration, fielding position, balance' },
+]
+
+const HITTING_PHASES = [
+  { name: 'Stance / Setup',          desc: 'Foot position, weight distribution, hand placement, posture' },
+  { name: 'Load',                     desc: 'Weight shift back, hip hinge, hand trigger, rhythm' },
+  { name: 'Stride / Timing',          desc: 'Stride length, direction, front foot landing, timing' },
+  { name: 'Hip Rotation',             desc: 'Back hip drive, rotation sequence, ground force use' },
+  { name: 'Hip-Shoulder Separation',  desc: 'Hips lead shoulders — the gap creates bat speed' },
+  { name: 'Contact Point',            desc: 'Barrel path to ball, attack angle, hand position at contact' },
+  { name: 'Extension / Follow Thru',  desc: 'Through-contact extension, full rotation, balance' },
 ]
 
 const RATINGS: { value: Rating; label: string; color: string }[] = [
@@ -31,21 +41,24 @@ interface PhaseRow {
   note: string
 }
 
-function initPhases(initial: PhaseRow[] | null): PhaseRow[] {
+function initPhases(initial: PhaseRow[] | null, isPitcher: boolean): PhaseRow[] {
   if (initial && initial.length > 0) return initial
-  return PHASES.map(p => ({ name: p.name, rating: null, note: '' }))
+  const source = isPitcher ? PITCHING_PHASES : HITTING_PHASES
+  return source.map(p => ({ name: p.name, rating: null, note: '' }))
 }
 
 export default function PhaseChecklist({
   clipId,
   role,
   initial,
+  isPitcher,
 }: {
   clipId: string
   role: 'coach' | 'player'
   initial: PhaseRow[] | null
+  isPitcher: boolean
 }) {
-  const [phases,    setPhases]    = useState<PhaseRow[]>(() => initPhases(initial))
+  const [phases,    setPhases]    = useState<PhaseRow[]>(() => initPhases(initial, isPitcher))
   const [saveState, setSaveState] = useState<SaveState>(initial ? 'done' : 'idle')
   const [error,     setError]     = useState<string | null>(null)
   const isCoach = role === 'coach'
@@ -101,7 +114,7 @@ export default function PhaseChecklist({
       {/* Phase rows */}
       <div className="space-y-2">
         {phases.map((phase, i) => {
-          const phaseDef = PHASES[i]
+          const phaseDef = (isPitcher ? PITCHING_PHASES : HITTING_PHASES)[i]
           const ratingObj = RATINGS.find(r => r.value === phase.rating)
           const borderColor = phase.rating === 'critical'   ? 'rgba(232,16,42,0.35)'
                             : phase.rating === 'needs_work' ? 'rgba(217,119,6,0.3)'
@@ -180,7 +193,7 @@ export default function PhaseChecklist({
               {saveState === 'done'
                 ? 'Saved'
                 : ratedCount > 0
-                ? `${ratedCount} / ${PHASES.length} phases rated`
+                ? `${ratedCount} / ${(isPitcher ? PITCHING_PHASES : HITTING_PHASES).length} phases rated`
                 : 'Rate each phase to build the report'}
             </span>
 
