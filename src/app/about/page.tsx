@@ -15,9 +15,9 @@ export default function AboutPage() {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-[#DDE4ED]" style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)' }}>
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/"><Logo size="sm" /></Link>
+          <Link href="/home"><Logo size="sm" /></Link>
           <nav className="flex items-center gap-6">
-            <Link href="/" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>Home</Link>
+            <Link href="/home" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>Home</Link>
             <Link href="/auth/login" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>Log In</Link>
             <Link
               href="/auth/signup"
