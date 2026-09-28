@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -30,30 +31,35 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
 
   return (
     <footer style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-      {/* Banner wordmark */}
-      <div className="max-w-5xl mx-auto px-6 pt-16 pb-10">
-        <p
-          className="text-[clamp(56px,10vw,120px)] leading-none tracking-tight text-slate-950 select-none"
-          style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase', fontWeight: 700 }}
-        >
-          Release Point
-        </p>
-      </div>
+      <div className="max-w-5xl mx-auto px-6 py-14 grid md:grid-cols-[1fr_auto] gap-12 items-start">
 
-      {/* Links row */}
-      <div className="max-w-5xl mx-auto px-6 pb-10 flex flex-wrap gap-x-8 gap-y-3">
-        {[
-          { href: '/auth/signup', label: 'Coach Sign Up' },
-          { href: '/auth/login',  label: 'Player Login'  },
-          { href: '/home',        label: 'Home'           },
-          { href: '/about',       label: 'About'          },
-          { href: '/privacy',     label: 'Privacy'        },
-          { href: '/terms',       label: 'Terms'          },
-        ].map(l => (
-          <Link key={l.href} href={l.href} className="text-sm text-slate-500 hover:text-slate-800 transition-colors" style={os}>
-            {l.label}
-          </Link>
-        ))}
+        {/* Large logo */}
+        <div className="flex items-center gap-4">
+          <Image src="/rp-icon.png" alt="Release Point" width={96} height={60} className="object-contain" />
+          <span
+            className="text-[32px] leading-none text-slate-950"
+            style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em' }}
+          >
+            Release Point
+          </span>
+        </div>
+
+        {/* Links */}
+        <div className="flex flex-col gap-3.5">
+          <p className="text-xs text-slate-400 tracking-widest mb-1" style={os}>Links</p>
+          {[
+            { href: '/auth/signup', label: 'Coach Sign Up' },
+            { href: '/auth/login',  label: 'Player Login'  },
+            { href: '/home',        label: 'Home'           },
+            { href: '/about',       label: 'About'          },
+            { href: '/privacy',     label: 'Privacy'        },
+            { href: '/terms',       label: 'Terms'          },
+          ].map(l => (
+            <Link key={l.href} href={l.href} className="text-sm text-slate-500 hover:text-slate-800 transition-colors" style={os}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
