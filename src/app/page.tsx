@@ -5,7 +5,6 @@ import SiteFooter from '@/components/SiteFooter'
 import SpotlightCard from '@/components/spotlight-card'
 import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
-import PhotoGallery from '@/components/photo-gallery'
 import PitchMetrics from '@/components/pitch-metrics'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -413,31 +412,65 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Founder ── */}
+      {/* ── Waitlist + LinkedIn ── */}
       <section style={{ borderTop: '1px solid #e2e8f0', background: '#fff' }}>
-        <div className="max-w-5xl mx-auto px-6 py-24 md:py-36">
-          <div className="grid md:grid-cols-2 gap-16 md:gap-24 items-start">
+        <div className="max-w-5xl mx-auto px-6 py-24 md:py-32">
+          <p className="text-[10px] tracking-[0.35em] text-[#E8102A] text-center mb-4" style={os}>Stay Connected</p>
+          <h2 className="text-[clamp(32px,4vw,52px)] leading-[0.92] text-slate-950 tracking-tight text-center mb-4" style={os}>
+            Be part of what&apos;s<br />being built.
+          </h2>
+          <p className="text-base text-slate-500 text-center max-w-xl mx-auto mb-14 leading-relaxed">
+            Release Point is an early-stage platform growing with coaches and players. Get early access or follow along as we build.
+          </p>
 
-            {/* Story */}
-            <div className="space-y-6 md:sticky md:top-24">
-              <p className="text-[10px] tracking-[0.35em] text-[#E8102A]" style={os}>Built by a pitcher</p>
-              <h2 className="text-[clamp(32px,4vw,52px)] leading-[0.92] text-slate-950 tracking-tight" style={os}>
-                I lived this problem.<br />
-                <span className="text-[#E8102A]">Then I solved it.</span>
-              </h2>
-              <p className="text-base text-slate-500 leading-relaxed">
-                I pitched four years of D1 baseball, two at UNLV and two at San Jose State, then played professionally with the Boise Hawks in the Pioneer League. At every level, the same thing happened. Coaches had film on their phones, spin numbers in a text thread, notes from a bullpen session no one could find two weeks later. The information was there. It just never made it to the player in any useful form.
-              </p>
-              <p className="text-base text-slate-500 leading-relaxed">
-                After I graduated from San Jose State, I started building software and got deep into what AI could do for player development. I understood the baseball side from living it for a decade. I built the technical side from scratch. Release Point is where those two things met. Film, metrics, and coaching feedback in one place so nothing falls through the cracks and players actually get better.
-              </p>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {/* Waitlist card */}
+            <Link
+              href="/waitlist"
+              className="group relative rounded-2xl p-8 flex flex-col gap-4 transition-all hover:shadow-lg"
+              style={{ background: '#0F1F33', border: '1px solid #1C3A5C' }}
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(232,16,42,0.15)' }}>
+                <svg className="w-5 h-5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-white text-sm mb-1" style={os}>Join the Waitlist</p>
+                <p className="text-[#8096AE] text-xs leading-relaxed">Be first in line for early access. We&apos;ll reach out when your spot is ready.</p>
+              </div>
+              <span className="text-[10px] text-[#E8102A] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
+                Get Early Access
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </span>
+            </Link>
 
-            </div>
-
-            {/* Interactive photo gallery */}
-            <div>
-              <PhotoGallery />
-            </div>
+            {/* LinkedIn card */}
+            <a
+              href="https://www.linkedin.com/company/release-point-ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative rounded-2xl p-8 flex flex-col gap-4 transition-all hover:shadow-lg"
+              style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#EEF2F7' }}>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#0A66C2">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-slate-900 text-sm mb-1" style={os}>Follow on LinkedIn</p>
+                <p className="text-slate-500 text-xs leading-relaxed">Follow Release Point for product updates, baseball development insights, and launch news.</p>
+              </div>
+              <span className="text-[10px] text-[#0A66C2] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
+                Release Point AI
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </span>
+            </a>
           </div>
         </div>
       </section>
