@@ -70,6 +70,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
           {[
             { href: '/auth/signup', label: 'Coach Sign Up' },
             { href: '/auth/login',  label: 'Player Login'  },
+            { href: '/home',        label: 'Home'           },
             { href: '/about',       label: 'About'          },
             { href: '/privacy',     label: 'Privacy'        },
             { href: '/terms',       label: 'Terms'          },

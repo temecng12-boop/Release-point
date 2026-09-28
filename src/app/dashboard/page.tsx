@@ -189,7 +189,7 @@ export default async function DashboardPage() {
         </span>
       </div>
       <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block" style={os}>
-        About
+        About RP
       </Link>
       <Link
         href={isCoach ? '/profile' : '/player-settings'}
