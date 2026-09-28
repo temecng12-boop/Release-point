@@ -29,7 +29,7 @@ export async function sendPlayerInviteEmail({
         </div>
         <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
-          <strong style="color:#0F1F33">${coachName}</strong> invited you to join Release Point — a professional-grade film room built for baseball.
+          <strong style="color:#0F1F33">${coachName}</strong> invited you to join Release Point, a professional-grade film room built for baseball.
         </p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
           Click below to set up your account and access your clips, annotations, and pitch data.

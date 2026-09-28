@@ -36,7 +36,7 @@ export default function ConsentForm({ playerId }: { playerId: string }) {
         className="w-full bg-[#C8102E] hover:bg-[#A50D26] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         style={oswald}
       >
-        {pending ? 'Recording Consent…' : 'I Consent — Continue'}
+        {pending ? 'Recording Consent…' : 'I Consent. Continue'}
       </button>
     </div>
   )

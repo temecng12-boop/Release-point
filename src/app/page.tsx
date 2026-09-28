@@ -79,7 +79,7 @@ export default function HomePage() {
                     className="block px-8 py-4 bg-[#E8102A] hover:bg-[#C80E24] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(232,16,42,0.25)] hover:shadow-[0_8px_32px_rgba(232,16,42,0.35)]"
                     style={os}
                   >
-                    Start Free — Coaches
+                    Start Free: Coaches
                   </Link>
                 </MagneticButton>
                 <MagneticButton>
@@ -266,7 +266,7 @@ export default function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#E8102A] mb-4" style={os}>01 — Video Analysis</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#E8102A] mb-4" style={os}>01 · Video Analysis</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-4 tracking-tight" style={os}>
                 Annotate<br />Every<br />Frame.
               </h3>
@@ -320,7 +320,7 @@ export default function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 — Pitch Analytics</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 · Pitch Analytics</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
@@ -340,7 +340,7 @@ export default function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#10B981] mb-4" style={os}>03 — AI Coach</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#10B981] mb-4" style={os}>03 · AI Coach</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-5 tracking-tight" style={os}>
                 An Expert<br />In Every<br />Session.
               </h3>
@@ -352,7 +352,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex justify-start">
                   <div className="max-w-[96%] rounded-xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed bg-slate-50 border border-slate-200 text-slate-600 space-y-1.5">
-                    <p>Spin rate is consistent — <span className="text-slate-900 font-semibold">2,340–2,380 rpm across all 4 sessions.</span> That&apos;s not the problem.</p>
+                    <p>Spin rate is consistent: <span className="text-slate-900 font-semibold">2,340–2,380 rpm across all 4 sessions.</span> That&apos;s not the problem.</p>
                     <p>His spin axis is drifting <span className="text-slate-900 font-semibold">from 6:30 to 8:00</span> rep to rep. When it&apos;s at 6:30 the break is tight. When it climbs toward 8, the ball flattens out and rolls instead of biting.</p>
                     <p className="text-slate-900 font-semibold">He&apos;s got two different releases on what he thinks is one pitch.</p>
                   </div>
@@ -364,7 +364,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex justify-start">
                   <div className="max-w-[96%] rounded-xl rounded-bl-sm px-3 py-2.5 text-xs leading-relaxed bg-slate-50 border border-slate-200 text-slate-600">
-                    Cue him to feel his middle finger <span className="text-slate-900 font-semibold">pulling straight down the 12 o&apos;clock seam</span> — not around it. One focused pen, 10–12 reps at full intent. Watch the axis lock in.
+                    Cue him to feel his middle finger <span className="text-slate-900 font-semibold">pulling straight down the 12 o&apos;clock seam</span>, not around it. One focused pen, 10–12 reps at full intent. Watch the axis lock in.
                   </div>
                 </div>
               </div>
@@ -490,7 +490,7 @@ export default function HomePage() {
               className="inline-block px-12 py-4 bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(232,16,42,0.3)] hover:shadow-[0_8px_40px_rgba(232,16,42,0.4)]"
               style={os}
             >
-              Start Free — Coaches
+              Start Free: Coaches
             </Link>
             <Link
               href="/auth/login"

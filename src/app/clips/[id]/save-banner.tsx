@@ -33,7 +33,7 @@ export default function SaveBanner({ role }: { role: 'coach' | 'player' }) {
         className="text-xs bg-[#C8102E] hover:bg-red-700 text-white px-4 py-1.5 rounded-lg transition-colors"
         style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
       >
-        Done — Back to Dashboard
+        Done. Back to Dashboard
       </button>
     </div>
   )

@@ -86,7 +86,7 @@ export default function UploadButton({
       } catch {
         // Compression failed — upload original. User will see the larger file size.
         fileToUpload = file
-        setError('Compression failed — uploading original file.')
+        setError('Compression failed. Uploading original file.')
       }
     }
 

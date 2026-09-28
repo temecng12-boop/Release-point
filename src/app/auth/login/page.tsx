@@ -80,7 +80,7 @@ export default function LoginPage() {
             <div className="pt-8 space-y-5" style={{ borderTop: '1px solid #e2e8f0' }}>
               <p className="text-[10px] text-slate-400 tracking-[0.25em]" style={os}>Sign in with</p>
               {[
-                { t: 'Email + Password', d: 'Works for coaches and players — use the credentials you signed up with.' },
+                { t: 'Email + Password', d: 'Works for coaches and players. Use the credentials you signed up with.' },
                 { t: 'Email Link',       d: 'No password? Request a one-click sign-in link sent to your email.' },
               ].map(i => (
                 <div key={i.t}>
@@ -91,7 +91,7 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-        <p className="text-xs text-slate-300">Release Point — Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-slate-300">Release Point. Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
       {/* Right panel */}
@@ -106,7 +106,7 @@ export default function LoginPage() {
             <div className="p-8">
               <div className="mb-6">
                 <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Sign In</h1>
-                <p className="text-sm text-slate-500">Coaches and players — sign in with your password or email link</p>
+                <p className="text-sm text-slate-500">Coaches and players: sign in with your password or email link</p>
               </div>
 
               {/* Mode toggle */}
@@ -153,7 +153,7 @@ export default function LoginPage() {
                     <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Password</label>
                     <input type="password" name="password" required placeholder="Your password" className={inputCls} />
                   </div>
-                  <p className="text-[11px] text-slate-400">Players — use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2">Email Link</button> tab instead.</p>
+                  <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2">Email Link</button> tab instead.</p>
                   {state?.error && (
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{state.error}</p>

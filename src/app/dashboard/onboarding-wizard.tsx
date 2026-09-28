@@ -16,7 +16,7 @@ export default function CoachOnboardingWizard({ hasTeams, hasPlayers, hasClips =
     {
       n: '01',
       title: 'Create Your First Team',
-      desc: 'Organize players by team and age group — Varsity, JV, travel, showcase.',
+      desc: 'Organize players by team and age group. Varsity, JV, travel, showcase.',
       done: hasTeams,
     },
     {

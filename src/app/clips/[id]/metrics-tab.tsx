@@ -264,7 +264,7 @@ export default function MetricsTab({
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4 space-y-4">
         <div>
           <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Import Pitch Analytics</p>
-          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Works with any pitch tracking file — TrackMan, Rapsodo, or Hawk-Eye</p>
+          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Works with any pitch tracking file: TrackMan, Rapsodo, or Hawk-Eye</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -300,7 +300,7 @@ export default function MetricsTab({
         {/* CSV preview */}
         {preview && preview.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs text-[#456080]">Preview — {preview.length} pitch{preview.length !== 1 ? 'es' : ''} parsed</p>
+            <p className="text-xs text-[#456080]">Preview: {preview.length} pitch{preview.length !== 1 ? 'es' : ''} parsed</p>
             <PreviewTable rows={preview} ageGroup={playerAgeGroup} />
             <button onClick={handleSave} disabled={saving}
               className="px-4 py-2 rounded-md text-xs text-white font-medium tracking-wide transition-colors"
@@ -316,7 +316,7 @@ export default function MetricsTab({
         {/* PDF preview */}
         {pdfPreview && pdfPreview.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs text-[#456080]">PDF preview — {pdfPreview.length} pitch type{pdfPreview.length !== 1 ? 's' : ''} found</p>
+            <p className="text-xs text-[#456080]">PDF preview: {pdfPreview.length} pitch type{pdfPreview.length !== 1 ? 's' : ''} found</p>
             <div className="overflow-x-auto rounded-lg border border-[#DDE4ED]">
               <table className="w-full text-xs">
                 <thead>

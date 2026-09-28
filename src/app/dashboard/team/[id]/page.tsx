@@ -125,7 +125,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
           {!players || players.length === 0 ? (
             <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm px-6 py-10 text-center">
-              <p className="text-sm text-[#3D5166]">No players on this team yet — invite someone above.</p>
+              <p className="text-sm text-[#3D5166]">No players on this team yet. Invite someone above.</p>
             </div>
           ) : (
             <div className="space-y-3">

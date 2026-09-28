@@ -5,7 +5,7 @@ import SiteFooter from '@/components/SiteFooter'
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 export const metadata = {
-  title: 'About — Release Point',
+  title: 'About | Release Point',
   description: 'The purpose, technology, and people behind Release Point.',
 }
 
@@ -39,7 +39,7 @@ export default function AboutPage() {
             Built for the way<br />baseball actually works
           </h1>
           <p className="text-lg text-[#456080] max-w-2xl leading-relaxed">
-            Release Point is a player development platform that connects film, metrics, and coaching feedback in one place — so nothing falls through the cracks and players actually get better.
+            Release Point is a player development platform that connects film, metrics, and coaching feedback in one place, so nothing falls through the cracks and players actually get better.
           </p>
         </div>
 
@@ -54,9 +54,9 @@ export default function AboutPage() {
           <div className="grid sm:grid-cols-2 gap-6">
             {[
               { title: 'Film on a phone', body: 'Coaches record bullpen sessions, at-bats, and live games on their phones. The clips sit there. Players never see them with any context attached.' },
-              { title: 'Metrics in a text thread', body: 'Spin rate, exit velocity, launch angle — coaches collect this from Rapsodo and Trackman sessions, then send raw numbers over text. It means nothing without context.' },
+              { title: 'Metrics in a text thread', body: 'Spin rate, exit velocity, launch angle. Coaches collect this from Rapsodo and Trackman sessions, then send raw numbers over text. It means nothing without context.' },
               { title: 'Notes that disappear', body: 'Coaching cues from a Tuesday bullpen session. A swing adjustment from a cage visit. A note about arm path on the 3-2 changeup. Gone by the following week.' },
-              { title: 'No feedback loop', body: "Players practice, games happen, data is collected — but the line between what a player does and what a coach observes is never closed. Development becomes guesswork." },
+              { title: 'No feedback loop', body: "Players practice, games happen, data is collected. But the line between what a player does and what a coach observes is never closed. Development becomes guesswork." },
             ].map(item => (
               <div key={item.title} className="bg-white rounded-xl border border-[#DDE4ED] p-6">
                 <p className="text-sm font-semibold text-[#0F1F33] mb-2" style={os}>{item.title}</p>
@@ -72,10 +72,10 @@ export default function AboutPage() {
         <section className="mb-20">
           <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>The Solution</p>
           <h2 className="text-3xl text-[#0F1F33] mb-6 leading-tight" style={os}>
-            One platform.<br />Film, metrics, and coaching — connected.
+            One platform.<br />Film, metrics, and coaching, connected.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point gives coaches a structured place to upload film, attach Rapsodo and Trackman data, and leave timestamped feedback — and gives players a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
+            Release Point gives coaches a structured place to upload film, attach Rapsodo and Trackman data, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
           </p>
           <div className="space-y-4">
             {[
@@ -85,15 +85,15 @@ export default function AboutPage() {
               },
               {
                 label: 'Mechanics Breakdown',
-                desc: 'Every clip gets a phase-by-phase checklist — 7 delivery phases for pitchers (windup through follow through), 7 swing phases for hitters (stance through extension). Each phase gets a rating and a coaching note.',
+                desc: 'Every clip gets a phase-by-phase checklist: 7 delivery phases for pitchers (windup through follow through), 7 swing phases for hitters (stance through extension). Each phase gets a rating and a coaching note.',
               },
               {
                 label: 'Rapsodo & Trackman Metrics',
-                desc: 'Coaches enter session-level data directly in the platform — velocity, spin rate, spin axis, break, extension, and VAA for pitchers; exit velocity, launch angle, barrel rate, bat speed, and attack angle for hitters. Players see their numbers in context.',
+                desc: 'Coaches enter session-level data directly in the platform: velocity, spin rate, spin axis, break, extension, and VAA for pitchers; exit velocity, launch angle, barrel rate, bat speed, and attack angle for hitters. Players see their numbers in context.',
               },
               {
                 label: 'Timestamped Feedback',
-                desc: 'Coaches can drop notes at exact moments in a clip — the 0:04 mark where the elbow drops, the 0:11 mark where hip rotation fires early. Players scrub to those moments directly.',
+                desc: 'Coaches can drop notes at exact moments in a clip, like the 0:04 mark where the elbow drops or the 0:11 mark where hip rotation fires early. Players scrub to those moments directly.',
               },
               {
                 label: 'Voice Notes',
@@ -101,7 +101,7 @@ export default function AboutPage() {
               },
               {
                 label: 'Crop & Reframe',
-                desc: 'Not every angle is clean. The crop tool lets coaches isolate the relevant part of a clip — focus on the hip rotation, cut out the crowd, frame the release point — before sharing.',
+                desc: 'Not every angle is clean. The crop tool lets coaches isolate the relevant part of a clip, focus on the hip rotation, cut out the crowd, frame the release point, before sharing.',
               },
             ].map((item, i) => (
               <div key={item.label} className="flex gap-5 bg-white rounded-xl border border-[#DDE4ED] p-5">
@@ -124,7 +124,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents — one for pitching, one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Rapsodo/Trackman metric frameworks. They are not generic sports chatbots. They know what a 2400 RPM four-seam with 1:00 spin axis means at the high school level versus the professional level.
+            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Rapsodo/Trackman metric frameworks. They are not generic sports chatbots. They know what a 2400 RPM four-seam with 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -141,7 +141,7 @@ export default function AboutPage() {
                     'VAA, extension, and release point optimization',
                   ].map(pt => (
                     <li key={pt} className="flex items-start gap-2 text-sm text-[#456080]">
-                      <span className="text-[#C8102E] shrink-0 mt-0.5">—</span>
+                      <span className="text-[#C8102E] shrink-0 mt-0.5">·</span>
                       {pt}
                     </li>
                   ))}
@@ -162,7 +162,7 @@ export default function AboutPage() {
                     'Bat speed benchmarks and contact consistency',
                   ].map(pt => (
                     <li key={pt} className="flex items-start gap-2 text-sm text-[#456080]">
-                      <span className="text-[#1C3A5C] shrink-0 mt-0.5">—</span>
+                      <span className="text-[#1C3A5C] shrink-0 mt-0.5">·</span>
                       {pt}
                     </li>
                   ))}
@@ -181,7 +181,7 @@ export default function AboutPage() {
             Purpose-built infrastructure<br />for player development data.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point is built on a modern full-stack architecture designed for real-time collaboration between coaches and players — with security and data privacy as a first-class concern.
+            Release Point is built on a modern full-stack architecture designed for real-time collaboration between coaches and players, with security and data privacy as a first-class concern.
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
@@ -195,7 +195,7 @@ export default function AboutPage() {
               },
               {
                 label: 'AI at the Edge',
-                desc: 'Both AI agents run on Anthropic\'s Claude, streaming responses in real time. Context from the clip — metrics, checklist, coach notes — is sent with every conversation.',
+                desc: 'Both AI agents run on Anthropic\'s Claude, streaming responses in real time. Context from the clip, including metrics, checklist, and coach notes, is sent with every conversation.',
               },
               {
                 label: 'Row-Level Security',
@@ -207,7 +207,7 @@ export default function AboutPage() {
               },
               {
                 label: 'Metric Integrations',
-                desc: 'Rapsodo and Trackman data is entered directly into the platform and stored alongside the film that produced it — keeping the full picture in one record.',
+                desc: 'Rapsodo and Trackman data is entered directly into the platform and stored alongside the film that produced it, keeping the full picture in one record.',
               },
             ].map(item => (
               <div key={item.label} className="bg-white rounded-xl border border-[#DDE4ED] p-5">
@@ -231,10 +231,10 @@ export default function AboutPage() {
               Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Rapsodo, Trackman, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
             </p>
             <p className="text-[#456080] leading-relaxed">
-              We are building the software layer that connects coaches, players, and data — so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
+              We are building the software layer that connects coaches, players, and data, so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
             </p>
             <p className="text-[#456080] leading-relaxed">
-              Release Point was founded by Nolan George — a pitcher who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects a decade of firsthand experience with what coaches have, what players need, and where the current tools fall short.
+              Release Point was founded by Nolan George, a pitcher who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects a decade of firsthand experience with what coaches have, what players need, and where the current tools fall short.
             </p>
           </div>
         </section>

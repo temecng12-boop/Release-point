@@ -4,9 +4,9 @@ import Image from 'next/image'
 import { useState, useEffect, useCallback } from 'react'
 
 const PHOTOS = [
-  { src: '/media/nolan-delivery.jpg', alt: 'Full extension — mid-delivery at the stadium' },
-  { src: '/media/nolan-windup.jpg',   alt: 'Wind-up — high leg lift, reading the target' },
-  { src: '/media/nolan-finish.jpg',   alt: 'Finish — complete follow-through on the mound' },
+  { src: '/media/nolan-delivery.jpg', alt: 'Full extension, mid-delivery at the stadium' },
+  { src: '/media/nolan-windup.jpg',   alt: 'Wind-up, high leg lift, reading the target' },
+  { src: '/media/nolan-finish.jpg',   alt: 'Finish, complete follow-through on the mound' },
 ]
 
 export default function PhotoGallery() {

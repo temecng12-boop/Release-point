@@ -88,7 +88,7 @@ export default async function GuardianPage() {
 
               {playerClips.length === 0 ? (
                 <div className="bg-white border border-[#DDE4ED] rounded-xl p-8 text-center shadow-sm">
-                  <p className="text-sm text-[#3D5166]">No clips yet — your player's coach will upload them.</p>
+                  <p className="text-sm text-[#3D5166]">No clips yet. Your player&apos;s coach will upload them.</p>
                 </div>
               ) : (
                 <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">

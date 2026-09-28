@@ -40,7 +40,7 @@ export default function RecordButton({
       }
       setPhase('preview')
     } catch {
-      setError('Camera access denied — check browser permissions')
+      setError('Camera access denied. Check browser permissions.')
     }
   }
 

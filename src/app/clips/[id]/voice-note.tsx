@@ -47,7 +47,7 @@ export default function VoiceNote({
       recorderRef.current = recorder
       setRecording(true)
     } catch {
-      setRecordError('Microphone access denied — check browser permissions')
+      setRecordError('Microphone access denied. Check browser permissions.')
     }
   }
 
@@ -65,7 +65,7 @@ export default function VoiceNote({
     // Get a signed upload URL from the server (bypasses RLS)
     const urlResult = await getSignedUploadUrl(storagePath)
     if (urlResult.error || !urlResult.signedUrl) {
-      setRecordError('Failed to prepare upload — please try again.')
+      setRecordError('Failed to prepare upload. Please try again.')
       setUploading(false)
       return
     }
@@ -80,7 +80,7 @@ export default function VoiceNote({
     })
 
     if (!uploadRes.ok) {
-      setRecordError('Upload failed — please try again.')
+      setRecordError('Upload failed. Please try again.')
       setUploading(false)
       return
     }
@@ -88,7 +88,7 @@ export default function VoiceNote({
     // Save the path to the clip record
     const saveResult = await saveVoicePath(clipId, storagePath)
     if (saveResult?.error) {
-      setRecordError('Saved but failed to link — refresh and try again.')
+      setRecordError('Saved but failed to link. Refresh and try again.')
       setUploading(false)
       return
     }
@@ -155,7 +155,7 @@ export default function VoiceNote({
         <audio controls src={voiceUrl} className="w-full" style={{ height: 40 }} />
       ) : (
         <p className="text-sm text-slate-400">
-          {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from your coach yet.'}
+          {isCoach ? 'No voice note yet. Hit Record above.' : 'No voice note from your coach yet.'}
         </p>
       )}
     </div>

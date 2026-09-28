@@ -741,7 +741,7 @@ export default function VideoPlayer({
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      setLessonError('Microphone access denied — check browser permissions')
+      setLessonError('Microphone access denied. Check browser permissions.')
       return
     }
 
@@ -794,7 +794,7 @@ export default function VideoPlayer({
     const res = await fetch(urlResult.signedUrl, {
       method: 'PUT', body: blob, headers: { 'Content-Type': mimeType },
     })
-    if (!res.ok) { setLessonError('Upload failed — try again'); setLessonPhase('idle'); return }
+    if (!res.ok) { setLessonError('Upload failed. Try again.'); setLessonPhase('idle'); return }
 
     await saveLessonPath(clipId, path)
 
@@ -861,7 +861,7 @@ export default function VideoPlayer({
     setReframeSaveErr(null)
     const result = await saveReframe(clipId, crop)
     if (result?.error) {
-      setReframeSaveErr('Save failed — ' + result.error)
+      setReframeSaveErr('Save failed: ' + result.error)
     } else {
       setReframeSaved(true)
       setTimeout(() => setReframeSaved(false), 2500)
@@ -897,7 +897,7 @@ export default function VideoPlayer({
       >
         {videoError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-            <p className="text-white text-sm opacity-70">Video unavailable — try refreshing the page.</p>
+            <p className="text-white text-sm opacity-70">Video unavailable. Try refreshing the page.</p>
           </div>
         )}
         {/* Crop overlay — only shown in reframe mode */}
@@ -1129,7 +1129,7 @@ export default function VideoPlayer({
         <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
           <span className="w-2 h-2 rounded-full bg-[#C8102E] animate-pulse shrink-0" />
           <span className="text-xs text-[#C8102E]" style={oswald}>
-            Recording — {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
+            Recording · {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
           </span>
           <button
             onClick={stopLessonRecording}
@@ -1176,7 +1176,7 @@ export default function VideoPlayer({
       {/* Per-mark list (coach only) */}
       {isCoach && markList.length > 0 && (
         <div className="mt-2 pt-2 border-t border-[#DDE4ED]">
-          <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1.5" style={oswald}>Marks — tap ✕ to remove from player view</p>
+          <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1.5" style={oswald}>Marks · tap ✕ to remove from player view</p>
           <div className="space-y-0.5 max-h-36 overflow-y-auto">
             {markList.map((m, i) => (
               <div key={i} className="flex items-center gap-2 text-[0.72rem] text-[#456080] py-0.5 px-1 rounded hover:bg-[#F0F4F8]">
@@ -1199,7 +1199,7 @@ export default function VideoPlayer({
       {/* Footer */}
       <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
-        {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">— coach annotations</span>}
+        {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">· coach annotations</span>}
       </div>
     </div>
   )

@@ -33,11 +33,11 @@ If you do not agree to these terms, do not use the platform.`,
           },
           {
             title: '2. Who Can Use Release Point',
-            body: `**Coaches** — Any adult (18+) who coaches a baseball or softball program may create a coach account. You are responsible for the players you add to your account and any content you upload.
+            body: `**Coaches:** Any adult (18+) who coaches a baseball or softball program may create a coach account. You are responsible for the players you add to your account and any content you upload.
 
-**Players** — Players join by invitation from their coach. Players under 18 must have parental or guardian consent to use the platform. By accepting an invitation, you confirm that appropriate consent has been obtained.
+**Players:** Players join by invitation from their coach. Players under 18 must have parental or guardian consent to use the platform. By accepting an invitation, you confirm that appropriate consent has been obtained.
 
-**Age restriction** — Direct account creation is limited to adults (18+). Players under 13 may not create their own accounts. Coaches creating accounts for players under 13 are responsible for obtaining verifiable parental consent (COPPA compliance).`,
+**Age restriction:** Direct account creation is limited to adults (18+). Players under 13 may not create their own accounts. Coaches creating accounts for players under 13 are responsible for obtaining verifiable parental consent (COPPA compliance).`,
           },
           {
             title: '3. Acceptable Use',
@@ -59,14 +59,14 @@ We reserve the right to suspend or terminate accounts that violate these terms.`
 
 We do not claim ownership of your content. We do not share your content with third parties except as described in our Privacy Policy (Supabase for storage, Anthropic for AI processing).
 
-You are solely responsible for the content you upload and for obtaining any necessary rights, permissions, or consents — including from athletes and their parents.`,
+You are solely responsible for the content you upload and for obtaining any necessary rights, permissions, or consents, including from athletes and their parents.`,
           },
           {
             title: '5. AI Coach Disclaimer',
             body: `The AI Coach feature is powered by Anthropic's Claude AI and is provided for informational and coaching-support purposes only. AI-generated responses:
 
 - Are not a substitute for professional coaching, medical, or biomechanical advice
-- May contain errors or inaccuracies — always verify important information
+- May contain errors or inaccuracies. Always verify important information.
 - Should be used as a tool to support, not replace, coach judgment
 - Are based on the data and context you provide
 

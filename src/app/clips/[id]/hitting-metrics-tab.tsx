@@ -21,7 +21,7 @@ interface HittingMetrics {
 const FIELDS: { key: keyof HittingMetrics; label: string; unit: string; desc: string }[] = [
   { key: 'ev_avg',           label: 'Avg Exit Velocity',  unit: 'mph', desc: 'Average speed of the ball off the bat' },
   { key: 'ev_max',           label: 'Max Exit Velocity',  unit: 'mph', desc: 'Hardest-hit ball this session' },
-  { key: 'launch_angle_avg', label: 'Avg Launch Angle',   unit: '°',   desc: 'Average degrees above horizontal — 8–32° is the sweet spot' },
+  { key: 'launch_angle_avg', label: 'Avg Launch Angle',   unit: '°',   desc: 'Average degrees above horizontal. 8–32° is the sweet spot.' },
   { key: 'barrel_rate',      label: 'Barrel Rate',        unit: '%',   desc: 'Balls hit with optimal EV + launch angle (elite contact)' },
   { key: 'hard_hit_rate',    label: 'Hard Hit %',         unit: '%',   desc: 'Balls hit 95 mph or harder' },
   { key: 'sweet_spot_rate',  label: 'Sweet Spot %',       unit: '%',   desc: 'Balls hit with launch angle between 8° and 32°' },

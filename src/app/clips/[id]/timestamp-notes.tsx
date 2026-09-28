@@ -112,7 +112,7 @@ export default function TimestampNotes({
       {notes.length === 0 ? (
         <p className="text-sm text-[#3D5166]">
           {isCoach
-            ? 'Pause the video, draw on the frame, then press Stamp — or type a note above.'
+            ? 'Pause the video, draw on the frame, then press Stamp, or type a note above.'
             : 'No timestamp notes from your coach yet.'}
         </p>
       ) : (

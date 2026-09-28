@@ -33,17 +33,17 @@ export default function PrivacyPage() {
             title: '2. Information We Collect',
             body: `We collect:
 
-**Account information** — When you sign up, we collect your name, email address, and password (hashed — never stored in plain text).
+**Account information:** When you sign up, we collect your name, email address, and password (hashed, never stored in plain text).
 
-**Profile data** — Role (coach or player), team name, age group, position.
+**Profile data:** Role (coach or player), team name, age group, position.
 
-**Video and media files** — Clips you upload, voice recordings attached to clips, and any annotations made on those clips.
+**Video and media files:** Clips you upload, voice recordings attached to clips, and any annotations made on those clips.
 
-**Performance metrics** — Pitch data imported from Rapsodo CSV exports (velocity, spin rate, spin axis, break measurements).
+**Performance metrics:** Pitch data imported from Rapsodo CSV exports (velocity, spin rate, spin axis, break measurements).
 
-**Usage data** — Timestamps, clip notes, and coaching feedback entered into the platform.
+**Usage data:** Timestamps, clip notes, and coaching feedback entered into the platform.
 
-**Technical data** — Browser type, device type, IP address, and standard server logs collected automatically.`,
+**Technical data:** Browser type, device type, IP address, and standard server logs collected automatically.`,
           },
           {
             title: '3. How We Use Your Information',
@@ -61,15 +61,15 @@ We do not sell your data to third parties. We do not use your data for advertisi
             title: '4. Third-Party Services',
             body: `We use the following third-party services to operate the platform:
 
-**Supabase** (supabase.com) — Database, authentication, and file storage. Your data is stored on Supabase's infrastructure. See supabase.com/privacy.
+**Supabase** (supabase.com): Database, authentication, and file storage. Your data is stored on Supabase's infrastructure. See supabase.com/privacy.
 
-**Anthropic** (anthropic.com) — Powers the AI Coach feature. When you use AI Coach, the conversation content and player context (name, age group, position, metrics) are sent to Anthropic's API. Anthropic does not train on API data by default. See anthropic.com/privacy.
+**Anthropic** (anthropic.com): Powers the AI Coach feature. When you use AI Coach, the conversation content and player context (name, age group, position, metrics) are sent to Anthropic's API. Anthropic does not train on API data by default. See anthropic.com/privacy.
 
 We do not share data with any other third parties.`,
           },
           {
             title: '5. Children\'s Privacy (COPPA)',
-            body: `Release Point is used to analyze youth athletes, including players under the age of 13. We do not knowingly create accounts for children under 13. Player accounts are created by their coaches (adults) via invitation — players do not self-register.
+            body: `Release Point is used to analyze youth athletes, including players under the age of 13. We do not knowingly create accounts for children under 13. Player accounts are created by their coaches (adults) via invitation. Players do not self-register.
 
 Coaches are responsible for obtaining appropriate consent from the parents or guardians of any players under 13 before adding them to the platform or uploading video of them.
 
@@ -104,7 +104,7 @@ To exercise any of these rights, contact us at the address below.`,
           },
           {
             title: '9. Security',
-            body: `We implement industry-standard security measures including encrypted connections (HTTPS), hashed passwords, and row-level security policies on our database. No method of transmission over the internet is 100% secure — we cannot guarantee absolute security, but we take reasonable steps to protect your data.`,
+            body: `We implement industry-standard security measures including encrypted connections (HTTPS), hashed passwords, and row-level security policies on our database. No method of transmission over the internet is 100% secure. We cannot guarantee absolute security, but we take reasonable steps to protect your data.`,
           },
           {
             title: '10. Changes to This Policy',

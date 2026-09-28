@@ -24,7 +24,7 @@ const HITTING_PHASES = [
   { name: 'Load',                     desc: 'Weight shift back, hip hinge, hand trigger, rhythm' },
   { name: 'Stride / Timing',          desc: 'Stride length, direction, front foot landing, timing' },
   { name: 'Hip Rotation',             desc: 'Back hip drive, rotation sequence, ground force use' },
-  { name: 'Hip-Shoulder Separation',  desc: 'Hips lead shoulders — the gap creates bat speed' },
+  { name: 'Hip-Shoulder Separation',  desc: 'Hips lead shoulders. The gap creates bat speed.' },
   { name: 'Contact Point',            desc: 'Barrel path to ball, attack angle, hand position at contact' },
   { name: 'Extension / Follow Thru',  desc: 'Through-contact extension, full rotation, balance' },
 ]

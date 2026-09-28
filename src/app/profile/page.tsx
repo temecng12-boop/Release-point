@@ -212,7 +212,7 @@ export default async function ProfilePage() {
 
         {!isCoach && myClips.length === 0 && (
           <div className="bg-white border border-[#DDE4ED] rounded-xl px-6 py-12 text-center shadow-sm">
-            <p className="text-sm text-[#3D5166]">No clips yet — your coach will upload them.</p>
+            <p className="text-sm text-[#3D5166]">No clips yet. Your coach will upload them.</p>
           </div>
         )}
 

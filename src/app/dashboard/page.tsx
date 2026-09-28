@@ -347,7 +347,7 @@ export default async function DashboardPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                       </svg>
                     </div>
-                    <p className="text-sm text-slate-500">No clips yet — add players and upload their first session.</p>
+                    <p className="text-sm text-slate-500">No clips yet. Add players and upload their first session.</p>
                   </div>
                 ) : (
                   <div className="rounded-xl overflow-hidden" style={glass}>
@@ -477,7 +477,7 @@ export default async function DashboardPage() {
                         </svg>
                       ),
                       title: 'Track Metrics',
-                      desc: 'Your coach uploads Rapsodo data linked to your clips — velocity, spin rate, movement.',
+                      desc: 'Your coach uploads Rapsodo data linked to your clips: velocity, spin rate, movement.',
                     },
                     {
                       icon: (
@@ -538,7 +538,7 @@ export default async function DashboardPage() {
               <div className="space-y-4">
                 {(myMetrics?.length ?? 0) === 0 && (
                   <div className="rounded-xl px-5 py-4 text-center" style={glass}>
-                    <p className="text-xs text-slate-500">No pitch metrics yet — upload a Rapsodo CSV on any clip to start tracking.</p>
+                    <p className="text-xs text-slate-500">No pitch metrics yet. Upload a Rapsodo CSV on any clip to start tracking.</p>
                   </div>
                 )}
                 {(myMetrics?.length ?? 0) > 0 && (

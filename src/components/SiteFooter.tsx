@@ -55,7 +55,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
 
       <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
         <p className="text-xs text-slate-400">
-          &copy; {new Date().getFullYear()} Release Point &mdash; Designed &amp; built by Nolan George
+          &copy; {new Date().getFullYear()} Release Point. Designed &amp; built by Nolan George
         </p>
         <p className="text-xs text-slate-300">Pitching &amp; hitting mechanics analyzer</p>
       </div>

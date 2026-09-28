@@ -74,7 +74,7 @@ export default function ClipNotes({
       recorderRef.current = recorder
       setRecording(true)
     } catch {
-      setRecordError('Microphone access denied — check browser permissions')
+      setRecordError('Microphone access denied. Check browser permissions.')
     }
   }
 
@@ -136,7 +136,7 @@ export default function ClipNotes({
           <audio controls src={voiceUrl} className="w-full" style={{ height: 36 }} />
         ) : (
           <p className="text-sm text-[#3D5166]">
-            {isCoach ? 'No voice note yet — hit Record above.' : 'No voice note from coach yet.'}
+            {isCoach ? 'No voice note yet. Hit Record above.' : 'No voice note from coach yet.'}
           </p>
         )}
       </div>

@@ -3,15 +3,15 @@ import Logo from '@/components/Logo'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-export const metadata = { title: 'Join the Waitlist — Release Point' }
+export const metadata = { title: 'Join the Waitlist | Release Point' }
 
 export default function WaitlistPage() {
   return (
-    <div className="min-h-screen bg-[#0F1F33] flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
 
       {/* Nav */}
-      <header className="px-6 md:px-12 h-14 flex items-center">
-        <Logo size="md" wordmarkClass="inline" dark />
+      <header className="px-6 md:px-12 h-14 flex items-center border-b border-[#e2e8f0]">
+        <Logo size="md" wordmarkClass="inline" />
       </header>
 
       {/* Main */}
@@ -20,7 +20,7 @@ export default function WaitlistPage() {
         {/* Badge */}
         <div
           className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-full border text-[10px] tracking-[0.25em]"
-          style={{ ...os, borderColor: 'rgba(200,16,46,0.4)', color: '#C8102E', background: 'rgba(200,16,46,0.08)' }}
+          style={{ ...os, borderColor: 'rgba(200,16,46,0.4)', color: '#C8102E', background: 'rgba(200,16,46,0.06)' }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#C8102E] animate-pulse" />
           Coming Soon
@@ -28,15 +28,15 @@ export default function WaitlistPage() {
 
         {/* Headline */}
         <h1
-          className="text-4xl sm:text-5xl md:text-6xl text-white text-center leading-tight mb-4 max-w-2xl"
+          className="text-4xl sm:text-5xl md:text-6xl text-[#0F1F33] text-center leading-tight mb-4 max-w-2xl"
           style={os}
         >
           Coaching that moves<br />
           <span className="text-[#C8102E]">at the speed of the game.</span>
         </h1>
 
-        <p className="text-[#8096AE] text-sm sm:text-base text-center max-w-md mb-10 leading-relaxed">
-          Release Point gives coaches and players a professional-grade film room — frame-by-frame analysis,
+        <p className="text-[#456080] text-sm sm:text-base text-center max-w-md mb-10 leading-relaxed">
+          Release Point gives coaches and players a professional-grade film room: frame-by-frame analysis,
           drawing tools, and instant feedback, built for baseball.
         </p>
 
@@ -53,7 +53,7 @@ export default function WaitlistPage() {
             <span
               key={f}
               className="text-[10px] tracking-wider px-3 py-1 rounded-full"
-              style={{ ...os, background: 'rgba(255,255,255,0.06)', color: '#AAB8C8', border: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ ...os, background: '#F0F4F8', color: '#456080', border: '1px solid #DDE4ED' }}
             >
               {f}
             </span>
@@ -63,22 +63,22 @@ export default function WaitlistPage() {
         {/* Form card */}
         <div
           className="w-full max-w-md rounded-2xl p-8"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: '#F8FAFC', border: '1px solid #DDE4ED' }}
         >
-          <p className="text-white text-sm font-medium mb-1" style={os}>Get early access</p>
-          <p className="text-[#8096AE] text-xs mb-6">Be first in line. We'll reach out when your spot is ready.</p>
+          <p className="text-[#0F1F33] text-sm font-medium mb-1" style={os}>Get early access</p>
+          <p className="text-[#456080] text-xs mb-6">Be first in line. We&apos;ll reach out when your spot is ready.</p>
           <WaitlistForm />
         </div>
 
         {/* Social proof */}
-        <p className="mt-8 text-[#3D5166] text-xs tracking-wider" style={os}>
+        <p className="mt-8 text-[#8096AE] text-xs tracking-wider" style={os}>
           Built by coaches. Trusted by players.
         </p>
       </main>
 
       {/* Footer */}
-      <footer className="px-6 py-5 text-center">
-        <p className="text-[#3D5166] text-xs">© {new Date().getFullYear()} Release Point. All rights reserved.</p>
+      <footer className="px-6 py-5 text-center border-t border-[#e2e8f0]">
+        <p className="text-[#8096AE] text-xs">&copy; {new Date().getFullYear()} Release Point. All rights reserved.</p>
       </footer>
     </div>
   )

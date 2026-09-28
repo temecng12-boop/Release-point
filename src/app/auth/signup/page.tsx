@@ -239,7 +239,7 @@ export default function SignupPage() {
           <div className="space-y-6">
             {[
               { n: '01', title: 'Video Analysis', desc: 'Frame-by-frame mechanics breakdown with canvas annotation tools' },
-              { n: '02', title: 'Rapsodo',         desc: 'Import pitch metrics — velocity, spin, break — benchmarked automatically' },
+              { n: '02', title: 'Rapsodo',         desc: 'Import pitch metrics: velocity, spin, break, benchmarked automatically' },
               { n: '03', title: 'AI Coach',         desc: 'Data-backed analysis tied to your player\'s age group and real numbers' },
               { n: '04', title: 'Team Management', desc: 'Organize players by team and age group, share clips instantly' },
             ].map((f) => (
@@ -253,7 +253,7 @@ export default function SignupPage() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-slate-300">Release Point — Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-slate-300">Release Point. Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
       {/* Right panel */}

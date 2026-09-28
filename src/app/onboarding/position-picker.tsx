@@ -36,7 +36,7 @@ export default function PositionPicker({ playerName }: { playerId: string; playe
     setSaveError(null)
     const result = await savePlayerPosition(selected)
     if (result?.error) {
-      setSaveError('Failed to save — please try again.')
+      setSaveError('Failed to save. Please try again.')
       setLoading(false)
       return
     }

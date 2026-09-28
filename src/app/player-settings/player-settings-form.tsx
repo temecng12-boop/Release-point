@@ -333,7 +333,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
             </div>
           </div>
 
-          <p className="text-xs text-[#3D5166]">Enter season totals or career stats — your coach can see everything here.</p>
+          <p className="text-xs text-[#3D5166]">Enter season totals or career stats. Your coach can see everything here.</p>
         </div>
       </div>
 

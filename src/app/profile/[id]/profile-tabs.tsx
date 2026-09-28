@@ -214,7 +214,7 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
       <div ref={scrollRef} className="max-h-[420px] overflow-y-auto p-4 space-y-3">
         <div className="flex justify-start">
           <div className="max-w-[85%] rounded-md px-3 py-2 text-sm text-[#456080] bg-[#F0F4F8] border border-[#DDE4ED]">
-            Ask me about {playerName}&apos;s development — I have context from all {metrics.length > 0 ? `${metrics.length} pitch${metrics.length > 1 ? 'es' : ''} tracked` : 'their sessions'}. What do you want to know?
+            Ask me about {playerName}&apos;s development. I have context from all {metrics.length > 0 ? `${metrics.length} pitch${metrics.length > 1 ? 'es' : ''} tracked` : 'their sessions'}. What do you want to know?
           </div>
         </div>
         {messages.map((m, i) => (
@@ -510,7 +510,7 @@ function AthleteProfileEditor({ playerId, initial }: { playerId: string; initial
         <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="px-4 py-3 border-b border-[#DDE4ED]">
             <p className="text-sm text-[#0F1F33]" style={oswald}>Physical Info</p>
-            <p className="text-xs text-[#3D5166] mt-0.5">Updated by the player — view only</p>
+            <p className="text-xs text-[#3D5166] mt-0.5">Updated by the player, view only</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#DDE4ED]">
             {infoFields.map(({ label, value }) => (
