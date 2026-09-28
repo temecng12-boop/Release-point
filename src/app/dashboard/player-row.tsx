@@ -150,7 +150,7 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
                 ) : (
                   <div className="flex items-center justify-between px-4 py-2 hover:bg-[#F0F4F8] transition-colors group">
                     <Link href={`/clips/${clip.id}`} className="flex-1 flex items-center justify-between">
-                      <span className="text-sm text-[#0F1F33]">{clip.title}</span>
+                      <span className="text-sm text-[#0F1F33]" style={{ textTransform: 'capitalize' }}>{clip.title}</span>
                       <span className="text-xs text-[#456080]">{fmtDate(clip.session_date, clip.created_at)}</span>
                     </Link>
                     <button

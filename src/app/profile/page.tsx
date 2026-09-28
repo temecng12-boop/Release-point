@@ -202,7 +202,7 @@ export default async function ProfilePage() {
                   href={`/clips/${clip.id}`}
                   className="flex items-center justify-between px-5 py-3 hover:bg-[#F0F4F8] transition-colors"
                 >
-                  <span className="text-sm text-[#0F1F33] truncate">{clip.title}</span>
+                  <span className="text-sm text-[#0F1F33] truncate" style={{ textTransform: 'capitalize' }}>{clip.title}</span>
                   <span className="text-xs text-[#3D5166] shrink-0 ml-3">{fmtDate(clip.created_at)}</span>
                 </Link>
               ))}
