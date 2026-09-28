@@ -10,8 +10,9 @@ export default function WaitlistPage() {
     <div className="min-h-screen bg-white flex flex-col">
 
       {/* Nav */}
-      <header className="px-6 md:px-12 h-14 flex items-center border-b border-[#e2e8f0]">
-        <Logo size="md" wordmarkClass="inline" />
+      <header className="px-6 md:px-12 h-14 flex items-center justify-between border-b border-[#e2e8f0]">
+        <Logo size="md" wordmarkClass="inline" href="/home" />
+        <a href="/home" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>← Home</a>
       </header>
 
       {/* Main */}
