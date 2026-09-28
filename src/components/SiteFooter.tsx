@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Logo from './Logo'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -31,26 +30,30 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
 
   return (
     <footer style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-      <div className="max-w-5xl mx-auto px-6 py-14 grid md:grid-cols-[1fr_auto] gap-12 items-start">
-        <div>
-          <Logo size="md" wordmarkClass="inline" />
-        </div>
+      {/* Banner wordmark */}
+      <div className="max-w-5xl mx-auto px-6 pt-16 pb-10">
+        <p
+          className="text-[clamp(56px,10vw,120px)] leading-none tracking-tight text-slate-950 select-none"
+          style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase', fontWeight: 700 }}
+        >
+          Release Point
+        </p>
+      </div>
 
-        <div className="flex flex-col gap-3.5">
-          <p className="text-xs text-slate-400 tracking-widest mb-1" style={os}>Links</p>
-          {[
-            { href: '/auth/signup', label: 'Coach Sign Up' },
-            { href: '/auth/login',  label: 'Player Login'  },
-            { href: '/home',        label: 'Home'           },
-            { href: '/about',       label: 'About'          },
-            { href: '/privacy',     label: 'Privacy'        },
-            { href: '/terms',       label: 'Terms'          },
-          ].map(l => (
-            <Link key={l.href} href={l.href} className="text-sm text-slate-500 hover:text-slate-800 transition-colors" style={os}>
-              {l.label}
-            </Link>
-          ))}
-        </div>
+      {/* Links row */}
+      <div className="max-w-5xl mx-auto px-6 pb-10 flex flex-wrap gap-x-8 gap-y-3">
+        {[
+          { href: '/auth/signup', label: 'Coach Sign Up' },
+          { href: '/auth/login',  label: 'Player Login'  },
+          { href: '/home',        label: 'Home'           },
+          { href: '/about',       label: 'About'          },
+          { href: '/privacy',     label: 'Privacy'        },
+          { href: '/terms',       label: 'Terms'          },
+        ].map(l => (
+          <Link key={l.href} href={l.href} className="text-sm text-slate-500 hover:text-slate-800 transition-colors" style={os}>
+            {l.label}
+          </Link>
+        ))}
       </div>
 
       <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2" style={{ borderTop: '1px solid #e2e8f0' }}>
