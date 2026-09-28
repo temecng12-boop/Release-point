@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
+import ClipTitle from './clip-title'
 import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
@@ -164,6 +165,8 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
             Compare
           </Link>
         </div>
+
+        <ClipTitle clipId={id} initialTitle={clip.title} />
 
         <VideoPlayer
           src={signedUrl}

@@ -7,7 +7,7 @@ import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-type Phase = 'idle' | 'preview' | 'recording' | 'uploading'
+type Phase = 'idle' | 'preview' | 'recording' | 'naming' | 'uploading'
 
 export default function RecordButton({
   playerId,
@@ -19,12 +19,14 @@ export default function RecordButton({
   const [phase, setPhase]     = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
   const [error, setError]     = useState<string | null>(null)
+  const [title, setTitle]     = useState('')
   const videoRef     = useRef<HTMLVideoElement>(null)
   const streamRef    = useRef<MediaStream | null>(null)
   const recRef       = useRef<MediaRecorder | null>(null)
   const chunksRef    = useRef<Blob[]>([])
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
   const cancelledRef = useRef(false)
+  const pendingMime  = useRef<string>('')
   const router    = useRouter()
 
   async function openCamera() {
@@ -52,7 +54,13 @@ export default function RecordButton({
     const recorder = new MediaRecorder(streamRef.current, { mimeType })
     chunksRef.current = []
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-    recorder.onstop = () => uploadRecording(mimeType)
+    recorder.onstop = () => {
+      if (cancelledRef.current) { cancelledRef.current = false; return }
+      pendingMime.current = mimeType
+      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+      setTitle(`${playerName} ${today}`)
+      setPhase('naming')
+    }
     recorder.start(250)
     recRef.current = recorder
     setElapsed(0)
@@ -65,7 +73,7 @@ export default function RecordButton({
     recRef.current?.stop()
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
-    setPhase('uploading')
+    // phase transitions to 'naming' inside recorder.onstop
   }
 
   function cancel() {
@@ -80,8 +88,7 @@ export default function RecordButton({
     setError(null)
   }
 
-  async function uploadRecording(mimeType: string) {
-    if (cancelledRef.current) { cancelledRef.current = false; return }
+  async function uploadRecording(mimeType: string, clipTitle: string) {
     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
     const storagePath = `${playerId}/${Date.now()}.${ext}`
 
@@ -106,11 +113,10 @@ export default function RecordButton({
       return
     }
 
-    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     const result = await createClip({
       player_id:    playerId,
       storage_path: storagePath,
-      title:        `${playerName} — ${today}`,
+      title:        clipTitle,
       session_date: null,
     })
 
@@ -128,6 +134,45 @@ export default function RecordButton({
     const m = Math.floor(s / 60)
     const sec = s % 60
     return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  // ── Naming overlay ─────────────────────────────────────────────────────────
+  if (phase === 'naming') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-6 w-[22rem] space-y-4">
+          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Name This Clip</p>
+          <input
+            autoFocus
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && title.trim()) { setPhase('uploading'); uploadRecording(pendingMime.current, title.trim()) }
+              if (e.key === 'Escape') { chunksRef.current = []; setPhase('idle') }
+            }}
+            placeholder="e.g. game changeup strikeout 9/27"
+            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { chunksRef.current = []; setPhase('idle') }}
+              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors"
+              style={oswald}
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => { if (title.trim()) { setPhase('uploading'); uploadRecording(pendingMime.current, title.trim()) } }}
+              disabled={!title.trim()}
+              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40"
+              style={oswald}
+            >
+              Upload
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // ── Camera / recording overlay ──────────────────────────────────────────────

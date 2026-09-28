@@ -46,7 +46,7 @@ async function compressVideo(file: File, onProgress: (pct: number) => void): Pro
   return new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' })
 }
 
-type Phase = 'idle' | 'compressing' | 'uploading'
+type Phase = 'idle' | 'naming' | 'compressing' | 'uploading'
 
 export default function UploadButton({
   playerId,
@@ -58,10 +58,20 @@ export default function UploadButton({
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
   const [error, setError]             = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const router   = useRouter()
+  const [title, setTitle]             = useState('')
+  const inputRef    = useRef<HTMLInputElement>(null)
+  const pendingFile = useRef<File | null>(null)
+  const router      = useRouter()
 
-  async function handleFile(file: File) {
+  function handleFileSelected(file: File) {
+    setError(null)
+    pendingFile.current = file
+    const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+    setTitle(`${playerName} ${today}`)
+    setPhase('naming')
+  }
+
+  async function handleFile(file: File, clipTitle: string) {
     setError(null)
     let fileToUpload = file
 
@@ -103,13 +113,10 @@ export default function UploadButton({
       return
     }
 
-    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const title = `${playerName} — ${today}`
-
     const result = await createClip({
       player_id:    playerId,
       storage_path: storagePath,
-      title,
+      title:        clipTitle,
       session_date: null,
     })
 
@@ -122,6 +129,45 @@ export default function UploadButton({
     setPhase('idle')
     if (inputRef.current) inputRef.current.value = ''
     router.refresh()
+  }
+
+  // ── naming overlay ───────────────────────────────────────────────────────
+  if (phase === 'naming') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-6 w-[22rem] space-y-4">
+          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Name This Clip</p>
+          <input
+            autoFocus
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && title.trim() && pendingFile.current) handleFile(pendingFile.current, title.trim())
+              if (e.key === 'Escape') { setPhase('idle'); pendingFile.current = null }
+            }}
+            placeholder="e.g. bullpen w/ Rapsodo 9/24"
+            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setPhase('idle'); pendingFile.current = null }}
+              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors"
+              style={oswald}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (title.trim() && pendingFile.current) handleFile(pendingFile.current, title.trim()) }}
+              disabled={!title.trim()}
+              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40"
+              style={oswald}
+            >
+              Upload
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // ── compressing overlay ───────────────────────────────────────────────────
@@ -155,7 +201,7 @@ export default function UploadButton({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]
-          if (file) handleFile(file)
+          if (file) handleFileSelected(file)
           e.target.value = ''
         }}
       />
