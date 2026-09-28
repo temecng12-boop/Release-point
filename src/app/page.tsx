@@ -432,31 +432,6 @@ export default function HomePage() {
                 Release Point is everything I wished existed when I was playing. One place for coaches to upload, annotate, and analyze — and for players to actually receive what their coach sees in real time.
               </p>
 
-              {/* Career stats — longevity & control */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                {[
-                  { label: 'Innings Pitched', val: '71.0 IP', sub: '2025 season · 21 appearances' },
-                  { label: 'Command', val: '3.11 K/BB', sub: '56 K · 18 BB' },
-                  { label: 'Strikeouts', val: '56 K', sub: 'San Jose State Spartans' },
-                  { label: 'Control', val: '18 BB', sub: 'in 71 innings pitched' },
-                ].map(s => (
-                  <div key={s.label} className="rounded-xl p-3 border border-[#DDE4ED]">
-                    <p className="text-[10px] text-[#C8102E] tracking-widest mb-1" style={os}>{s.label}</p>
-                    <p className="text-sm font-semibold text-slate-900">{s.val}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{s.sub}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-4 pt-2">
-                <div className="w-10 h-10 rounded-full overflow-hidden relative shrink-0 border-2 border-[#E8102A]/20">
-                  <Image src="/media/nolan-followthrough.jpg" alt="Nolan George" fill className="object-cover object-top" sizes="40px" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-950 font-semibold" style={os}>Nolan George</p>
-                  <p className="text-xs text-slate-400">Founder · Former Professional Pitcher</p>
-                </div>
-              </div>
             </div>
 
             {/* Interactive photo gallery */}
