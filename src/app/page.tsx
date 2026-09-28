@@ -426,7 +426,7 @@ export default function HomePage() {
                 <span className="text-[#E8102A]">Then I solved it.</span>
               </h2>
               <p className="text-base text-slate-500 leading-relaxed">
-                I pitched four years of D1 baseball at San Jose State University and played professionally with the Boise Hawks in the Pioneer League. At every level, the same thing happened. Coaches had film on their phones, spin numbers in a text thread, notes from a bullpen session no one could find two weeks later. The information was there. It just never made it to the player in any useful form.
+                I pitched four years of D1 baseball, two at UNLV and two at San Jose State, then played professionally with the Boise Hawks in the Pioneer League. At every level, the same thing happened. Coaches had film on their phones, spin numbers in a text thread, notes from a bullpen session no one could find two weeks later. The information was there. It just never made it to the player in any useful form.
               </p>
               <p className="text-base text-slate-500 leading-relaxed">
                 After I graduated from San Jose State, I started building software and got deep into what AI could do for player development. I understood the baseball side from living it for a decade. I built the technical side from scratch. Release Point is where those two things met. Film, metrics, and coaching feedback in one place so nothing falls through the cracks and players actually get better.
