@@ -9,7 +9,7 @@ const STATS: StatDef[] = [
   { value: 2480, suffix: '',   label: 'RPM Spin Rate',  color: '#3B82F6', decimals: 0 },
   { value: 18.2, suffix: '"',  label: 'Vertical Break', color: '#10B981', decimals: 1 },
   { value: 6.4,  suffix: ' ft', label: 'Extension',     color: '#8B5CF6', decimals: 1 },
-  { value: 4.2,  suffix: '°',  label: 'Vert. Approach', color: '#F59E0B', decimals: 1 },
+  { value: 94,   suffix: '%',  label: 'Spin Efficiency', color: '#F59E0B', decimals: 0 },
 ]
 
 function Counter({ value, suffix, decimals = 0, color }: StatDef) {
