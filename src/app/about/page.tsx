@@ -220,6 +220,16 @@ export default function AboutPage() {
 
         <div className="w-full h-px bg-[#DDE4ED] mb-20" />
 
+        {/* Founder */}
+        <section className="mb-20">
+          <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>The Builder</p>
+          <p className="text-lg text-[#0F1F33] leading-relaxed max-w-2xl">
+            Release Point was designed and built by Nolan George — a pitcher who competed at San Jose State University, the University of Nevada Las Vegas, and with the Boise Hawks. His career at the intersection of high-level amateur and independent baseball sparked a deep interest in AI and data-driven development.
+          </p>
+        </section>
+
+        <div className="w-full h-px bg-[#DDE4ED] mb-20" />
+
         {/* CTA */}
         <section className="text-center">
           <h2 className="text-4xl text-[#0F1F33] mb-4" style={os}>Ready to get started?</h2>
