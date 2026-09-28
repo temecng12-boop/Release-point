@@ -33,11 +33,11 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
     <footer style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
       <div className="max-w-5xl mx-auto px-6 py-14 grid md:grid-cols-[1fr_auto] gap-12 items-start">
         <div>
-          <Logo size="sm" wordmarkClass="inline" />
+          <Logo size="md" wordmarkClass="inline" />
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          <p className="text-[10px] text-slate-400 tracking-widest mb-1" style={os}>Links</p>
+        <div className="flex flex-col gap-3.5">
+          <p className="text-xs text-slate-400 tracking-widest mb-1" style={os}>Links</p>
           {[
             { href: '/auth/signup', label: 'Coach Sign Up' },
             { href: '/auth/login',  label: 'Player Login'  },
@@ -46,7 +46,7 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
             { href: '/privacy',     label: 'Privacy'        },
             { href: '/terms',       label: 'Terms'          },
           ].map(l => (
-            <Link key={l.href} href={l.href} className="text-xs text-slate-500 hover:text-slate-800 transition-colors" style={os}>
+            <Link key={l.href} href={l.href} className="text-sm text-slate-500 hover:text-slate-800 transition-colors" style={os}>
               {l.label}
             </Link>
           ))}
