@@ -7,8 +7,8 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#F5F7FA] text-[#0F1F33]">
       <header className="bg-white border-b border-[#DDE4ED] px-6 py-4 flex items-center justify-between">
-        <Logo size="sm" href="/" />
-        <Link href="/" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors">← Home</Link>
+        <Logo size="sm" href="/home" />
+        <Link href="/home" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors">← Home</Link>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-16 space-y-10">
@@ -150,7 +150,7 @@ Upon termination, your content will be deleted within 30 days unless we are requ
         <div className="flex items-center justify-center gap-6 text-xs text-[#3D5166]">
           <Link href="/privacy" className="hover:text-[#456080] transition-colors">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-[#456080] transition-colors">Terms of Service</Link>
-          <Link href="/" className="hover:text-[#456080] transition-colors">Home</Link>
+          <Link href="/home" className="hover:text-[#456080] transition-colors">Home</Link>
         </div>
       </footer>
     </div>
