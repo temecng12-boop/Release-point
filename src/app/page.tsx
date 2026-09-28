@@ -422,14 +422,14 @@ export default function HomePage() {
             <div className="space-y-6 md:sticky md:top-24">
               <p className="text-[10px] tracking-[0.35em] text-[#E8102A]" style={os}>Built by a pitcher</p>
               <h2 className="text-[clamp(32px,4vw,52px)] leading-[0.92] text-slate-950 tracking-tight" style={os}>
-                This tool didn&apos;t exist.<br />
-                <span className="text-[#E8102A]">So I built it.</span>
+                I lived this problem.<br />
+                <span className="text-[#E8102A]">Then I solved it.</span>
               </h2>
               <p className="text-base text-slate-500 leading-relaxed">
-                I spent years on the mound collecting data — velocity readings, spin numbers, video from bullpens — and none of it was connected. Coaches couldn&apos;t share it easily. Players couldn&apos;t access it. Every insight lived in someone&apos;s notes app or a spreadsheet no one could find.
+                I pitched four years of D1 baseball at San Jose State University and played professionally with the Boise Hawks in the Pioneer League. At every level, the same thing happened. Coaches had film on their phones, spin numbers in a text thread, notes from a bullpen session no one could find two weeks later. The information was there. It just never made it to the player in any useful form.
               </p>
               <p className="text-base text-slate-500 leading-relaxed">
-                Release Point is everything I wished existed when I was playing. One place for coaches to upload, annotate, and analyze — and for players to actually receive what their coach sees in real time.
+                After I graduated from San Jose State, I started building software and got deep into what AI could do for player development. I understood the baseball side from living it for a decade. I built the technical side from scratch. Release Point is where those two things met. Film, metrics, and coaching feedback in one place so nothing falls through the cracks and players actually get better.
               </p>
 
             </div>
