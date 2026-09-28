@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, Fragment } from 'react'
 
+type Agent   = 'randy' | 'barry'
 type Message = { role: 'user' | 'assistant'; content: string }
 
 function renderMarkdown(text: string) {
@@ -16,8 +17,34 @@ function renderMarkdown(text: string) {
     </Fragment>
   ))
 }
+
 type Metric   = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null }
 type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
+
+const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+const AGENTS = {
+  randy: {
+    name: 'Randy',
+    role: 'Pitching Agent',
+    color: '#C8102E',
+    bg: '#FFF5F5',
+    border: '#FBD0D6',
+    description: 'Pitch design, mechanics, Rapsodo and Trackman pitching data, velocity, spin, break profile, and arm health.',
+    placeholder: 'Ask Randy about mechanics, pitch design, Rapsodo data…',
+    intro: "I'm Randy, your pitching AI. I have access to this session's Trackman and Rapsodo data. Ask me about mechanics, pitch design, or what to work on.",
+  },
+  barry: {
+    name: 'Barry',
+    role: 'Hitting Agent',
+    color: '#1C3A5C',
+    bg: '#F0F4F8',
+    border: '#C0CFE0',
+    description: 'Exit velocity, launch angle, barrel rate, bat path, swing mechanics, Rapsodo and Trackman hitting data.',
+    placeholder: 'Ask Barry about exit velo, launch angle, swing path…',
+    intro: "I'm Barry, your hitting AI. I can read exit velocity, launch angle, barrel rate, attack angle, and any Trackman or Rapsodo hitting data loaded for this session. Ask me about swing mechanics or what to work on.",
+  },
+}
 
 export default function AIChat({
   clipId,
@@ -38,22 +65,27 @@ export default function AIChat({
   checklist?: PhaseRow[] | null
   coachNotes?: string | null
 }) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
+  const [agent,     setAgent]     = useState<Agent | null>(null)
+  const [messages,  setMessages]  = useState<Message[]>([])
+  const [input,     setInput]     = useState('')
   const [streaming, setStreaming] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to bottom when messages or streaming text changes
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, streaming])
+
+  function chooseAgent(a: Agent) {
+    setAgent(a)
+    setMessages([])
+    setInput('')
+    setStreaming('')
+  }
 
   async function sendMessage() {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading || !agent) return
 
     const userMsg: Message = { role: 'user', content: text }
     const nextMessages: Message[] = [...messages, userMsg]
@@ -69,6 +101,7 @@ export default function AIChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: nextMessages,
+          agent,
           context: {
             playerName,
             ageGroup: playerAgeGroup,
@@ -82,19 +115,16 @@ export default function AIChat({
         }),
       })
 
-      if (!res.ok || !res.body) {
-        throw new Error(`Request failed: ${res.status}`)
-      }
+      if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`)
 
-      const reader = res.body.getReader()
+      const reader  = res.body.getReader()
       const decoder = new TextDecoder()
       let accumulated = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        accumulated += chunk
+        accumulated += decoder.decode(value, { stream: true })
         setStreaming(accumulated)
       }
 
@@ -109,82 +139,104 @@ export default function AIChat({
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+  // ── Agent picker ────────────────────────────────────────────────────────────
+  if (!agent) {
+    return (
+      <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-5 space-y-4">
+        <div>
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os}>AI Coach</p>
+          <p className="text-sm text-[#0F1F33]">Choose your analyst before you start.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {(Object.entries(AGENTS) as [Agent, typeof AGENTS.randy][]).map(([key, ag]) => (
+            <button
+              key={key}
+              onClick={() => chooseAgent(key)}
+              className="text-left rounded-xl border-2 p-4 transition-all hover:shadow-md active:scale-[0.98] space-y-2"
+              style={{ borderColor: ag.border, background: ag.bg }}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-lg font-bold leading-none"
+                  style={{ color: ag.color, fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}
+                >
+                  {ag.name}
+                </span>
+                <span
+                  className="text-[9px] px-1.5 py-0.5 rounded-full text-white"
+                  style={{ background: ag.color, fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                >
+                  {ag.role}
+                </span>
+              </div>
+              <p className="text-xs text-[#456080] leading-relaxed">{ag.description}</p>
+              <p className="text-[10px] font-semibold" style={{ color: ag.color, ...os }}>
+                Talk to {ag.name} →
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
   }
+
+  // ── Active chat ─────────────────────────────────────────────────────────────
+  const ag = AGENTS[agent]
 
   return (
     <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
-        <p
-          className="text-xs text-[#3D5166] tracking-widest"
-          style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
+      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold" style={{ color: ag.color, ...os }}>{ag.name}</span>
+          <span className="text-[9px] text-[#8096AE] tracking-wide" style={os}>{ag.role}</span>
+        </div>
+        <button
+          onClick={() => { setAgent(null); setMessages([]) }}
+          className="text-[10px] text-[#8096AE] hover:text-[#456080] transition-colors"
+          style={os}
         >
-          AI Coach Chat
-        </p>
+          Switch Agent
+        </button>
       </div>
 
-      {/* Message list */}
+      {/* Messages */}
       <div ref={scrollRef} className="max-h-[400px] overflow-y-auto p-4 space-y-3">
-        {/* Intro message */}
         <div className="flex justify-start">
-          <div
-            className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]"
-            style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
-          >
-            Ask me anything about this clip, player mechanics, or what to work on.
+          <div className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]" style={{ background: ag.bg, border: `1px solid ${ag.border}` }}>
+            {ag.intro}
           </div>
         </div>
 
-        {/* Conversation */}
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] rounded-md px-3 py-2 text-sm ${
-                msg.role === 'user'
-                  ? 'text-white'
-                  : 'text-[#456080]'
-              }`}
-              style={
-                msg.role === 'user'
-                  ? { background: '#C8102E' }
-                  : { background: '#F0F4F8', border: '1px solid #DDE4ED' }
-              }
+              className={`max-w-[80%] rounded-md px-3 py-2 text-sm ${msg.role === 'user' ? 'text-white' : 'text-[#456080]'}`}
+              style={msg.role === 'user' ? { background: ag.color } : { background: ag.bg, border: `1px solid ${ag.border}` }}
             >
               {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
             </div>
           </div>
         ))}
 
-        {/* Streaming response */}
         {isLoading && (
           <div className="flex justify-start">
-            <div
-              className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]"
-              style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
-            >
-              {streaming ? renderMarkdown(streaming) : (
-                <span className="text-[#3D5166]">
-                  <span className="animate-pulse">...</span>
-                </span>
-              )}
+            <div className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]" style={{ background: ag.bg, border: `1px solid ${ag.border}` }}>
+              {streaming ? renderMarkdown(streaming) : <span className="animate-pulse">...</span>}
             </div>
           </div>
         )}
       </div>
 
-      {/* Input area */}
+      {/* Input */}
       <div className="border-t border-[#DDE4ED] p-3 flex gap-2">
         <input
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about mechanics, pitch design, development…"
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+          placeholder={ag.placeholder}
           disabled={isLoading}
           className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-50"
         />
@@ -192,7 +244,7 @@ export default function AIChat({
           onClick={sendMessage}
           disabled={isLoading || !input.trim()}
           className="px-4 py-2 rounded-md text-sm text-white font-medium transition-colors disabled:opacity-40"
-          style={{ background: '#C8102E' }}
+          style={{ background: ag.color }}
         >
           Send
         </button>
