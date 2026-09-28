@@ -220,12 +220,23 @@ export default function AboutPage() {
 
         <div className="w-full h-px bg-[#DDE4ED] mb-20" />
 
-        {/* Founder */}
+        {/* Company */}
         <section className="mb-20">
-          <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>The Builder</p>
-          <p className="text-lg text-[#0F1F33] leading-relaxed max-w-2xl">
-            Release Point was designed and built by Nolan George — a pitcher who competed at San Jose State University, the University of Nevada Las Vegas, and with the Boise Hawks. His career at the intersection of high-level amateur and independent baseball sparked a deep interest in AI and data-driven development.
-          </p>
+          <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>Who We Are</p>
+          <h2 className="text-3xl text-[#0F1F33] mb-6 leading-tight" style={os}>
+            A startup built at the intersection of baseball and software.
+          </h2>
+          <div className="space-y-5 max-w-2xl">
+            <p className="text-[#456080] leading-relaxed">
+              Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Rapsodo, Trackman, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
+            </p>
+            <p className="text-[#456080] leading-relaxed">
+              We are building the software layer that connects coaches, players, and data — so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
+            </p>
+            <p className="text-[#456080] leading-relaxed">
+              Release Point was founded by Nolan George — a pitcher who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects a decade of firsthand experience with what coaches have, what players need, and where the current tools fall short.
+            </p>
+          </div>
         </section>
 
         <div className="w-full h-px bg-[#DDE4ED] mb-20" />
