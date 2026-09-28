@@ -121,14 +121,18 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     lessonPath = (lpData as { lesson_path?: string | null } | null)?.lesson_path ?? null
   }
 
-  let initialReframe: { zoom: number; panX: number; panY: number } | null = null
+  let initialReframe: { left: number; top: number; right: number; bottom: number } | null = null
   {
     const { data: rfData } = await supabaseAdmin
       .from('clips')
       .select('reframe')
       .eq('id', id)
       .single()
-    initialReframe = (rfData as { reframe?: { zoom: number; panX: number; panY: number } | null } | null)?.reframe ?? null
+    const raw = (rfData as { reframe?: Record<string, unknown> | null } | null)?.reframe ?? null
+    // Only use the new corner-based format; ignore legacy zoom/panX/panY entries
+    if (raw && 'left' in raw) {
+      initialReframe = raw as { left: number; top: number; right: number; bottom: number }
+    }
   }
 
   let lessonUrl: string | null = null

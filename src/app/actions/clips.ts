@@ -433,7 +433,7 @@ export async function addPitchMetric(clipId: string, data: {
   return { metric: row }
 }
 
-export async function saveReframe(clipId: string, reframe: { zoom: number; panX: number; panY: number } | null) {
+export async function saveReframe(clipId: string, reframe: { left: number; top: number; right: number; bottom: number } | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }

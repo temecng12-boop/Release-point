@@ -277,7 +277,7 @@ export default function VideoPlayer({
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
   initialLessonUrl?: string | null
-  initialReframe?: { zoom: number; panX: number; panY: number } | null
+  initialReframe?: { left: number; top: number; right: number; bottom: number } | null
 }) {
   const isCoach = role === 'coach'
 
@@ -319,16 +319,18 @@ export default function VideoPlayer({
   const [stampSaving,    setStampSaving]      = useState(false)
 
   // reframe
+  type Crop = { left: number; top: number; right: number; bottom: number }
+  type HandleId = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l'
+  const fullCrop: Crop = { left: 0, top: 0, right: 100, bottom: 100 }
   const [reframeMode,    setReframeMode]      = useState(false)
-  const [reframeDragging,setReframeDragging]  = useState(false)
-  const [zoom,           setZoom]             = useState(initialReframe?.zoom ?? 1)
-  const [panX,           setPanX]             = useState(initialReframe?.panX ?? 0)
-  const [panY,           setPanY]             = useState(initialReframe?.panY ?? 0)
+  const [crop,           setCrop]             = useState<Crop>(
+    initialReframe && 'left' in initialReframe ? initialReframe : fullCrop
+  )
   const [reframeSaved,   setReframeSaved]     = useState(false)
   const [reframeSaveErr, setReframeSaveErr]   = useState<string | null>(null)
   const stageRef        = useRef<HTMLDivElement>(null)
   const reframeModeRef  = useRef(false)
-  const reframeDragRef  = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null)
+  const cropDragRef     = useRef<{ handle: HandleId; startX: number; startY: number; startCrop: Crop } | null>(null)
 
   // lesson recording
   const [lessonUrl,      setLessonUrl]        = useState<string | null>(initialLessonUrl)
@@ -797,7 +799,7 @@ export default function VideoPlayer({
     await saveLessonPath(clipId, path)
 
     const signedResult = await getLessonSignedUrl(path)
-    if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl)
+    if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl ?? null)
     setLessonPhase('idle')
   }
 
@@ -807,60 +809,59 @@ export default function VideoPlayer({
   }
 
   // ── reframe helpers ──────────────────────────────────────────────────────
-  // Sync ref so wheel handler closure stays current
   useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
 
-  // Wheel zoom — must be registered non-passive to call preventDefault
-  useEffect(() => {
-    const stage = stageRef.current
-    if (!stage) return
-    function onWheel(e: WheelEvent) {
-      if (!reframeModeRef.current) return
-      e.preventDefault()
-      const delta = e.deltaY < 0 ? 0.15 : -0.15
-      setZoom(z => Math.min(4, Math.max(1, +(z + delta).toFixed(2))))
-    }
-    stage.addEventListener('wheel', onWheel, { passive: false })
-    return () => stage.removeEventListener('wheel', onWheel)
-  }, [])
+  function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)) }
 
-  // Clamp pan whenever zoom changes
-  useEffect(() => {
-    const stage = stageRef.current
-    if (!stage) return
-    const maxX = (stage.offsetWidth  * (zoom - 1)) / 2
-    const maxY = (stage.offsetHeight * (zoom - 1)) / 2
-    setPanX(x => Math.min(maxX, Math.max(-maxX, x)))
-    setPanY(y => Math.min(maxY, Math.max(-maxY, y)))
-  }, [zoom])
-
-  function startReframeDrag(e: React.PointerEvent) {
+  function startCropDrag(e: React.PointerEvent, handle: HandleId) {
+    e.preventDefault()
+    e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    setReframeDragging(true)
-    reframeDragRef.current = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY }
+    cropDragRef.current = { handle, startX: e.clientX, startY: e.clientY, startCrop: { ...crop } }
   }
 
-  function moveReframeDrag(e: React.PointerEvent) {
-    if (!reframeDragRef.current) return
+  function moveCropDrag(e: React.PointerEvent) {
+    if (!cropDragRef.current) return
     const stage = stageRef.current
-    const maxX = stage ? (stage.offsetWidth  * (zoom - 1)) / 2 : 999
-    const maxY = stage ? (stage.offsetHeight * (zoom - 1)) / 2 : 999
-    const nx = reframeDragRef.current.startPanX + (e.clientX - reframeDragRef.current.startX)
-    const ny = reframeDragRef.current.startPanY + (e.clientY - reframeDragRef.current.startY)
-    setPanX(Math.min(maxX, Math.max(-maxX, nx)))
-    setPanY(Math.min(maxY, Math.max(-maxY, ny)))
+    if (!stage) return
+    const rect = stage.getBoundingClientRect()
+    const dx = (e.clientX - cropDragRef.current.startX) / rect.width * 100
+    const dy = (e.clientY - cropDragRef.current.startY) / rect.height * 100
+    const s = cropDragRef.current.startCrop
+    const MIN = 10
+    const h = cropDragRef.current.handle
+    const next = { ...s }
+    if (h === 'tl' || h === 'bl' || h === 'l') next.left   = clamp(s.left   + dx, 0,          s.right  - MIN)
+    if (h === 'tr' || h === 'br' || h === 'r') next.right  = clamp(s.right  + dx, s.left + MIN, 100)
+    if (h === 'tl' || h === 'tr' || h === 't') next.top    = clamp(s.top    + dy, 0,          s.bottom - MIN)
+    if (h === 'bl' || h === 'br' || h === 'b') next.bottom = clamp(s.bottom + dy, s.top  + MIN, 100)
+    setCrop(next)
   }
 
-  function endReframeDrag() {
-    reframeDragRef.current = null
-    setReframeDragging(false)
+  function endCropDrag() { cropDragRef.current = null }
+
+  function cropToInnerStyle(): React.CSSProperties {
+    if (reframeMode) return { lineHeight: 0 }
+    const { left, top, right, bottom } = crop
+    const cw = (right - left) / 100
+    const ch = (bottom - top) / 100
+    if (cw >= 0.999 && ch >= 0.999) return { lineHeight: 0 }
+    const W = stageRef.current?.offsetWidth ?? 0
+    const H = stageRef.current?.offsetHeight ?? 0
+    if (!W || !H) return { lineHeight: 0 }
+    const z = Math.max(1 / cw, 1 / ch)
+    const cx = (left + right) / 2
+    const cy = (top + bottom) / 2
+    const px = -(cx / 100 - 0.5) * W * z
+    const py = -(cy / 100 - 0.5) * H * z
+    return { transform: `translate(${px}px, ${py}px) scale(${z})`, transformOrigin: 'center center', lineHeight: 0 }
   }
 
   async function handleSaveReframe() {
     setReframeSaveErr(null)
-    const result = await saveReframe(clipId, { zoom, panX, panY })
+    const result = await saveReframe(clipId, crop)
     if (result?.error) {
-      setReframeSaveErr('Column missing — run: ALTER TABLE clips ADD COLUMN reframe JSONB')
+      setReframeSaveErr('Save failed — ' + result.error)
     } else {
       setReframeSaved(true)
       setTimeout(() => setReframeSaved(false), 2500)
@@ -868,7 +869,7 @@ export default function VideoPlayer({
   }
 
   function resetReframe() {
-    setZoom(1); setPanX(0); setPanY(0); setReframeSaved(false); setReframeSaveErr(null)
+    setCrop(fullCrop); setReframeSaved(false); setReframeSaveErr(null)
   }
 
   function toggleTracking() {
@@ -892,37 +893,68 @@ export default function VideoPlayer({
           ...(videoAspect && videoAspect < 1
             ? { maxWidth: `min(100%, calc(70vh * ${videoAspect.toFixed(4)}))` }
             : {}),
-          cursor: reframeMode ? (reframeDragging ? 'grabbing' : 'grab') : undefined,
-          userSelect: reframeMode ? 'none' : undefined,
-        }}
-        onPointerDown={reframeMode ? startReframeDrag : undefined}
-        onPointerMove={reframeMode ? moveReframeDrag : undefined}
-        onPointerUp={reframeMode ? endReframeDrag : undefined}
-        onPointerLeave={reframeMode ? endReframeDrag : undefined}
+          }}
       >
         {videoError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
             <p className="text-white text-sm opacity-70">Video unavailable — try refreshing the page.</p>
           </div>
         )}
-        {zoom > 1 && (
-          <div
-            className="absolute top-2 right-2 z-10 text-white/70 text-[0.65rem] bg-black/40 px-1.5 py-0.5 rounded pointer-events-none"
-            style={oswald}
-          >
-            {zoom.toFixed(1)}x
-          </div>
-        )}
-        {/* Inner stage — receives the zoom/pan transform */}
-        <div
-          style={{
-            transform: zoom !== 1 || panX !== 0 || panY !== 0
-              ? `translate(${panX}px, ${panY}px) scale(${zoom})`
-              : undefined,
-            transformOrigin: 'center center',
-            lineHeight: 0,
-          }}
-        >
+        {/* Crop overlay — only shown in reframe mode */}
+        {reframeMode && (() => {
+          const { left, top, right, bottom } = crop
+          const handles: { id: HandleId; x: number; y: number; cursor: string }[] = [
+            { id: 'tl', x: left,               y: top,                  cursor: 'nw-resize' },
+            { id: 't',  x: (left + right) / 2, y: top,                  cursor: 'n-resize'  },
+            { id: 'tr', x: right,              y: top,                  cursor: 'ne-resize' },
+            { id: 'r',  x: right,              y: (top + bottom) / 2,   cursor: 'e-resize'  },
+            { id: 'br', x: right,              y: bottom,               cursor: 'se-resize' },
+            { id: 'b',  x: (left + right) / 2, y: bottom,               cursor: 's-resize'  },
+            { id: 'bl', x: left,               y: bottom,               cursor: 'sw-resize' },
+            { id: 'l',  x: left,               y: (top + bottom) / 2,   cursor: 'w-resize'  },
+          ]
+          return (
+            <div className="absolute inset-0 z-20" style={{ pointerEvents: 'none' }}>
+              {/* Dark mask outside crop */}
+              <div style={{ position: 'absolute', inset: 0, top: 0, left: 0, right: 0, height: `${top}%`, background: 'rgba(0,0,0,0.55)' }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${100 - bottom}%`, background: 'rgba(0,0,0,0.55)' }} />
+              <div style={{ position: 'absolute', left: 0, top: `${top}%`, bottom: `${100 - bottom}%`, width: `${left}%`, background: 'rgba(0,0,0,0.55)' }} />
+              <div style={{ position: 'absolute', right: 0, top: `${top}%`, bottom: `${100 - bottom}%`, width: `${100 - right}%`, background: 'rgba(0,0,0,0.55)' }} />
+              {/* Crop border */}
+              <div style={{ position: 'absolute', left: `${left}%`, top: `${top}%`, right: `${100 - right}%`, bottom: `${100 - bottom}%`, border: '1.5px solid rgba(255,255,255,0.85)', boxSizing: 'border-box' }} />
+              {/* Rule-of-thirds grid */}
+              <div style={{ position: 'absolute', left: `${left + (right - left) / 3}%`, top: `${top}%`, bottom: `${100 - bottom}%`, width: 1, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ position: 'absolute', left: `${left + (right - left) * 2 / 3}%`, top: `${top}%`, bottom: `${100 - bottom}%`, width: 1, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ position: 'absolute', top: `${top + (bottom - top) / 3}%`, left: `${left}%`, right: `${100 - right}%`, height: 1, background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ position: 'absolute', top: `${top + (bottom - top) * 2 / 3}%`, left: `${left}%`, right: `${100 - right}%`, height: 1, background: 'rgba(255,255,255,0.2)' }} />
+              {/* Handles */}
+              {handles.map(h => (
+                <div
+                  key={h.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${h.x}%`,
+                    top: `${h.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: 11,
+                    height: 11,
+                    background: 'white',
+                    border: '1.5px solid rgba(0,0,0,0.4)',
+                    borderRadius: 2,
+                    cursor: h.cursor,
+                    pointerEvents: 'auto',
+                    touchAction: 'none',
+                  }}
+                  onPointerDown={e => startCropDrag(e, h.id)}
+                  onPointerMove={moveCropDrag}
+                  onPointerUp={endCropDrag}
+                />
+              ))}
+            </div>
+          )
+        })()}
+        {/* Inner stage — receives the crop transform when not in reframe mode */}
+        <div style={cropToInnerStyle()}>
           <video
             ref={videoRef}
             src={src}
@@ -1039,17 +1071,11 @@ export default function VideoPlayer({
       {/* Reframe controls */}
       {isCoach && reframeMode && (
         <div className="mt-2 pt-2 flex flex-wrap items-center gap-3" style={divider}>
-          <span className="text-[0.72rem] text-[#3D5166] tabular-nums w-8 shrink-0" style={oswald}>
-            {zoom.toFixed(1)}x
-          </span>
-          <input
-            type="range" min="100" max="400" step="5"
-            value={Math.round(zoom * 100)}
-            onChange={e => setZoom(Number(e.target.value) / 100)}
-            className="w-28 accent-[#C8102E]"
-          />
           <span className="text-[0.65rem] text-[#8096AE]" style={oswald}>
-            Drag to pan · scroll to zoom
+            Drag corners or edges to crop
+          </span>
+          <span className="text-[0.65rem] text-[#3D5166] tabular-nums" style={oswald}>
+            {Math.round(crop.right - crop.left)}% × {Math.round(crop.bottom - crop.top)}%
           </span>
           <div className="flex gap-1 ml-auto">
             <button onClick={resetReframe} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
