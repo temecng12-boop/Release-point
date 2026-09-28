@@ -31,8 +31,8 @@ export default function WaitlistForm() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <p className="text-white text-sm font-medium" style={os}>You're on the list</p>
-        <p className="text-[#8096AE] text-xs">We'll reach out to {email} when your spot is ready. Thanks for the support.</p>
+        <p className="text-[#0F1F33] text-sm font-medium" style={os}>You're on the list</p>
+        <p className="text-[#456080] text-xs">We'll reach out to {email} when your spot is ready. Thanks for the support.</p>
       </div>
     )
   }
@@ -44,7 +44,7 @@ export default function WaitlistForm() {
         value={name}
         onChange={e => setName(e.target.value)}
         placeholder="Your name"
-        className="w-full bg-[#0F1F33] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-3 text-sm text-white placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors"
+        className="w-full bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 text-sm text-[#0F1F33] placeholder:text-[#8096AE] focus:outline-none focus:border-[#456080] transition-colors"
       />
       <input
         type="email"
@@ -52,7 +52,7 @@ export default function WaitlistForm() {
         onChange={e => { setEmail(e.target.value); if (state === 'error') setState('idle') }}
         placeholder="Email address"
         required
-        className="w-full bg-[#0F1F33] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-3 text-sm text-white placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors"
+        className="w-full bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 text-sm text-[#0F1F33] placeholder:text-[#8096AE] focus:outline-none focus:border-[#456080] transition-colors"
       />
       {state === 'error' && (
         <p className="text-[#C8102E] text-xs">{message}</p>
