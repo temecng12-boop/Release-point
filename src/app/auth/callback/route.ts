@@ -73,6 +73,10 @@ export async function GET(request: NextRequest) {
           } catch { /* email is non-critical */ }
         }
       }
+      // New invited player — send to onboarding to pick position + give consent
+      if ((updatedPlayers ?? []).length > 0) {
+        return NextResponse.redirect(`${origin}/onboarding`)
+      }
     }
     return NextResponse.redirect(`${origin}${next}`)
   }

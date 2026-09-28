@@ -32,9 +32,9 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Guardian Email</label>
+            <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Email</label>
             <div className="flex gap-2">
-              <input type="email" name="guardian_email" placeholder="Parent / guardian email" required className={inputClass} />
+              <input type="email" name="player_email" placeholder="Player email" required className={inputClass} />
               <button
                 type="submit"
                 disabled={pending}

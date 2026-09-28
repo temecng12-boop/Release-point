@@ -25,12 +25,13 @@ const CARDS: { value: Position; label: string; sub: string; points: string[] }[]
 
 export default function PositionPicker({ playerName }: { playerId: string; playerName: string }) {
   const [selected, setSelected] = useState<Position | null>(null)
+  const [consent, setConsent]   = useState(false)
   const [loading, setLoading]   = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const router = useRouter()
 
   async function handleContinue() {
-    if (!selected) return
+    if (!selected || !consent) return
     setLoading(true)
     setSaveError(null)
     const result = await savePlayerPosition(selected)
@@ -102,6 +103,20 @@ export default function PositionPicker({ playerName }: { playerId: string; playe
             })}
           </div>
 
+          {/* Consent checkbox */}
+          <label className="flex items-start gap-3 cursor-pointer mb-8 p-4 rounded-xl border border-[#DDE4ED] bg-white">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={e => setConsent(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#C8102E] shrink-0 cursor-pointer"
+            />
+            <span className="text-xs text-[#456080] leading-relaxed">
+              I agree to Release Point&apos;s use of video, analytics, and coaching data for player development.
+              If I am under 18, I confirm I have parental or guardian consent to use this platform.
+            </span>
+          </label>
+
           {saveError && (
             <p className="text-sm text-[#C8102E] text-center mb-4">{saveError}</p>
           )}
@@ -109,7 +124,7 @@ export default function PositionPicker({ playerName }: { playerId: string; playe
           <div className="flex justify-center">
             <button
               onClick={handleContinue}
-              disabled={!selected || loading}
+              disabled={!selected || !consent || loading}
               className="px-12 py-4 rounded-lg text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 ...oswald,

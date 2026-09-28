@@ -95,7 +95,7 @@ export async function savePlayerPosition(position: 'pitcher' | 'hitter') {
 
   const { error } = await supabaseAdmin
     .from('players')
-    .update({ position })
+    .update({ position, consent_given_at: new Date().toISOString() })
     .eq('user_id', user.id)
 
   if (error) return { error: error.message }
