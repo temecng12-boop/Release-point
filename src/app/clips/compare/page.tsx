@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { canViewPlayerContent } from '@/lib/clip-access'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ComparePlayer, { ClipData } from './compare-player'
@@ -37,9 +38,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       .eq('id', clip.player_id)
       .single()
 
-    const isCoachOfPlayer = role === 'coach' && playerRow?.coach_id === user!.id
-    const isPlayerOwner   = role === 'player' && playerRow?.user_id === user!.id
-    if (!isCoachOfPlayer && !isPlayerOwner) return null
+    // Same rule as the clip page: player, direct coach, team coach or guardian.
+    const access = await canViewPlayerContent(supabaseAdmin, user!.id, clip.player_id)
+    if (!access.allowed) return null
 
     const { data: signed } = await supabaseAdmin.storage
       .from('clips')

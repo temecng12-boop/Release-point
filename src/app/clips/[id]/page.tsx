@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { canViewPlayerContent } from '@/lib/clip-access'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -24,6 +25,11 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   if (clipError) console.error('[ClipPage] DB error fetching clip', id, JSON.stringify(clipError))
   if (!clip) notFound()
+
+  // Only the player, their direct coach, a coach on one of their teams, or a
+  // linked guardian may see this clip. Everyone else gets a 404.
+  const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id)
+  if (!access.allowed) notFound()
 
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
