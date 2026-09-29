@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canViewPlayerContent } from '@/lib/clip-access'
+import { canUseAiCoachFor } from '@/lib/auth/roster-access'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -89,7 +90,7 @@ async function ClipContent({ id, clip, userId }: {
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')
-    .select('full_name, age_group, position')
+    .select('full_name, age_group, position, coach_id, user_id')
     .eq('id', clip.player_id)
     .single()
 
@@ -301,6 +302,7 @@ async function ClipContent({ id, clip, userId }: {
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
+            aiCoachAvailable={canUseAiCoachFor(userId, playerRow)}
           />
         </div>
       </main>
