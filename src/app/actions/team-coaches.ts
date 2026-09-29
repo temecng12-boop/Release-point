@@ -83,16 +83,21 @@ export async function removeCoachFromTeam(teamId: string, coachId: string): Prom
   if (role !== 'organizer') return { error: 'Only the team organizer can remove coaches' }
   if (coachId === user.id) return { error: 'The organizer cannot be removed' }
 
-  const { error } = await supabaseAdmin
+  const { data: removed, error } = await supabaseAdmin
     .from('team_coaches')
     .delete()
     .eq('team_id', teamId)
     .eq('coach_id', coachId)
     .neq('role', 'organizer')
+    .select('coach_id')
 
   if (error) {
     console.error('[removeCoachFromTeam] delete failed', { code: error.code, message: error.message })
     return { error: 'Could not remove that coach. Please try again.' }
+  }
+  if (!removed || removed.length === 0) {
+    console.warn('[removeCoachFromTeam] no row removed', { teamId, coachId, by: user.id })
+    return { error: 'That coach is not an assistant on this team (they may already have been removed). Refresh the page to see the current staff.' }
   }
 
   revalidatePath(`/dashboard/team/${teamId}`)

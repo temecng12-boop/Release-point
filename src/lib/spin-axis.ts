@@ -3,7 +3,8 @@
 // Storage convention (pitch_metrics.spin_axis): degrees clockwise from 12:00,
 // so 12:00 = 0°, 3:00 = 90°, 6:00 = 180°, 9:00 = 270°. Each hour is 30° and
 // each minute is 0.5°. This matches the metrics table display and the TrackMan
-// PDF "Tilt" import.
+// PDF "Tilt" import. TrackMan CSV "SpinAxis" degrees use 180° = 12:00 and are
+// converted with trackmanSpinAxisToDegrees.
 
 export type AxisParseResult =
   | { ok: true; degrees: number | null }
@@ -40,4 +41,48 @@ export function degreesToClock(degrees: number): string {
   const h = Math.floor(totalMinutes / 60) || 12
   const m = totalMinutes % 60
   return `${h}:${String(m).padStart(2, '0')}`
+}
+
+/**
+ * TrackMan "SpinAxis" degrees → storage degrees.
+ *
+ * TrackMan (and Statcast) put 180° at 12:00 (pure backspin), 90° at 9:00 and
+ * 270° at 3:00, increasing clockwise on the same clock face, so its own "Tilt"
+ * column is (SpinAxis − 180) / 30 hours. The app puts 0° at 12:00, so
+ * app = (trackman − 180 + 360) mod 360: 180 → 0 (12:00), 270 → 90 (3:00),
+ * 0/360 → 180 (6:00), 90 → 270 (9:00). Rounded to 0.01° to drop float noise.
+ */
+export function trackmanSpinAxisToDegrees(trackman: number): number | null {
+  if (!Number.isFinite(trackman)) return null
+  const deg = Math.round((((trackman - 180) % 360) + 360) % 360 * 100) / 100
+  return deg >= 360 ? deg - 360 : deg
+}
+
+/**
+ * A spin axis cell from an imported CSV. Clock strings ("1:15", TrackMan's
+ * "Tilt" column) are already in the app's clock convention; plain numbers are
+ * TrackMan-convention degrees (180° = 12:00). Empty or unparseable → null.
+ */
+export function parseImportedSpinAxis(value: string | null | undefined): number | null {
+  const s = (value ?? '').trim()
+  if (s === '') return null
+  if (s.includes(':')) {
+    const clock = parseClockAxis(s)
+    return clock.ok ? clock.degrees : null
+  }
+  if (!/^[-+]?(\d+(\.\d*)?|\.\d+)$/.test(s)) return null
+  return trackmanSpinAxisToDegrees(Number(s))
+}
+
+/**
+ * True when Postgres rejected a fractional value for an integer column
+ * (pitch_metrics.spin_axis before migration 020 makes it numeric).
+ */
+export function isIntegerSyntaxError(error: { code?: string; message?: string } | null | undefined): boolean {
+  return !!error && error.code === '22P02' && (error.message ?? '').includes('integer')
+}
+
+/** Whole-degree fallback for an integer spin_axis column. */
+export function roundAxisForIntegerColumn(degrees: number | null): number | null {
+  return degrees == null ? null : Math.round(degrees) % 360
 }
