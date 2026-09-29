@@ -93,14 +93,21 @@ export default function TimestampNotes({
     const t = v?.currentTime ?? 0
     setAdding(true)
     setError(null)
-    const result = await saveTimestampNote({ clip_id: clipId, time_seconds: t, body: draft.trim() })
-    if (result?.error) {
-      setError(result.error)
-    } else if (result?.note) {
-      setNotes(prev => [...prev, result.note!].sort((a, b) => a.time_seconds - b.time_seconds))
-      setDraft('')
+
+    try {
+      const result = await saveTimestampNote({ clip_id: clipId, time_seconds: t, body: draft.trim() })
+      if (result?.note) {
+        setNotes(prev => [...prev, result.note!].sort((a, b) => a.time_seconds - b.time_seconds))
+        setDraft('')
+      } else {
+        setError(result?.error ?? 'Could not save this note. Please try again.')
+      }
+    } catch (err) {
+      console.error('[addNote] request failed', err)
+      setError('Could not save this note. Check your connection and try again.')
+    } finally {
+      setAdding(false)
     }
-    setAdding(false)
   }
 
   async function startVoice() {
@@ -167,8 +174,10 @@ export default function TimestampNotes({
   }
 
   async function removeNote(id: string) {
+    setError(null)
     const result = await deleteTimestampNote(id)
-    if (!result?.error) setNotes(prev => prev.filter(n => n.id !== id))
+    if (result?.error) setError(result.error)
+    else setNotes(prev => prev.filter(n => n.id !== id))
   }
 
   return (
@@ -239,7 +248,9 @@ export default function TimestampNotes({
             )}
           </div>
 
-          {error && <p className="text-xs text-[#C8102E]">Save failed: {error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-[#C8102E]">Save failed: {error}</p>
+          )}
         </div>
       )}
 

@@ -1,4 +1,8 @@
 'use server'
+import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
+import { normalizeClipNotes } from '@/lib/clip-notes'
+import { isCoachOnPlayersTeam } from '@/lib/team-access'
+import { degreesToClock } from '@/lib/spin-axis'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -218,7 +222,7 @@ export async function saveAnnotation(data: {
     origin_time: data.origin_time,
   }).select('id').single()
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('saveAnnotation', error, 'Could not save this mark.') }
   return { success: true, id: inserted.id as string }
 }
 
@@ -279,14 +283,32 @@ export async function saveTimestampNote(data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  const { data: note, error } = await supabaseAdmin
+  // Only send drawing_data when there are drawings, so text-only notes don't
+  // depend on that column (added in migration 019).
+  const hasDrawing = Array.isArray(data.drawing_data) && data.drawing_data.length > 0
+  const row: Record<string, unknown> = {
+    clip_id: data.clip_id,
+    created_by: user.id,
+    time_seconds: data.time_seconds,
+    body: data.body,
+  }
+  if (hasDrawing) row.drawing_data = data.drawing_data
+
+  const { data: inserted, error } = await supabaseAdmin
     .from('timestamp_notes')
-    .insert({ clip_id: data.clip_id, created_by: user.id, time_seconds: data.time_seconds, body: data.body, drawing_data: data.drawing_data ?? null })
-    .select('id, time_seconds, body, drawing_data')
+    .insert(row)
+    .select(hasDrawing ? 'id, time_seconds, body, drawing_data' : 'id, time_seconds, body')
     .single()
 
-  if (error) return { error: error.message }
-  return { success: true, note }
+  if (error) {
+    if (hasDrawing && isMissingColumnError(error, 'drawing_data')) {
+      console.error('[saveTimestampNote] timestamp_notes.drawing_data is missing; apply supabase/migrations/019_schema_drift_catchup.sql', error)
+      return { error: 'Drawings can\'t be saved yet because the database is missing an update (timestamp_notes.drawing_data). Remove the drawings to save the note as text only, or contact support.' }
+    }
+    return { error: describeDbError('saveTimestampNote', error, 'Could not save this note.') }
+  }
+  const note = inserted as unknown as { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
+  return { success: true, note: { ...note, drawing_data: note.drawing_data ?? null } }
 }
 
 export async function deleteTimestampNote(noteId: string) {
@@ -300,7 +322,7 @@ export async function deleteTimestampNote(noteId: string) {
     .eq('id', noteId)
     .eq('created_by', user.id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('deleteTimestampNote', error, 'Could not delete this note.') }
   return { success: true }
 }
 
@@ -332,22 +354,18 @@ export async function deleteLessonPath(clipId: string) {
   return { success: true }
 }
 
+// The player, their direct coach, or a coach on one of their teams. Team
+// membership uses the shared rule in src/lib/clip-access.ts (players.team_id
+// plus player_teams), instead of a separate team_id-only lookup.
 async function isCoachForPlayer(userId: string, playerId: string): Promise<boolean> {
   const { data: player } = await supabaseAdmin
     .from('players')
     .select('coach_id, team_id, user_id')
     .eq('id', playerId)
-    .single()
+    .maybeSingle()
   if (!player) return false
   if (player.coach_id === userId || player.user_id === userId) return true
-  if (!player.team_id) return false
-  const { data: membership } = await supabaseAdmin
-    .from('team_coaches')
-    .select('coach_id')
-    .eq('team_id', player.team_id)
-    .eq('coach_id', userId)
-    .single()
-  return !!membership
+  return isCoachOnPlayersTeam(userId, playerId, player.team_id as string | null)
 }
 
 export async function deleteVoicePath(clipId: string) {
@@ -487,35 +505,55 @@ export async function addPitchMetric(clipId: string, data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  // extension and vaa are new columns — insert fault-tolerantly
-  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
-  let row: Record<string, unknown> | null = null
-  let insertError: { message: string } | null = null
-
-  const full = await supabaseAdmin
-    .from('pitch_metrics')
-    .insert(baseInsert)
-    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
-    .single()
-
-  if (full.error?.code === 'PGRST204' || full.error?.message?.includes('extension') || full.error?.message?.includes('vaa')) {
-    // Columns don't exist yet — insert without them
-    const { extension: _ext, vaa: _vaa, ...coreData } = baseInsert as typeof baseInsert & { extension: unknown; vaa: unknown }
-    void _ext; void _vaa
-    const fallback = await supabaseAdmin
-      .from('pitch_metrics')
-      .insert(coreData)
-      .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
-      .single()
-    row = fallback.data as Record<string, unknown> | null
-    insertError = fallback.error
-  } else {
-    row = full.data as Record<string, unknown> | null
-    insertError = full.error
+  // spin_axis is degrees clockwise from 12:00 (see src/lib/spin-axis.ts).
+  if (data.spin_axis != null && !(Number.isFinite(data.spin_axis) && data.spin_axis >= 0 && data.spin_axis < 360)) {
+    return { error: 'Axis must be a clock time from 1:00 to 12:59.' }
   }
 
-  if (insertError) return { error: insertError.message }
-  return { metric: row }
+  // extension and vaa are new columns — insert fault-tolerantly
+  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
+  let { row, error: insertError } = await addPitchMetricRow(baseInsert)
+
+  // Until migration 020 makes spin_axis numeric, the column is integer and
+  // half-degree values (any odd minute, e.g. 8:45 = 262.5°) are rejected with
+  // 22P02. Save the nearest whole degree instead and say so.
+  let warning: string | undefined
+  if (insertError && data.spin_axis != null && !Number.isInteger(data.spin_axis) && isIntegerSyntaxError(insertError)) {
+    console.error('[addPitchMetric] pitch_metrics.spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', insertError)
+    const rounded = Math.round(data.spin_axis) % 360
+    const retry = await addPitchMetricRow({ ...baseInsert, spin_axis: rounded })
+    row = retry.row
+    insertError = retry.error
+    if (!insertError) warning = `Axis was rounded to ${degreesToClock(rounded)} because the database only stores whole degrees for now.`
+  }
+
+  if (insertError) return { error: describeDbError('addPitchMetric', insertError, 'Could not save this pitch.') }
+  return { metric: row, warning }
+}
+
+function isIntegerSyntaxError(error: { code?: string; message?: string }) {
+  return error.code === '22P02' && (error.message ?? '').includes('integer')
+}
+
+// Insert one pitch_metrics row, dropping extension/vaa if those columns are missing.
+async function addPitchMetricRow(insert: Record<string, unknown>) {
+  const full = await supabaseAdmin
+    .from('pitch_metrics')
+    .insert(insert)
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
+    .single()
+  if (!(full.error?.code === 'PGRST204' || full.error?.message?.includes('extension') || full.error?.message?.includes('vaa'))) {
+    return { row: full.data as Record<string, unknown> | null, error: full.error }
+  }
+  const core = { ...insert }
+  delete core.extension
+  delete core.vaa
+  const fallback = await supabaseAdmin
+    .from('pitch_metrics')
+    .insert(core)
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+    .single()
+  return { row: fallback.data as Record<string, unknown> | null, error: fallback.error }
 }
 
 export async function saveReframe(clipId: string, reframe: { left: number; top: number; right: number; bottom: number } | null) {
@@ -532,5 +570,54 @@ export async function saveReframe(clipId: string, reframe: { left: number; top: 
   const { error } = await supabaseAdmin.from('clips').update({ reframe }).eq('id', clipId)
   if (error) return { error: error.message }
   revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
+// Coach notes on a clip (create, edit, clear). Written only here, on the
+// server with the service client, after the check below; the browser no
+// longer writes clips.notes directly.
+//
+// Who can edit: the player's direct coach (players.coach_id), or any coach on
+// one of the player's teams (organizer or assistant in team_coaches), the same
+// rule as the corrected 018 RLS policies. "Player's teams" means players.team_id
+// plus player_teams rows, because the app links players through player_teams.
+// Blank text clears the notes (stored as null); see src/lib/clip-notes.ts.
+export async function saveClipNotes(clipId: string, notes: string | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Your session has expired. Please sign in again.' }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+  const normalized = normalizeClipNotes(notes)
+  if (!normalized.ok) return { error: normalized.error }
+
+  const { data: clip, error: clipError } = await supabaseAdmin
+    .from('clips')
+    .select('player_id')
+    .eq('id', clipId)
+    .maybeSingle()
+  if (clipError) return { error: describeDbError('saveClipNotes:clip', clipError, 'Could not save notes.') }
+  if (!clip) return { error: 'Clip not found' }
+
+  const { data: player, error: playerError } = await supabaseAdmin
+    .from('players')
+    .select('coach_id, team_id')
+    .eq('id', clip.player_id)
+    .maybeSingle()
+  if (playerError) return { error: describeDbError('saveClipNotes:player', playerError, 'Could not save notes.') }
+  if (!player) return { error: 'Clip not found' }
+  const allowed = player.coach_id === user.id
+    || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
+  if (!allowed) return { error: 'Only the player\'s coaches can edit these notes.' }
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('clips')
+    .update({ notes: normalized.notes })
+    .eq('id', clipId)
+    .select('id')
+  if (error) return { error: describeDbError('saveClipNotes', error, 'Could not save notes.') }
+  if (!updated || updated.length === 0) {
+    console.error('[saveClipNotes] update matched no rows', { clipId })
+    return { error: 'Could not save notes. Please refresh and try again.' }
+  }
   return { success: true }
 }

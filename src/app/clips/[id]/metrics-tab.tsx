@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
+import { AXIS_FORMAT_HINT, parseClockAxis } from '@/lib/spin-axis'
 import { createClient } from '@/lib/supabase/client'
 import { addPitchMetric } from '@/app/actions/clips'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
@@ -143,13 +144,16 @@ export default function MetricsTab({
   const [manualForm, setManualForm] = useState(emptyManual)
 
   async function handleManualSave() {
+    // Axis is entered as clock tilt ("8:45") and stored as degrees (12:00 = 0°).
+    const axis = parseClockAxis(manualForm.spin_axis)
+    if (!axis.ok) { setManualError(axis.error); return }
     setManualSaving(true)
     setManualError(null)
     const result = await addPitchMetric(clipId, {
       pitch_type: manualForm.pitch_type || null,
       velocity: manualForm.velocity ? parseFloat(manualForm.velocity) : null,
       spin_rate: manualForm.spin_rate ? parseInt(manualForm.spin_rate) : null,
-      spin_axis: manualForm.spin_axis ? parseInt(manualForm.spin_axis) : null,
+      spin_axis: axis.degrees,
       horizontal_break: manualForm.horizontal_break ? parseFloat(manualForm.horizontal_break) : null,
       vertical_break: manualForm.vertical_break ? parseFloat(manualForm.vertical_break) : null,
       extension: manualForm.extension ? parseFloat(manualForm.extension) : null,
@@ -158,6 +162,7 @@ export default function MetricsTab({
     if (result?.error) {
       setManualError(result.error)
     } else if (result?.metric) {
+      if (result.warning) setSaveError(result.warning)
       updateMetrics(prev => [...prev, result.metric as MetricRow])
       setManualForm(emptyManual)
       setShowManual(false)
@@ -380,7 +385,7 @@ export default function MetricsTab({
                 { key: 'pitch_type',       label: 'Pitch Type',    placeholder: 'Fastball', type: 'text' },
                 { key: 'velocity',         label: 'Velo (mph)',    placeholder: '89.0',  type: 'number' },
                 { key: 'spin_rate',        label: 'Spin (rpm)',    placeholder: '2248',  type: 'number' },
-                { key: 'spin_axis',        label: 'Axis (°)',      placeholder: '22',    type: 'number' },
+                { key: 'spin_axis',        label: 'Axis (tilt)',   placeholder: '1:15',  type: 'text', hint: AXIS_FORMAT_HINT },
                 { key: 'vertical_break',   label: 'IVB (in)',      placeholder: '18.7',  type: 'number' },
                 { key: 'horizontal_break', label: 'H-Break (in)',  placeholder: '8.1',   type: 'number' },
                 { key: 'extension',        label: 'Ext (ft)',      placeholder: '6.4',   type: 'number' },
@@ -390,10 +395,12 @@ export default function MetricsTab({
                   <label className="block text-[10px] text-[#3D5166] mb-1" style={oswald}>{field.label}</label>
                   <input
                     type={field.type}
-                    step="any"
+                    step={field.type === 'number' ? 'any' : undefined}
+                    title={field.hint}
+                    aria-label={field.hint ? `${field.label}. ${field.hint}` : undefined}
                     placeholder={field.placeholder}
                     value={manualForm[field.key as keyof typeof manualForm]}
-                    onChange={e => setManualForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    onChange={e => { setManualForm(f => ({ ...f, [field.key]: e.target.value })); setManualError(null) }}
                     className="w-full bg-[#F5F7FA] border border-[#DDE4ED] rounded px-2 py-1.5 text-sm text-[#0F1F33] focus:outline-none focus:border-[#456080]"
                   />
                 </div>

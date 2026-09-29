@@ -32,7 +32,7 @@ const AGENTS = {
     border: '#FBD0D6',
     description: 'Mechanics, velocity, spin, and pitch design.',
     placeholder: 'Ask Randy anything about pitching…',
-    intro: "I've got your numbers. What are we working on?",
+    intro: "I've got this clip's notes and numbers. I can't watch the video, so I work from the coach's notes and the metrics. What are we working on?",
   },
   barry: {
     name: 'Barry',
@@ -42,7 +42,7 @@ const AGENTS = {
     border: '#C0CFE0',
     description: 'Swing mechanics, exit velocity, and bat path.',
     placeholder: 'Ask Barry anything about hitting…',
-    intro: "I've got your numbers. What are we working on?",
+    intro: "I've got this clip's notes and numbers. I can't watch the video, so I work from the coach's notes and the metrics. What are we working on?",
   },
 }
 
@@ -115,7 +115,10 @@ export default function AIChat({
         }),
       })
 
-      if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`)
+      if (!res.ok || !res.body) {
+        const detail = res.ok ? '' : (await res.text().catch(() => '')).slice(0, 300)
+        throw new Error(detail || `Request failed: ${res.status}`)
+      }
 
       const reader  = res.body.getReader()
       const decoder = new TextDecoder()
