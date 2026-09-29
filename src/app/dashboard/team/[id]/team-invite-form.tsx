@@ -67,7 +67,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
           )}
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          Player receives an invite email to set up their account and join the roster. For players under 18, video can't be added until guardian consent is on file.
+          Player receives an invite email to set up their account and join the roster. For players under 18, video can&apos;t be added until guardian consent is on file.
         </p>
       </div>
     </div>
