@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 015: player 18+ confirmation and clip consent check (RP-041)
+-- Migration 023: player 18+ confirmation and clip consent check (RP-041)
 -- ============================================================================
 -- Consent status is stored on the players row:
 --   * adult_confirmed_at / adult_confirmed_by: the player was confirmed 18+
