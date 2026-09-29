@@ -24,7 +24,6 @@ type Profile = {
   team_name: string | null
   bio: string | null
   college: string | null
-  schools: string[] | null
   playing_career: string | null
   coaching_since: number | null
   certifications: string[] | null
@@ -35,6 +34,15 @@ type Profile = {
   avatar_url: string | null
 }
 
+function parseSchools(college: string | null): string[] {
+  if (!college) return []
+  try {
+    const parsed = JSON.parse(college)
+    if (Array.isArray(parsed)) return parsed as string[]
+  } catch { /* legacy plain-text value */ }
+  return [college]
+}
+
 export default async function ProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,7 +50,7 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, role, team_name, bio, college, schools, playing_career, coaching_since, certifications, location, social_twitter, social_instagram, social_linkedin, avatar_url')
+    .select('full_name, role, team_name, bio, college, playing_career, coaching_since, certifications, location, social_twitter, social_instagram, social_linkedin, avatar_url')
     .eq('id', user.id)
     .single() as { data: Profile | null }
 
@@ -125,9 +133,9 @@ export default async function ProfilePage() {
               </div>
             )}
 
-            {isCoach && (profile?.playing_career || (profile?.schools ?? []).length > 0 || profile?.college) && (
+            {isCoach && (profile?.playing_career || profile?.college) && (
               <div className="flex flex-wrap gap-2 mt-4">
-                {((profile?.schools ?? []).length > 0 ? (profile!.schools!) : profile?.college ? [profile.college] : []).map(s => (
+                {parseSchools(profile?.college ?? null).map(s => (
                   <span key={s} className="text-xs bg-[#EEF2F7] text-[#456080] px-3 py-1.5 rounded-full flex items-center gap-1.5">
                     <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                     {s}
@@ -182,7 +190,7 @@ export default async function ProfilePage() {
             initialName={profile?.full_name ?? ''}
             initialTeamName={profile?.team_name ?? ''}
             initialBio={profile?.bio ?? ''}
-            initialSchools={profile?.schools ?? (profile?.college ? [profile.college] : [])}
+            initialSchools={parseSchools(profile?.college ?? null)}
             initialPlayingCareer={profile?.playing_career ?? ''}
             initialCoachingSince={profile?.coaching_since ?? null}
             initialCertifications={profile?.certifications ?? []}

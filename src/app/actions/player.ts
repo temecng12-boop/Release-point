@@ -161,7 +161,6 @@ export async function updateProfile(data: {
   full_name?: string
   team_name?: string
   bio?: string
-  college?: string
   schools?: string[]
   playing_career?: string
   coaching_since?: number | null
@@ -175,9 +174,17 @@ export async function updateProfile(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { schools, ...rest } = data
+
+  // Store schools array as JSON in the existing `college` text column
+  const payload: Record<string, unknown> = { ...rest }
+  if (schools !== undefined) {
+    payload.college = schools.length > 0 ? JSON.stringify(schools) : null
+  }
+
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update(data)
+    .update(payload)
     .eq('id', user.id)
 
   if (error) return { error: error.message }
