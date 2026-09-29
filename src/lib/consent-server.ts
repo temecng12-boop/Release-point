@@ -4,6 +4,7 @@
 // these functions can be unit tested with a mocked client. Only call them from
 // Server Actions, Route Handlers or Server Components.
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isPlayersOwnCoach } from './auth/roster-access'
 import {
   canUploadVideo,
   PLAYER_CONSENT_COLUMNS,
@@ -36,9 +37,8 @@ export async function checkUploadConsent(db: Db, playerId: string): Promise<Cons
 }
 
 /**
- * True if `userId` may change a player's 18+ status: the player's coach, or,
- * for a player with no coach set, the coach who owns a team the player is on
- * (the same roster rule the dashboard uses).
+ * True if `userId` may change a player's 18+ status: only the player's own
+ * coach. A player with no coach set cannot be changed by any coach.
  */
 export async function canManagePlayerAge(db: Db, userId: string, playerId: string): Promise<boolean> {
   const { data: player } = await db
@@ -46,25 +46,7 @@ export async function canManagePlayerAge(db: Db, userId: string, playerId: strin
     .select('coach_id')
     .eq('id', playerId)
     .maybeSingle()
-  if (!player) return false
-
-  const coachId = (player as { coach_id: string | null }).coach_id
-  if (coachId) return coachId === userId
-
-  const { data: links } = await db
-    .from('player_teams')
-    .select('team_id')
-    .eq('player_id', playerId)
-  const teamIds = ((links ?? []) as { team_id: string }[]).map((l) => l.team_id)
-  if (teamIds.length === 0) return false
-
-  const { data: ownedTeams } = await db
-    .from('teams')
-    .select('id')
-    .eq('coach_id', userId)
-    .in('id', teamIds)
-    .limit(1)
-  return ((ownedTeams ?? []) as unknown[]).length > 0
+  return isPlayersOwnCoach(userId, player as { coach_id: string | null } | null)
 }
 
 /** Marks (or unmarks) a player as a confirmed adult, after an authorization check. */
