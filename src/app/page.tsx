@@ -380,7 +380,7 @@ export default function HomePage() {
           <p className="text-[10px] tracking-[0.35em] text-slate-400 mb-16 text-center" style={os}>How It Works</p>
           <div className="grid md:grid-cols-3 gap-10">
             {[
-              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. Guardian consent handled automatically.' },
+              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They set up their account and join the roster.' },
               { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, import pitch data files. Everything linked to the player.' },
               { n: '03', t: 'Players Get It All',   d: 'Every annotation, metric, and AI insight is shared with the player instantly.' },
             ].map((s, i) => (
