@@ -186,14 +186,17 @@ async function main() {
     assert('error' in r && !queries.some((q) => hasOp(q, 'update')), 'unknown player is refused')
   }
   {
-    // Coach-less player on a team the caller owns.
-    const { db } = mockDb({
+    // Coach-less player on a team the caller owns: still refused (own coach only).
+    const { db, queries } = mockDb({
       players: (q) => (hasOp(q, 'update') ? { data: null, error: null } : { data: { coach_id: null }, error: null }),
       player_teams: () => ({ data: [{ team_id: 't1' }], error: null }),
-      teams: (q) => ({ data: JSON.stringify(opArgs(q, 'eq')) === JSON.stringify(['coach_id', COACH]) ? [{ id: 't1' }] : [], error: null }),
+      teams: () => ({ data: [{ id: 't1' }], error: null }),
     })
-    assert(await canManagePlayerAge(db, COACH, PLAYER), "coach-less player on the caller's team: allowed")
+    assert(!(await canManagePlayerAge(db, COACH, PLAYER)), "coach-less player on the caller's team: refused")
     assert(!(await canManagePlayerAge(db, OTHER_COACH, PLAYER)), "coach-less player on someone else's team: refused")
+    assert(!queries.some((q) => q.table === 'player_teams' || q.table === 'teams'), 'team membership is not consulted')
+    const r = await setAdultConfirmation(db, COACH, PLAYER, true)
+    assert('error' in r && r.error === 'Not authorized' && !queries.some((q) => hasOp(q, 'update')), 'setAdultConfirmation refuses a team coach of a coach-less player')
   }
   {
     const { db } = mockDb({
@@ -201,6 +204,11 @@ async function main() {
       player_teams: () => ({ data: [], error: null }),
     })
     assert(!(await canManagePlayerAge(db, COACH, PLAYER)), 'coach-less player on no team: refused')
+  }
+  {
+    const { db } = mockDb({ players: () => ({ data: { coach_id: COACH }, error: null }) })
+    assert(await canManagePlayerAge(db, COACH, PLAYER), 'own coach: allowed')
+    assert(!(await canManagePlayerAge(db, 'cccccccc-0000-4000-8000-000000000001', PLAYER)), 'the player themself: refused')
   }
   {
     const { db } = mockDb({
