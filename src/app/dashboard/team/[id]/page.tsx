@@ -65,7 +65,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const { data: players } = ownPlayerIds.length > 0
     ? await supabaseAdmin
         .from('players')
-        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at, adult_confirmed_at')
+        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at, adult_confirmed_at, coach_id')
         .in('id', ownPlayerIds)
         .order('full_name', { ascending: true })
     : { data: [] }
@@ -200,6 +200,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 <PlayerRow
                   key={p.id}
                   player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
+                  isOwnPlayer={p.coach_id === user.id}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
                   teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}
                   sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}
