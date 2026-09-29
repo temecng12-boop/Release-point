@@ -1,6 +1,7 @@
 'use server'
 import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
+import { degreesToClock } from '@/lib/spin-axis'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -507,35 +508,55 @@ export async function addPitchMetric(clipId: string, data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  // extension and vaa are new columns — insert fault-tolerantly
-  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
-  let row: Record<string, unknown> | null = null
-  let insertError: { message: string } | null = null
-
-  const full = await supabaseAdmin
-    .from('pitch_metrics')
-    .insert(baseInsert)
-    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
-    .single()
-
-  if (full.error?.code === 'PGRST204' || full.error?.message?.includes('extension') || full.error?.message?.includes('vaa')) {
-    // Columns don't exist yet — insert without them
-    const { extension: _ext, vaa: _vaa, ...coreData } = baseInsert as typeof baseInsert & { extension: unknown; vaa: unknown }
-    void _ext; void _vaa
-    const fallback = await supabaseAdmin
-      .from('pitch_metrics')
-      .insert(coreData)
-      .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
-      .single()
-    row = fallback.data as Record<string, unknown> | null
-    insertError = fallback.error
-  } else {
-    row = full.data as Record<string, unknown> | null
-    insertError = full.error
+  // spin_axis is degrees clockwise from 12:00 (see src/lib/spin-axis.ts).
+  if (data.spin_axis != null && !(Number.isFinite(data.spin_axis) && data.spin_axis >= 0 && data.spin_axis < 360)) {
+    return { error: 'Axis must be a clock time from 1:00 to 12:59.' }
   }
 
-  if (insertError) return { error: insertError.message }
-  return { metric: row }
+  // extension and vaa are new columns — insert fault-tolerantly
+  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
+  let { row, error: insertError } = await addPitchMetricRow(baseInsert)
+
+  // Until migration 020 makes spin_axis numeric, the column is integer and
+  // half-degree values (any odd minute, e.g. 8:45 = 262.5°) are rejected with
+  // 22P02. Save the nearest whole degree instead and say so.
+  let warning: string | undefined
+  if (insertError && data.spin_axis != null && !Number.isInteger(data.spin_axis) && isIntegerSyntaxError(insertError)) {
+    console.error('[addPitchMetric] pitch_metrics.spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', insertError)
+    const rounded = Math.round(data.spin_axis) % 360
+    const retry = await addPitchMetricRow({ ...baseInsert, spin_axis: rounded })
+    row = retry.row
+    insertError = retry.error
+    if (!insertError) warning = `Axis was rounded to ${degreesToClock(rounded)} because the database only stores whole degrees for now.`
+  }
+
+  if (insertError) return { error: describeDbError('addPitchMetric', insertError, 'Could not save this pitch.') }
+  return { metric: row, warning }
+}
+
+function isIntegerSyntaxError(error: { code?: string; message?: string }) {
+  return error.code === '22P02' && (error.message ?? '').includes('integer')
+}
+
+// Insert one pitch_metrics row, dropping extension/vaa if those columns are missing.
+async function addPitchMetricRow(insert: Record<string, unknown>) {
+  const full = await supabaseAdmin
+    .from('pitch_metrics')
+    .insert(insert)
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa')
+    .single()
+  if (!(full.error?.code === 'PGRST204' || full.error?.message?.includes('extension') || full.error?.message?.includes('vaa'))) {
+    return { row: full.data as Record<string, unknown> | null, error: full.error }
+  }
+  const core = { ...insert }
+  delete core.extension
+  delete core.vaa
+  const fallback = await supabaseAdmin
+    .from('pitch_metrics')
+    .insert(core)
+    .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+    .single()
+  return { row: fallback.data as Record<string, unknown> | null, error: fallback.error }
 }
 
 export async function saveReframe(clipId: string, reframe: { left: number; top: number; right: number; bottom: number } | null) {
