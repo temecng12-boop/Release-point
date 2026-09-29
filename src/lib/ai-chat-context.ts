@@ -3,10 +3,12 @@
 // The client sends only which clip or player the chat is about. Everything the
 // prompt says about the player (name, age group, position, pitch data,
 // checklist, notes) is loaded here, after checking that the caller is that
-// player's own coach or the player themself. The Supabase client is passed in
-// so this can be unit tested with a mock.
+// player's own coach, a coach on one of the player's teams, or the player
+// themself (not guardians). The Supabase client is passed in so this can be
+// unit tested with a mock.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { canUseAiCoachFor } from './auth/roster-access'
+import { teamCoachAccess, type AccessDb } from './clip-access'
 
 type Db = Pick<SupabaseClient, 'from'>
 
@@ -47,12 +49,13 @@ type PlayerRow = {
   position: string | null
   coach_id: string | null
   user_id: string | null
+  team_id: string | null
 }
 
 async function loadPlayer(db: Db, playerId: string): Promise<PlayerRow | null> {
   const { data } = await db
     .from('players')
-    .select('id, full_name, age_group, position, coach_id, user_id')
+    .select('id, full_name, age_group, position, coach_id, user_id, team_id')
     .eq('id', playerId)
     .maybeSingle()
   return (data as PlayerRow | null) ?? null
@@ -61,8 +64,8 @@ async function loadPlayer(db: Db, playerId: string): Promise<PlayerRow | null> {
 /**
  * Loads the AI coach context for `clipId` (a clip chat) or, if no clip is
  * given, `playerId` (the player-profile chat). Returns 404 when the target
- * doesn't exist or the caller isn't the player's own coach or the player.
- * Future: team coaches (upstream `team_coaches`) would be allowed here too.
+ * doesn't exist or the caller isn't the player's own coach, a coach on one of
+ * the player's teams (team_coaches), or the player.
  */
 export async function loadAiChatContext(
   db: Db,
@@ -84,7 +87,12 @@ export async function loadAiChatContext(
   }
 
   const player = await loadPlayer(db, playerId!)
-  if (!player || !canUseAiCoachFor(userId, player)) return { ok: false, status: 404 }
+  if (!player) return { ok: false, status: 404 }
+  if (!canUseAiCoachFor(userId, player)) {
+    // Team coaches read the same data they can see on the clip page.
+    const team = await teamCoachAccess(db as unknown as AccessDb, userId, player.id, player.team_id ?? null)
+    if (team !== 'yes') return { ok: false, status: 404 }
+  }
 
   let metrics: AiChatMetric[] = []
   let checklist: AiChatPhaseRow[] | null = null

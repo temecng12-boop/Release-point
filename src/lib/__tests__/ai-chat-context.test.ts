@@ -96,9 +96,30 @@ async function main() {
     assert(!queries.some((q) => q.table === 'pitch_metrics'), 'no pitch data is read when refused')
   }
   {
+    // A coach on one of the player's teams (team_coaches) may use it too.
+    const TEAM = 'ffffffff-0000-4000-8000-000000000001'
+    const teamWorld = (teamCoaches: Result) => {
+      const w = world()
+      const from = w.db.from.bind(w.db)
+      const extra = mockDb({
+        player_teams: () => ({ data: [{ team_id: TEAM }], error: null }),
+        team_coaches: (q) => q.ops.some((o) => o.name === 'eq' && o.args[0] === 'coach_id' && o.args[1] === OTHER) ? teamCoaches : { data: [], error: null },
+      })
+      ;(w.db as unknown as { from: (t: string) => unknown }).from = (t: string) =>
+        t === 'player_teams' || t === 'team_coaches' ? extra.db.from(t) : from(t)
+      return w
+    }
+    let r = await loadAiChatContext(teamWorld({ data: [{ team_id: TEAM }], error: null }).db, OTHER, { clipId: CLIP })
+    assert(r.ok, "coach on the player's team: allowed")
+    r = await loadAiChatContext(teamWorld({ data: [], error: null }).db, OTHER, { clipId: CLIP })
+    assert(!r.ok && r.status === 404, 'coach not on any of the player\'s teams: 404')
+    r = await loadAiChatContext(teamWorld({ data: null, error: { message: 'relation "team_coaches" does not exist' } }).db, OTHER, { clipId: CLIP })
+    assert(!r.ok && r.status === 404, 'team_coaches unavailable: 404 (fails closed)')
+  }
+  {
     const { db } = world()
     const r = await loadAiChatContext(db, GUARDIAN_USER, { clipId: CLIP })
-    assert(!r.ok && r.status === 404, 'guardian: 404 (AI coach is for the coach or the player)')
+    assert(!r.ok && r.status === 404, 'guardian: 404 (AI coach is for coaches and the player)')
   }
   {
     const { db } = world({ ...playerRow, coach_id: null })
