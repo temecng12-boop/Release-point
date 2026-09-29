@@ -91,7 +91,7 @@ export default async function HomePage() {
                     className="block px-8 py-4 bg-[#E8102A] hover:bg-[#C80E24] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(232,16,42,0.25)] hover:shadow-[0_8px_32px_rgba(232,16,42,0.35)]"
                     style={os}
                   >
-                    Start Free: Coaches
+                    Get Started: Coaches
                   </Link>
                 </MagneticButton>
                 <MagneticButton>
@@ -106,7 +106,7 @@ export default async function HomePage() {
               </div>
 
               <div className="flex items-center gap-5 flex-wrap">
-                {['Free for coaches', 'No credit card', 'All levels'].map((t) => (
+                {['Built for coaches', 'All levels'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -502,7 +502,7 @@ export default async function HomePage() {
               className="inline-block px-12 py-4 bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(232,16,42,0.3)] hover:shadow-[0_8px_40px_rgba(232,16,42,0.4)]"
               style={os}
             >
-              Start Free: Coaches
+              Get Started: Coaches
             </Link>
             <Link
               href="/auth/login"
@@ -512,7 +512,7 @@ export default async function HomePage() {
               Player Login
             </Link>
           </div>
-          <p className="text-xs text-white/20 mt-6">Free for coaches · No credit card required</p>
+          <p className="text-xs text-white/20 mt-6">Built for coaches and players</p>
         </div>
       </section>
 

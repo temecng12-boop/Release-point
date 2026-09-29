@@ -244,7 +244,7 @@ export default function AboutPage() {
         {/* CTA */}
         <section className="text-center">
           <h2 className="text-4xl text-[#0F1F33] mb-4" style={os}>Ready to get started?</h2>
-          <p className="text-[#456080] mb-8">Free to try. No credit card required.</p>
+          <p className="text-[#456080] mb-8">Built for coaches and players.</p>
           <Link
             href="/auth/signup"
             className="inline-block text-sm text-white px-10 py-4 rounded-lg transition-colors"
