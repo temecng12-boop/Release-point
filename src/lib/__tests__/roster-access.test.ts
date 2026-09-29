@@ -13,6 +13,7 @@ import {
   splitRosterByCoach,
   canDeleteClip,
   canDeleteClipItem,
+  canUseAiCoachFor,
   pickBullpenUpdates,
 } from '../auth/roster-access'
 
@@ -102,6 +103,13 @@ assert(canDeleteClipItem(PLAYER_USER, PLAYER_USER, owned), 'player deleting thei
 assert(!canDeleteClipItem(PLAYER_USER, COACH, owned), "player deleting the coach's note: refused")
 assert(!canDeleteClipItem(COACH, null, owned), 'note with no author: refused')
 assert(!canDeleteClipItem(COACH, COACH, null), 'unknown player: refused')
+
+section('canUseAiCoachFor (api/ai-chat)')
+assert(canUseAiCoachFor(COACH, owned), 'own coach: allowed')
+assert(canUseAiCoachFor(PLAYER_USER, owned), 'the player: allowed')
+assert(!canUseAiCoachFor(OTHER, owned), 'another coach: refused')
+assert(!canUseAiCoachFor(COACH, coachless), 'any coach for a coach-less player: refused')
+assert(!canUseAiCoachFor(COACH, null), 'unknown player: refused')
 
 section('pickBullpenUpdates (updateBullpenSession)')
 {

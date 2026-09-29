@@ -90,6 +90,11 @@ export function canDeleteClipItem(userId: string, createdBy: string | null | und
   return isPlayersOwnCoach(userId, player) || isThePlayer(userId, player)
 }
 
+/** Who may use the AI coach for a player's data: their own coach or the player. */
+export function canUseAiCoachFor(userId: string, player: PlayerAccessIds): boolean {
+  return isPlayersOwnCoach(userId, player) || isThePlayer(userId, player)
+}
+
 export type BullpenPitchBlock = { pitch_type: string; target: number; thrown: number; focus: string }
 export type BullpenSessionUpdates = {
   pitches?: BullpenPitchBlock[]

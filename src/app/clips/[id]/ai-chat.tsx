@@ -46,15 +46,11 @@ const AGENTS = {
   },
 }
 
+// The chat sends only the clip id; the server loads the player's details,
+// pitch data, checklist and notes itself after an access check. The other
+// props are kept for the existing callers but are no longer sent.
 export default function AIChat({
   clipId,
-  role,
-  playerName,
-  playerAgeGroup,
-  playerPosition,
-  metrics = [],
-  checklist = null,
-  coachNotes = null,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -102,16 +98,7 @@ export default function AIChat({
         body: JSON.stringify({
           messages: nextMessages,
           agent,
-          context: {
-            playerName,
-            ageGroup: playerAgeGroup,
-            position: playerPosition,
-            clipId,
-            viewerRole: role,
-            metrics,
-            checklist,
-            coachNotes,
-          },
+          context: { clipId },
         }),
       })
 
