@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
 export async function uploadAvatar(formData: FormData) {
   const supabase = await createClient()
@@ -46,21 +47,51 @@ export async function updatePlayer(playerId: string, data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { teamIds, ...fields } = data
+  // Only the player's own coach may change anything, including team links.
+  const { data: player } = await supabaseAdmin
+    .from('players')
+    .select('coach_id')
+    .eq('id', playerId)
+    .maybeSingle()
+  if (!isPlayersOwnCoach(user.id, player)) return { error: 'Not authorized' }
+
+  // Server action arguments come from the client: keep only the editable
+  // fields, and only team ids for teams this coach owns.
+  const fields = pickCoachEditableFields((data ?? {}) as Record<string, unknown>)
+  const teamIds = Array.isArray(data?.teamIds)
+    ? data.teamIds.filter((t): t is string => typeof t === 'string')
+    : undefined
+
+  let ownedTeamIds: string[] = []
+  if (teamIds !== undefined) {
+    const { data: ownedTeams, error: teamsError } = await supabaseAdmin
+      .from('teams')
+      .select('id')
+      .eq('coach_id', user.id)
+    if (teamsError) return { error: teamsError.message }
+    ownedTeamIds = (ownedTeams ?? []).map((t) => t.id as string)
+    if (teamIdsNotOwned(teamIds, ownedTeamIds).length > 0) return { error: 'Invalid team' }
+  }
 
   if (fields.full_name) fields.full_name = toTitleCase(fields.full_name)
 
-  const { error } = await supabaseAdmin
-    .from('players')
-    .update(fields)
-    .eq('id', playerId)
-    .eq('coach_id', user.id)
+  if (Object.keys(fields).length > 0) {
+    const { error } = await supabaseAdmin
+      .from('players')
+      .update(fields)
+      .eq('id', playerId)
+      .eq('coach_id', user.id)
 
-  if (error) return { error: error.message }
+    if (error) return { error: error.message }
+  }
 
-  // Sync team assignments
-  if (teamIds !== undefined) {
-    await supabaseAdmin.from('player_teams').delete().eq('player_id', playerId)
+  // Sync team assignments, limited to this coach's own teams.
+  if (teamIds !== undefined && ownedTeamIds.length > 0) {
+    await supabaseAdmin
+      .from('player_teams')
+      .delete()
+      .eq('player_id', playerId)
+      .in('team_id', ownedTeamIds)
     if (teamIds.length > 0) {
       await supabaseAdmin.from('player_teams').insert(
         teamIds.map((tid) => ({ player_id: playerId, team_id: tid }))
