@@ -9,6 +9,7 @@ import {
   teamIdsNotOwned,
   pickCoachEditableFields,
   profilePageAccess,
+  splitRosterByCoach,
 } from '../auth/roster-access'
 
 let passed = 0
@@ -54,6 +55,20 @@ assert(profilePageAccess(COACH, 'coach', null) === 'not-found', 'unknown player:
 assert(profilePageAccess(COACH, 'player', { coach_id: COACH }) === 'redirect-dashboard', 'player role: sent to own dashboard')
 assert(profilePageAccess(COACH, 'guardian', { coach_id: COACH }) === 'redirect-dashboard', 'guardian role: sent to dashboard (which redirects to /guardian)')
 assert(profilePageAccess(COACH, undefined, { coach_id: COACH }) === 'redirect-dashboard', 'no profile: sent to dashboard')
+
+section('splitRosterByCoach (team page roster)')
+{
+  const rows = [
+    { id: 'p1', coach_id: COACH },
+    { id: 'p2', coach_id: OTHER },
+    { id: 'p3', coach_id: null },
+    { id: 'p4', coach_id: COACH },
+  ]
+  const { own, others } = splitRosterByCoach(COACH, rows)
+  assert(JSON.stringify(own.map((r) => r.id)) === '["p1","p4"]', 'own players: only coach_id = caller')
+  assert(JSON.stringify(others.map((r) => r.id)) === '["p2","p3"]', "other coaches' and coach-less players are split out")
+  assert(splitRosterByCoach(COACH, []).own.length === 0, 'empty roster')
+}
 
 section('Results')
 const total = passed + failed

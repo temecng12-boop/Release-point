@@ -44,3 +44,17 @@ export function profilePageAccess(
   if (role !== 'coach') return 'redirect-dashboard'
   return isPlayersOwnCoach(userId, player) ? 'view' : 'not-found'
 }
+
+/**
+ * Splits a team roster into the caller's own players and everyone else
+ * (other coaches' players, or players with no coach).
+ */
+export function splitRosterByCoach<T extends { coach_id: string | null }>(
+  userId: string,
+  players: readonly T[],
+): { own: T[]; others: T[] } {
+  const own: T[] = []
+  const others: T[] = []
+  for (const p of players) (isPlayersOwnCoach(userId, p) ? own : others).push(p)
+  return { own, others }
+}
