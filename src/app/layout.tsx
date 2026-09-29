@@ -20,11 +20,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: { default: "Release Point", template: "%s | Release Point" },
-  description: "Pitching and hitting mechanics analysis for coaches and players. Upload video, track Rapsodo data, and get AI-powered feedback.",
+  description: "Pitching and hitting mechanics analysis for coaches and players. Upload video, track pitch data, and get AI-powered feedback.",
   metadataBase: new URL("https://releasepointai.com"),
   openGraph: {
     title: "Release Point",
-    description: "Video analysis and Rapsodo metrics for baseball coaches and players.",
+    description: "Video analysis and pitch metrics for baseball coaches and players.",
     url: "https://releasepointai.com",
     siteName: "Release Point",
     type: "website",

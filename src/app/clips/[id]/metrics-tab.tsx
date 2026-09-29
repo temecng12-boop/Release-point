@@ -273,7 +273,7 @@ export default function MetricsTab({
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4 space-y-4">
         <div>
           <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Import Pitch Analytics</p>
-          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Works with any pitch tracking file: TrackMan, Rapsodo, or Hawk-Eye</p>
+          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Works with TrackMan pitch tracking files</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -285,7 +285,7 @@ export default function MetricsTab({
               className="w-full border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
             >
               <span className="block font-medium" style={oswald}>CSV</span>
-              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan, Rapsodo, Hawk-Eye</span>
+              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan</span>
             </button>
           </div>
 
@@ -418,7 +418,7 @@ export default function MetricsTab({
           <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between">
             <div>
               <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Pitch Analytics</p>
-              <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Compatible with TrackMan, Rapsodo, and Hawk-Eye exports</p>
+              <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Compatible with TrackMan exports</p>
             </div>
             <p className="text-[10px] text-[#3D5166]/50">{metrics.length} pitch{metrics.length !== 1 ? 'es' : ''}</p>
           </div>

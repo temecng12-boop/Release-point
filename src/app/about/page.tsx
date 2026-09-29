@@ -75,7 +75,7 @@ export default function AboutPage() {
             One platform.<br />Film, metrics, and coaching, connected.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point gives coaches a structured place to upload film, attach Rapsodo and Trackman data, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
+            Release Point gives coaches a structured place to upload film, attach Trackman data, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
           </p>
           <div className="space-y-4">
             {[
@@ -88,7 +88,7 @@ export default function AboutPage() {
                 desc: 'Every clip gets a phase-by-phase checklist: 7 delivery phases for pitchers (windup through follow through), 7 swing phases for hitters (stance through extension). Each phase gets a rating and a coaching note.',
               },
               {
-                label: 'Rapsodo & Trackman Metrics',
+                label: 'Trackman Metrics',
                 desc: 'Coaches enter session-level data directly in the platform: velocity, spin rate, spin axis, break, extension, and VAA for pitchers; exit velocity, launch angle, barrel rate, bat speed, and attack angle for hitters. Players see their numbers in context.',
               },
               {
@@ -124,7 +124,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Rapsodo/Trackman metric frameworks. They are not generic sports chatbots. They know what a 2400 RPM four-seam with 1:00 spin axis means at the high school level versus the professional level.
+            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Trackman metric frameworks. They are not generic sports chatbots. They know what a 2400 RPM four-seam with 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -207,7 +207,7 @@ export default function AboutPage() {
               },
               {
                 label: 'Metric Integrations',
-                desc: 'Rapsodo and Trackman data is entered directly into the platform and stored alongside the film that produced it, keeping the full picture in one record.',
+                desc: 'Trackman data is entered directly into the platform and stored alongside the film that produced it, keeping the full picture in one record.',
               },
             ].map(item => (
               <div key={item.label} className="bg-white rounded-xl border border-[#DDE4ED] p-5">

@@ -336,7 +336,7 @@ export default async function HomePage() {
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
-              <p className="text-[10px] text-slate-400 mb-5">TrackMan · Rapsodo · Hawk-Eye · CSV · PDF</p>
+              <p className="text-[10px] text-slate-400 mb-5">TrackMan · CSV · PDF</p>
               <PitchMetrics />
             </div>
           </SpotlightCard>
