@@ -2,6 +2,12 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatPhilosophiesForPrompt } from '@/lib/philosophies'
+import { loadClipContext } from '@/lib/ai-coach/clip-context'
+import {
+  VIDEO_ACCESS_NOTE, cleanCoachNotes, formatChecklist, formatClipDetails, formatHittingMetrics, formatMetrics,
+  formatTimestampNotes,
+  type CoachClipDetails, type CoachHittingMetrics, type CoachMetric, type CoachPhaseRow, type CoachTimestampNote,
+} from '@/lib/ai-coach/prompt'
 
 const client = new Anthropic()
 
@@ -13,45 +19,6 @@ const AGE_BENCHMARKS = {
   'Professional':  { velocity: { avg: 94, good: 97, elite: 99 }, spin: { avg: 2400, good: 2500, elite: 2700 }, spinEff: { avg: 92, good: 96 } },
 }
 
-type Metric = {
-  pitch_type: string | null
-  velocity: number | null
-  spin_rate: number | null
-  spin_axis: number | null
-  horizontal_break: number | null
-  vertical_break: number | null
-}
-
-type PhaseRow = {
-  name: string
-  rating: 'good' | 'needs_work' | 'critical' | null
-  note: string
-}
-
-function formatMetrics(metrics: Metric[]): string {
-  if (!metrics.length) return 'No pitch metrics uploaded for this session.'
-  return metrics.map(m => {
-    const parts: string[] = []
-    if (m.pitch_type) parts.push(`Pitch: ${m.pitch_type}`)
-    if (m.velocity != null) parts.push(`Velo: ${m.velocity} mph`)
-    if (m.spin_rate != null) parts.push(`Spin: ${m.spin_rate} rpm`)
-    if (m.spin_axis != null) parts.push(`Axis: ${m.spin_axis}°`)
-    if (m.horizontal_break != null) parts.push(`HB: ${m.horizontal_break}"`)
-    if (m.vertical_break != null) parts.push(`VB: ${m.vertical_break}"`)
-    return parts.join(' | ')
-  }).join('\n')
-}
-
-function formatChecklist(checklist: PhaseRow[] | null): string {
-  if (!checklist || checklist.length === 0) return 'No mechanics checklist completed for this clip.'
-  const ratingLabel = { good: '✓ Good', needs_work: '△ Needs Work', critical: '✗ Critical' }
-  return checklist.map(row => {
-    const rating = row.rating ? ratingLabel[row.rating] : '— Not rated'
-    const note = row.note?.trim() ? ` — "${row.note}"` : ''
-    return `${row.name}: ${rating}${note}`
-  }).join('\n')
-}
-
 const HITTING_BENCHMARKS = {
   'Youth':         { ev: { avg: 60, good: 72, elite: 80  }, la: { sweet: '8-32°', ideal: '12-25°' } },
   'Middle School': { ev: { avg: 72, good: 80, elite: 87  }, la: { sweet: '8-32°', ideal: '12-25°' } },
@@ -60,13 +27,24 @@ const HITTING_BENCHMARKS = {
   'Professional':  { ev: { avg: 90, good: 96, elite: 103 }, la: { sweet: '8-32°', ideal: '14-28°' } },
 }
 
-function buildBarryPrompt(playerName: string, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null): string {
+// Shared by Randy and Barry: what the model can see, and the clip it's about.
+function buildClipBlock(clipText: string, timestampNotesText: string): string {
+  return `${VIDEO_ACCESS_NOTE}
+
+CLIP CONTEXT (TEXT ONLY — YOU CAN'T SEE THE VIDEO):
+${clipText}
+${timestampNotesText ? `\nTIMESTAMPED NOTES FROM THE COACH:\n${timestampNotesText}\n` : ''}`
+}
+
+function buildBarryPrompt(playerName: string | null, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null, clipBlock: string): string {
   const hb = ageGroup ? HITTING_BENCHMARKS[ageGroup as keyof typeof HITTING_BENCHMARKS] : null
   return `You are Barry — built after Barry Bonds. The greatest hitter who ever lived by the numbers, and the most disciplined one. Bonds walked 232 times in a single season because he refused to give pitchers anything to work with. His approach was simple: know your zone, know your pitch, and make the pitcher come to you. When his pitch came, he didn't miss it.
 
 Barry Bonds didn't have the biggest swing. He had the best information. He knew before the ball was released whether it was his pitch. He talked about watching the spin out of the pitcher's hand, reading the grip, knowing the situation. The numbers — exit velocity, launch angle, barrel rate — are the proof of that approach. When the approach is right, the numbers follow.
 
 YOUR VOICE: calm, precise, no wasted words. You don't get excited about mechanics for their own sake. You care about what the data tells you about the swing decision and the swing path. When the numbers are good, you say what made them good. When they're off, you trace it back to the specific thing that went wrong — approach, timing, load, or path — and you say it plainly.
+
+${clipBlock}
 
 PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
 
@@ -106,32 +84,63 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
 
-  const { messages, agent = 'randy', context } = await req.json()
+  const body = await req.json().catch(() => null) as { messages?: unknown; agent?: unknown; context?: Record<string, unknown> } | null
+  const messages = Array.isArray(body?.messages)
+    ? (body.messages as { role?: unknown; content?: unknown }[])
+        .filter(m => (m?.role === 'user' || m?.role === 'assistant') && typeof m.content === 'string' && m.content.trim() !== '')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
+    : []
+  if (messages.length === 0) return new Response('No message to answer.', { status: 400 })
+  const agent = body?.agent === 'barry' ? 'barry' : 'randy'
+  const context = body?.context && typeof body.context === 'object' ? body.context : {}
 
-  const {
-    playerName,
-    ageGroup,
-    position,
-    metrics = [],
-    checklist = null,
-    coachNotes = null,
-  } = context
+  let playerName = typeof context.playerName === 'string' ? context.playerName : null
+  let ageGroup = typeof context.ageGroup === 'string' ? context.ageGroup : null
+  let position = typeof context.position === 'string' ? context.position : null
+  let metrics: CoachMetric[] = Array.isArray(context.metrics) ? context.metrics as CoachMetric[] : []
+  let hittingMetrics: CoachHittingMetrics | null = null
+  let checklist: CoachPhaseRow[] | null = Array.isArray(context.checklist) ? context.checklist as CoachPhaseRow[] : null
+  let coachNotes = cleanCoachNotes(context.coachNotes)
+  let clipDetails: CoachClipDetails | null = null
+  let timestampNotes: CoachTimestampNote[] = []
+
+  // On a clip page, load the clip's context on the server (fresh, and only if
+  // this user may see the clip) instead of trusting what the page sent.
+  if (typeof context.clipId === 'string' && context.clipId) {
+    const loaded = await loadClipContext(user.id, context.clipId)
+    if (!loaded.ok) return new Response(loaded.message, { status: loaded.status })
+    const c = loaded.context
+    playerName = c.playerName ?? playerName
+    ageGroup = c.ageGroup
+    position = c.position
+    metrics = c.metrics
+    hittingMetrics = c.hittingMetrics
+    checklist = c.checklist
+    coachNotes = cleanCoachNotes(c.coachNotes)
+    clipDetails = c.clip
+    timestampNotes = c.timestampNotes
+  }
 
   const benchmarks    = ageGroup ? AGE_BENCHMARKS[ageGroup as keyof typeof AGE_BENCHMARKS] : null
-  const metricsText   = formatMetrics(metrics as Metric[])
-  const checklistText = formatChecklist(checklist as PhaseRow[] | null)
+  const checklistText = formatChecklist(checklist)
+  const clipBlock     = buildClipBlock(formatClipDetails(clipDetails), clipDetails ? formatTimestampNotes(timestampNotes) : '')
 
   let systemPrompt: string
 
   if (agent === 'barry') {
-    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes)
+    // Barry reads the session's hitting metrics; pitch metrics are Randy's.
+    const metricsText = formatHittingMetrics(hittingMetrics)
+    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes, clipBlock)
   } else {
+    const metricsText = formatMetrics(metrics)
     const philosophiesText = formatPhilosophiesForPrompt()
     systemPrompt = `You are Randy — built after Randy Johnson, the Big Unit. 6'10". Four Cy Youngs. 4,875 strikeouts. The most dominant left-handed pitcher who ever lived, and someone who reinvented himself mechanically in his mid-30s to become even better. You don't sugarcoat. You don't guess. You look at the numbers, you look at what the mechanics evaluation says, and you tell a pitcher exactly what's happening and why.
 
 Randy Johnson's philosophy: attack the zone, make hitters uncomfortable, and understand that velocity without location is just noise. He didn't try to blow everyone away — he threw to spots and let the shape of his pitches do the work. His slider didn't just break. It started in the zone and disappeared. That's the standard.
 
 YOUR VOICE: blunt, confident, specific. Not mean — just doesn't waste words. If something is wrong, you say it plainly and explain what to fix. If something is right, you say that too. You don't lecture. You say one thing at a time and make it land.
+
+${clipBlock}
 
 PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
 
@@ -182,10 +191,7 @@ Quote specific numbers from the session. If a metric isn't there, say so — nev
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      messages: messages.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
+      messages,
     })
 
     const readable = new ReadableStream({

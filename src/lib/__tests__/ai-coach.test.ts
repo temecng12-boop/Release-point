@@ -11,6 +11,7 @@
  */
 
 import { PHILOSOPHIES, ACTIVE_PHILOSOPHIES, formatPhilosophiesForPrompt, type Philosophy } from '../philosophies'
+import { formatMetrics } from '../ai-coach/prompt'
 
 // ─── Minimal test harness ─────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ const MOCK_METRICS = [
     pitch_type: '4-Seam Fastball',
     velocity: 84,
     spin_rate: 2310,
-    spin_axis: 180,    // 12:00 — good backspin axis
+    spin_axis: 0,      // stored as degrees clockwise from 12:00, so 0 = 12:00 (good backspin axis)
     horizontal_break: -2.1,
     vertical_break: 14.8,  // slightly below expected for this spin
   },
@@ -55,20 +56,7 @@ const MOCK_CHECKLIST = [
 
 const MOCK_COACH_NOTES = 'Kid has great arm but loses everything at front foot contact — knee caves, no block, all the velo bleeds out.'
 
-// ─── Helpers that mirror the route logic ─────────────────────────────────────
-
-function formatMetrics(metrics: typeof MOCK_METRICS): string {
-  return metrics.map(m => {
-    const parts: string[] = []
-    if (m.pitch_type)           parts.push(`Pitch: ${m.pitch_type}`)
-    if (m.velocity != null)     parts.push(`Velo: ${m.velocity} mph`)
-    if (m.spin_rate != null)    parts.push(`Spin: ${m.spin_rate} rpm`)
-    if (m.spin_axis != null)    parts.push(`Axis: ${m.spin_axis}°`)
-    if (m.horizontal_break != null) parts.push(`HB: ${m.horizontal_break}"`)
-    if (m.vertical_break != null)   parts.push(`VB: ${m.vertical_break}"`)
-    return parts.join(' | ')
-  }).join('\n')
-}
+// ─── Helpers (formatMetrics is the real one from src/lib/ai-coach/prompt.ts) ──
 
 function formatChecklist(checklist: typeof MOCK_CHECKLIST): string {
   const ratingLabel = { good: '✓ Good', needs_work: '△ Needs Work', critical: '✗ Critical' }
@@ -152,7 +140,7 @@ const checklistText = formatChecklist(MOCK_CHECKLIST)
 
 // Verify mock data surfaces expected signals
 assert(metricsText.includes('2310 rpm'), 'Spin rate present in formatted metrics')
-assert(metricsText.includes('180°'),     'Spin axis (12:00 proxy) present')
+assert(metricsText.includes('Axis: 12:00 tilt'), 'Spin axis shown as 12:00 clock tilt')
 assert(metricsText.includes('14.8"'),    'VB (below-expected for spin) present')
 
 assert(checklistText.includes('✗ Critical'), 'Critical rating appears in checklist')
