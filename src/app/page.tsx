@@ -6,10 +6,14 @@ import SpotlightCard from '@/components/spotlight-card'
 import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
 import PitchMetrics from '@/components/pitch-metrics'
+import { createClient } from '@/lib/supabase/server'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <div className="min-h-screen bg-white text-slate-950 overflow-x-hidden">
 
@@ -25,12 +29,20 @@ export default function HomePage() {
       >
         <Logo size="md" wordmarkClass="inline" />
         <nav className="flex items-center gap-1">
-          <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2" style={os}>
-            Sign In
-          </Link>
-          <Link href="/auth/signup" className="text-xs bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
-            Get Started
-          </Link>
+          {user ? (
+            <Link href="/dashboard" className="text-xs bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2" style={os}>
+                Sign In
+              </Link>
+              <Link href="/auth/signup" className="text-xs bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
+                Get Started
+              </Link>
+            </>
+          )}
         </nav>
       </header>
 
