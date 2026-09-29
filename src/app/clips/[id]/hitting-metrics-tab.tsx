@@ -74,7 +74,7 @@ export default function HittingMetricsTab({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[#3D5166]" style={os}>Hitting Data</p>
-          <p className="text-[11px] text-[#8096AE] mt-0.5">Trackman / Rapsodo session stats</p>
+          <p className="text-[11px] text-[#8096AE] mt-0.5">Trackman session stats</p>
         </div>
         {isCoach && hasAny && (
           <button

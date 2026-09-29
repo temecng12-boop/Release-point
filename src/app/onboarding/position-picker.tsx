@@ -13,7 +13,7 @@ const CARDS: { value: Position; label: string; sub: string; points: string[] }[]
     value: 'pitcher',
     label: 'Pitcher',
     sub: 'I take the mound',
-    points: ['Fastball & breaking ball mechanics', 'Rapsodo spin rate & axis analysis', 'Release point & arm path tracking'],
+    points: ['Fastball & breaking ball mechanics', 'Spin rate & axis analysis', 'Release point & arm path tracking'],
   },
   {
     value: 'hitter',

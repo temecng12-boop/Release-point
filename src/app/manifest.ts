@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Release Point',
     short_name: 'Release Point',
-    description: 'Pitching and hitting mechanics analysis for coaches and players.',
+    description: 'Pitching mechanics analysis for coaches and players.',
     start_url: '/dashboard',
     scope: '/',
     display: 'standalone',

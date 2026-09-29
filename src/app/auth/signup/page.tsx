@@ -136,8 +136,8 @@ function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void
         {
           role: 'coach' as const,
           title: 'Coach',
-          desc: 'Manage your roster, upload and annotate clips, import Rapsodo metrics, and track player development.',
-          tags: ['Teams', 'Video Analysis', 'Rapsodo', 'AI Coach'],
+          desc: 'Manage your roster, upload and annotate clips, import pitch metrics, and track player development.',
+          tags: ['Teams', 'Video Analysis', 'Pitch Metrics', 'AI Coach'],
         },
         {
           role: 'player' as const,
@@ -239,7 +239,7 @@ export default function SignupPage() {
           <div className="space-y-6">
             {[
               { n: '01', title: 'Video Analysis', desc: 'Frame-by-frame mechanics breakdown with canvas annotation tools' },
-              { n: '02', title: 'Rapsodo',         desc: 'Import pitch metrics: velocity, spin, break, benchmarked automatically' },
+              { n: '02', title: 'Pitch Metrics',   desc: 'Import pitch metrics: velocity, spin, break, benchmarked automatically' },
               { n: '03', title: 'AI Coach',         desc: 'Data-backed analysis tied to your player\'s age group and real numbers' },
               { n: '04', title: 'Team Management', desc: 'Organize players by team and age group, share clips instantly' },
             ].map((f) => (

@@ -303,7 +303,7 @@ function MetricsSummary({ metrics }: { metrics: Metric[] }) {
   if (metrics.length === 0) {
     return (
       <div className="bg-white border border-[#DDE4ED] rounded-xl px-6 py-12 text-center shadow-sm">
-        <p className="text-sm text-[#3D5166]">No Rapsodo metrics uploaded yet.</p>
+        <p className="text-sm text-[#3D5166]">No pitch metrics uploaded yet.</p>
         <p className="text-xs text-[#3D5166] mt-2">Upload a CSV from a clip to start tracking pitch data.</p>
       </div>
     )

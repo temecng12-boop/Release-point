@@ -39,7 +39,7 @@ export default function PrivacyPage() {
 
 **Video and media files:** Clips you upload, voice recordings attached to clips, and any annotations made on those clips.
 
-**Performance metrics:** Pitch data imported from Rapsodo CSV exports (velocity, spin rate, spin axis, break measurements).
+**Performance metrics:** Pitch data imported from CSV and PDF exports (velocity, spin rate, spin axis, break measurements).
 
 **Usage data:** Timestamps, clip notes, and coaching feedback entered into the platform.
 
@@ -77,7 +77,7 @@ If you believe a child under 13 has been added to the platform without proper pa
           },
           {
             title: '6. Video and Performance Data',
-            body: `Videos, voice recordings, and Rapsodo metrics uploaded to Release Point are stored securely in Supabase Storage and are accessible only to:
+            body: `Videos, voice recordings, and pitch metrics uploaded to Release Point are stored securely in Supabase Storage and are accessible only to:
 
 - The coach who uploaded the content
 - The player the content is associated with

@@ -321,7 +321,7 @@ export default async function HomePage() {
             </div>
           </SpotlightCard>
 
-          {/* Rapsodo */}
+          {/* Pitch data */}
           <SpotlightCard
             className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
@@ -336,7 +336,7 @@ export default async function HomePage() {
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
-              <p className="text-[10px] text-slate-400 mb-5">TrackMan · Rapsodo · Hawk-Eye · CSV · PDF</p>
+              <p className="text-[10px] text-slate-400 mb-5">TrackMan · CSV · PDF</p>
               <PitchMetrics />
             </div>
           </SpotlightCard>

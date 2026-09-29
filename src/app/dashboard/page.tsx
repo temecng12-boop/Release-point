@@ -432,7 +432,7 @@ export default async function DashboardPage() {
                 <div className="grid sm:grid-cols-3 gap-3">
                   {[
                     { title: 'Upload a Clip', desc: 'Film your bullpen or game appearance and upload it. Your coach gets notified instantly.' },
-                    { title: 'Track Metrics', desc: 'Your coach uploads Rapsodo data linked to your clips: velocity, spin rate, movement.' },
+                    { title: 'Track Metrics', desc: 'Your coach uploads pitch data linked to your clips: velocity, spin rate, movement.' },
                     { title: 'Get Feedback',  desc: 'Coaches draw directly on your video and leave voice notes. See exactly what to work on.' },
                   ].map(card => (
                     <div key={card.title} className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>

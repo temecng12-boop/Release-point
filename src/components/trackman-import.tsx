@@ -53,7 +53,7 @@ export default function TrackmanImport({ onImport }: Props) {
         ) : (
           <>
             <p className="text-sm text-[#3D5166]">Drop your pitch data PDF here</p>
-            <p className="text-xs text-[#3D5166]/60 mt-0.5">or click to browse · TrackMan, Rapsodo, Hawk-Eye</p>
+            <p className="text-xs text-[#3D5166]/60 mt-0.5">or click to browse · TrackMan</p>
           </>
         )}
       </div>
