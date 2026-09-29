@@ -387,6 +387,8 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   // player's own coach may write lesson files.
   const decision = await decideStorageAccess(supabaseAdmin, user.id, 'lessons', lessonPath, 'write')
   if (!decision.allowed || decision.playerId !== clip.player_id.toLowerCase()) return { error: 'Not authorized' }
+  const consent = await checkUploadConsent(supabaseAdmin, clip.player_id)
+  if (!consent.ok) return { error: consent.error }
   const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
   if (error) return { error: error.message }
   // Re-record: remove the previous recording once the new one is attached.
@@ -456,6 +458,8 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
   const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
   if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: 'Not authorized' }
   if (!isVoicePathFor(voicePath, clip.player_id, clipId)) return { error: 'Invalid storage path' }
+  const consent = await checkUploadConsent(supabaseAdmin, clip.player_id)
+  if (!consent.ok) return { error: consent.error }
 
   const { error } = await supabaseAdmin
     .from('clips')
