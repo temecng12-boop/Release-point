@@ -124,7 +124,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Trackman metric frameworks. They are not generic sports chatbots. They know what a 2400 RPM four-seam with 1:00 spin axis means at the high school level versus the professional level.
+            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and Trackman metric frameworks. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">

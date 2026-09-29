@@ -48,7 +48,7 @@ export default function WaitlistPage() {
             'Live coach annotations',
             'Timestamp feedback',
             'Side-by-side compare',
-            'Pitch metrics',
+            'Pitch & swing metrics',
             'AI coaching assistant',
           ].map(f => (
             <span
@@ -73,7 +73,7 @@ export default function WaitlistPage() {
 
         {/* Social proof */}
         <p className="mt-8 text-[#8096AE] text-xs tracking-wider" style={os}>
-          Built by coaches. Trusted by players.
+          Built by coaches. Made for players.
         </p>
       </main>
 

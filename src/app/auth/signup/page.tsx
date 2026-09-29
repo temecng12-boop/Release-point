@@ -136,13 +136,13 @@ function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void
         {
           role: 'coach' as const,
           title: 'Coach',
-          desc: 'Manage your roster, upload and annotate clips, import pitch metrics, and track player development.',
-          tags: ['Teams', 'Video Analysis', 'Pitch Metrics', 'AI Coach'],
+          desc: 'Manage your roster, upload and annotate clips, import pitch metrics, enter swing metrics, and track player development.',
+          tags: ['Teams', 'Video Analysis', 'Pitch & Swing Metrics', 'AI Coach'],
         },
         {
           role: 'player' as const,
           title: 'Player',
-          desc: 'Review your clips and coach annotations, track your pitch metrics, and follow your progress over time.',
+          desc: 'Review your clips and coach annotations, track your pitching or hitting metrics, and follow your progress over time.',
           tags: ['Clip Review', 'Metrics', 'Coach Feedback'],
         },
       ].map(item => (

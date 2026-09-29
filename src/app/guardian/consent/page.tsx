@@ -46,7 +46,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
                 Video is accessible only to you, the player, and the coach who invited you. It is never shared publicly. You may request deletion at any time by contacting your coach.
               </p>
               <p className="text-xs text-[#3D5166] leading-relaxed">
-                This consent covers: video recordings, annotations, pitch metrics, and AI-generated coaching notes attached to this player's profile.
+                This consent covers: video recordings, annotations, pitching and hitting metrics, and AI-generated coaching notes attached to this player's profile.
               </p>
             </div>
 

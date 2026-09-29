@@ -400,7 +400,7 @@ export default async function DashboardPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
                   <h1 className="text-2xl text-slate-950 leading-tight truncate tracking-tight" style={os}>
-                    {playerRow?.full_name ?? 'Pitcher'}
+                    {playerRow?.full_name ?? 'Player'}
                   </h1>
                   <p className="text-sm text-slate-500 mt-1">
                     {(myClips?.length ?? 0) === 0
@@ -431,8 +431,8 @@ export default async function DashboardPage() {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-3 gap-3">
                   {[
-                    { title: 'Upload a Clip', desc: 'Film your bullpen or game appearance and upload it. Your coach gets notified instantly.' },
-                    { title: 'Track Metrics', desc: 'Your coach uploads pitch data linked to your clips: velocity, spin rate, movement.' },
+                    { title: 'Upload a Clip', desc: 'Film your bullpen, cage work, or game appearance and upload it. Your coach gets notified instantly.' },
+                    { title: 'Track Metrics', desc: 'Your coach adds pitch or swing data linked to your clips: velocity, spin rate, exit velocity, bat speed.' },
                     { title: 'Get Feedback',  desc: 'Coaches draw directly on your video and leave voice notes. See exactly what to work on.' },
                   ].map(card => (
                     <div key={card.title} className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
