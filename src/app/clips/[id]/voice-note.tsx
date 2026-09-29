@@ -161,7 +161,7 @@ export default function VoiceNote({
         <audio controls src={voiceUrl} className="w-full" style={{ height: 40 }} />
       ) : (
         <p className="text-sm text-slate-400">
-          {isCoach ? 'No voice note yet. Hit Record above.' : 'No voice note from your coach yet.'}
+          {isCoach ? (canAddMedia ? 'No voice note yet. Hit Record above.' : 'No voice note yet.') : 'No voice note from your coach yet.'}
         </p>
       )}
     </div>
