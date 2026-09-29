@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { clockToDegrees, degreesToClock, parseClockAxis } from '../spin-axis'
+import { clockToDegrees, degreesToClock, isIntegerSyntaxError, parseClockAxis, parseImportedSpinAxis, roundAxisForIntegerColumn, trackmanSpinAxisToDegrees } from '../spin-axis'
 
 function degreesOf(input: string): number | null {
   const r = parseClockAxis(input)
@@ -63,4 +63,61 @@ test('every minute from 1:00 to 12:59 round-trips exactly', () => {
       assert.equal(degreesToClock(deg!), clock)
     }
   }
+})
+
+// ── TrackMan import (RP: SpinAxis 180° = 12:00) ──────────────────────────────
+
+test('TrackMan SpinAxis → app degrees at the 4 cardinal points', () => {
+  assert.equal(trackmanSpinAxisToDegrees(180), 0)    // 12:00 pure backspin
+  assert.equal(trackmanSpinAxisToDegrees(270), 90)   // 3:00
+  assert.equal(trackmanSpinAxisToDegrees(0), 180)    // 6:00 pure topspin
+  assert.equal(trackmanSpinAxisToDegrees(90), 270)   // 9:00
+})
+
+test('TrackMan SpinAxis wraps around 0/360', () => {
+  assert.equal(trackmanSpinAxisToDegrees(360), 180)
+  assert.equal(trackmanSpinAxisToDegrees(179), 359)
+  assert.equal(trackmanSpinAxisToDegrees(181), 1)
+  assert.equal(trackmanSpinAxisToDegrees(179.5), 359.5)
+  assert.equal(trackmanSpinAxisToDegrees(540), 0)
+  assert.equal(trackmanSpinAxisToDegrees(-90), 90)
+  assert.equal(trackmanSpinAxisToDegrees(179.999), 0)    // rounds to 360 → 0, never 360
+  assert.equal(trackmanSpinAxisToDegrees(Number.NaN), null)
+  assert.equal(trackmanSpinAxisToDegrees(Infinity), null)
+})
+
+test('TrackMan degrees agree with TrackMan Tilt and with manual clock entry (round trip)', () => {
+  // TrackMan Tilt = (SpinAxis − 180) / 30 hours; e.g. SpinAxis 225 ↔ Tilt 1:30
+  const cases: [number, string][] = [[180, '12:00'], [270, '3:00'], [0, '6:00'], [90, '9:00'], [225, '1:30'], [215, '1:10'], [247.914355, '2:16'], [135, '10:30']]
+  for (const [tm, clock] of cases) {
+    const app = trackmanSpinAxisToDegrees(tm)!
+    assert.equal(degreesToClock(app), clock, `${tm}° → ${clock}`)
+    const manual = parseClockAxis(clock)
+    assert.ok(manual.ok)
+    if (Number.isInteger(tm)) assert.equal(manual.degrees, app, `manual ${clock} stores the same degrees as TrackMan ${tm}`)
+  }
+  for (const clock of ['12:00', '3:00', '6:00', '9:00', '1:15', '8:45', '11:59', '12:01']) {
+    const r = parseClockAxis(clock)
+    assert.ok(r.ok && r.degrees != null)
+    assert.equal(degreesToClock(r.degrees), clock)
+  }
+})
+
+test('imported CSV cells: numbers are TrackMan degrees, clock strings are used as-is', () => {
+  assert.equal(parseImportedSpinAxis('180'), 0)
+  assert.equal(parseImportedSpinAxis(' 213.4 '), 33.4)
+  assert.equal(parseImportedSpinAxis('0'), 180)          // 0 is a real value, not "missing"
+  assert.equal(parseImportedSpinAxis('1:15'), 37.5)      // TrackMan Tilt column / clock strings
+  assert.equal(parseImportedSpinAxis('12:00'), 0)
+  assert.equal(parseImportedSpinAxis('9:00'), 270)
+  for (const bad of ['', '  ', null, undefined, 'abc', '13:00', '1:75', '12abc', '1e3x']) assert.equal(parseImportedSpinAxis(bad as string), null, String(bad))
+})
+
+test('integer-column fallback helpers', () => {
+  assert.equal(isIntegerSyntaxError({ code: '22P02', message: 'invalid input syntax for type integer: "33.4"' }), true)
+  assert.equal(isIntegerSyntaxError({ code: '22P02', message: 'invalid input syntax for type uuid' }), false)
+  assert.equal(isIntegerSyntaxError(null), false)
+  assert.equal(roundAxisForIntegerColumn(33.4), 33)
+  assert.equal(roundAxisForIntegerColumn(359.5), 0)
+  assert.equal(roundAxisForIntegerColumn(null), null)
 })

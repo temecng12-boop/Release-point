@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { AXIS_FORMAT_HINT, parseClockAxis } from '@/lib/spin-axis'
+import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, parseImportedSpinAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
 import { createClient } from '@/lib/supabase/client'
 import { addPitchMetric } from '@/app/actions/clips'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
@@ -14,6 +14,7 @@ const COLUMN_MAP = {
   velocity:       ['Velocity', 'Speed (mph)', 'RelSpeed', 'Pitch Speed', 'ReleaseSpeed'],
   spin_rate:      ['Spin Rate (rpm)', 'SpinRate', 'Spin Rate', 'SpinRpm'],
   spin_axis:      ['Spin Axis (deg)', 'SpinAxis', 'Spin Axis', 'SpinAxis2d'],
+  tilt:           ['Tilt'],   // TrackMan clock string, e.g. "1:15"
   horiz_break:    ['Horizontal Break (in)', 'HorzBreak', 'Horizontal Break', 'pfxX', 'HorzMovement'],
   vert_break:     ['Induced Vertical Break (in)', 'InducedVertBreak', 'Induced Vert Break', 'pfxZ', 'InducedVertMovement'],
   extension:      ['Extension (ft)', 'Extension', 'ReleaseExtension'],
@@ -60,13 +61,36 @@ function mapRow(row: Record<string, string>) {
     pitch_type:        get(COLUMN_MAP.pitch_type),
     velocity:          parseFloat(get(COLUMN_MAP.velocity) ?? '') || null,
     spin_rate:         parseInt(get(COLUMN_MAP.spin_rate) ?? '') || null,
-    spin_axis:         parseInt(get(COLUMN_MAP.spin_axis) ?? '') || null,
+    // Degrees are TrackMan convention (180° = 12:00) and converted; clock strings are used as-is.
+    spin_axis:         parseImportedSpinAxis(get(COLUMN_MAP.spin_axis)) ?? parseImportedSpinAxis(get(COLUMN_MAP.tilt)),
     horizontal_break:  parseFloat(get(COLUMN_MAP.horiz_break) ?? '') || null,
     vertical_break:    parseFloat(get(COLUMN_MAP.vert_break) ?? '') || null,
     extension:         parseFloat(get(COLUMN_MAP.extension) ?? '') || null,
     vaa:               parseFloat(get(COLUMN_MAP.vaa) ?? '') || null,
     release_height:    parseFloat(get(COLUMN_MAP.release_height) ?? '') || null,
   }
+}
+
+// ── Insert imported rows ─────────────────────────────────────────────────────
+// Until migration 020 makes pitch_metrics.spin_axis numeric, the column is
+// integer and fractional degrees (converted TrackMan values, odd-minute tilts)
+// are rejected with 22P02. Retry with whole degrees and say so.
+type InsertRow = { spin_axis: number | null } & Record<string, unknown>
+const METRIC_COLUMNS = 'id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break'
+async function insertMetricRows(supabase: ReturnType<typeof createClient>, inserts: InsertRow[]) {
+  const first = await supabase.from('pitch_metrics').insert(inserts).select(METRIC_COLUMNS)
+  const fractional = inserts.filter(r => r.spin_axis != null && !Number.isInteger(r.spin_axis))
+  if (!first.error || fractional.length === 0 || !isIntegerSyntaxError(first.error)) {
+    return { data: first.data, error: first.error, warning: null }
+  }
+  console.error('[pitch_metrics import] spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', first.error)
+  const retry = await supabase.from('pitch_metrics')
+    .insert(inserts.map(r => ({ ...r, spin_axis: roundAxisForIntegerColumn(r.spin_axis) })))
+    .select(METRIC_COLUMNS)
+  const example = fractional[0].spin_axis as number
+  const warning = retry.error ? null
+    : `Axis values were rounded to whole degrees (e.g. ${degreesToClock(example)} saved as ${degreesToClock(roundAxisForIntegerColumn(example) as number)}) because the database only stores whole degrees for now.`
+  return { data: retry.data, error: retry.error, warning }
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -131,6 +155,7 @@ export default function MetricsTab({
   const [preview, setPreview] = useState<ParsedRow[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [axisWarning, setAxisWarning] = useState<string | null>(null)
 
   const [pdfPreview, setPdfPreview]   = useState<ParsedPitchRow[] | null>(null)
   const [pdfError, setPdfError]       = useState<string | null>(null)
@@ -149,6 +174,7 @@ export default function MetricsTab({
     if (!axis.ok) { setManualError(axis.error); return }
     setManualSaving(true)
     setManualError(null)
+    setAxisWarning(null)
     const result = await addPitchMetric(clipId, {
       pitch_type: manualForm.pitch_type || null,
       velocity: manualForm.velocity ? parseFloat(manualForm.velocity) : null,
@@ -162,7 +188,7 @@ export default function MetricsTab({
     if (result?.error) {
       setManualError(result.error)
     } else if (result?.metric) {
-      if (result.warning) setSaveError(result.warning)
+      setAxisWarning(result.warning ?? null)
       updateMetrics(prev => [...prev, result.metric as MetricRow])
       setManualForm(emptyManual)
       setShowManual(false)
@@ -192,6 +218,7 @@ export default function MetricsTab({
     if (!preview) return
     setSaving(true)
     setSaveError(null)
+    setAxisWarning(null)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -207,13 +234,10 @@ export default function MetricsTab({
         }
       })
 
-      const { data, error } = await supabase
-        .from('pitch_metrics')
-        .insert(inserts)
-        .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
-
+      const { data, error, warning } = await insertMetricRows(supabase, inserts)
       if (error) throw error
 
+      setAxisWarning(warning)
       updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPreview(null)
       if (fileRef.current) fileRef.current.value = ''
@@ -243,6 +267,7 @@ export default function MetricsTab({
     if (!pdfPreview) return
     setPdfSaving(true)
     setPdfError(null)
+    setAxisWarning(null)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -257,11 +282,9 @@ export default function MetricsTab({
         horizontal_break: r.horizontal_break,
         vertical_break: r.vertical_break,
       }))
-      const { data, error } = await supabase
-        .from('pitch_metrics')
-        .insert(inserts)
-        .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
+      const { data, error, warning } = await insertMetricRows(supabase, inserts)
       if (error) throw error
+      setAxisWarning(warning)
       updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPdfPreview(null)
       if (pdfRef.current) pdfRef.current.value = ''
@@ -310,6 +333,7 @@ export default function MetricsTab({
 
         {saveError && <p className="text-xs text-[#C8102E]">{saveError}</p>}
         {pdfError  && <p className="text-xs text-[#C8102E]">{pdfError}</p>}
+        {axisWarning && <p role="status" className="text-xs text-[#B45309]">{axisWarning}</p>}
 
         {/* CSV preview */}
         {preview && preview.length > 0 && (
@@ -335,7 +359,7 @@ export default function MetricsTab({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-[#DDE4ED] bg-[#F5F7FA]">
-                    {['Pitch', 'Avg Velo', 'Spin', 'IVB', 'HB', 'Axis°'].map(h => (
+                    {['Pitch', 'Avg Velo', 'Spin', 'IVB', 'HB', 'Axis'].map(h => (
                       <th key={h} className="px-3 py-2 text-left text-[#3D5166] font-medium">{h}</th>
                     ))}
                   </tr>
@@ -348,7 +372,7 @@ export default function MetricsTab({
                       <td className="px-3 py-2 text-[#3D5166] font-mono">{r.spin_rate?.toLocaleString() ?? '—'}</td>
                       <td className="px-3 py-2 text-[#3D5166] font-mono">{r.vertical_break != null ? `${r.vertical_break > 0 ? '+' : ''}${r.vertical_break}"` : '—'}</td>
                       <td className="px-3 py-2 text-[#3D5166] font-mono">{r.horizontal_break != null ? `${r.horizontal_break > 0 ? '+' : ''}${r.horizontal_break}"` : '—'}</td>
-                      <td className="px-3 py-2 text-[#3D5166] font-mono">{r.spin_axis ?? '—'}</td>
+                      <td className="px-3 py-2 text-[#3D5166] font-mono">{r.spin_axis != null ? `${degreesToClock(r.spin_axis)} (${r.spin_axis}°)` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -557,7 +581,7 @@ function PreviewTable({ rows, ageGroup }: { rows: ParsedRow[]; ageGroup: string 
                 ) : '—'}
               </td>
               <td className="px-2 py-1.5 text-[#0F1F33]">{r.spin_rate != null ? r.spin_rate.toLocaleString() : '—'}</td>
-              <td className="px-2 py-1.5 text-[#0F1F33]">{r.spin_axis != null ? `${r.spin_axis}°` : '—'}</td>
+              <td className="px-2 py-1.5 text-[#0F1F33]">{r.spin_axis != null ? `${degreesToClock(r.spin_axis)} (${r.spin_axis}°)` : '—'}</td>
               <td className="px-2 py-1.5 text-[#0F1F33]">{r.horizontal_break != null ? `${r.horizontal_break.toFixed(1)}"` : '—'}</td>
               <td className="px-2 py-1.5 text-[#0F1F33]">{r.vertical_break != null ? `${r.vertical_break.toFixed(1)}"` : '—'}</td>
             </tr>

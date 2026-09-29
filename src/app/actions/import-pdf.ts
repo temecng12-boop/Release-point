@@ -1,5 +1,7 @@
 'use server'
 
+import { parseClockAxis } from '@/lib/spin-axis'
+
 export interface ParsedPitchRow {
   pitch_type: string
   velocity: number | null
@@ -17,12 +19,14 @@ const PITCH_TYPES = [
   'Cutter', 'Sinker', 'Splitter', 'Two-Seam', 'Sweeper',
 ]
 
+// TrackMan PDF "Tilt" is a clock string, already in the app convention (12:00 = 0°).
+// Kept unrounded (1:15 = 37.5°) so it displays back as 1:15; the save path
+// rounds only if the column is still integer (before migration 020).
 function tiltToDegrees(tilt: string): number | null {
   const match = tilt.match(/(\d{1,2}):(\d{2})/)
   if (!match) return null
-  const h = parseInt(match[1]) % 12
-  const m = parseInt(match[2])
-  return Math.round((h * 30 + m * 0.5)) % 360
+  const parsed = parseClockAxis(`${match[1]}:${match[2]}`)
+  return parsed.ok ? parsed.degrees : null
 }
 
 function parseTrackmanText(text: string): ParsedPitchRow[] {

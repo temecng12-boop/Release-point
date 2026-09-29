@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useTransition } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { addCoachToTeam, removeCoachFromTeam } from '@/app/actions/team-coaches'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -88,14 +88,24 @@ export default function AddCoachForm({
 
 function RemoveButton({ teamId, coachId }: { teamId: string; coachId: string }) {
   const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
   return (
-    <button
-      onClick={() => startTransition(async () => { await removeCoachFromTeam(teamId, coachId) })}
-      disabled={pending}
-      className="text-[11px] text-[#8096AE] hover:text-[#C8102E] transition-colors disabled:opacity-50"
-      style={oswald}
-    >
-      {pending ? '…' : 'Remove'}
-    </button>
+    <div className="flex flex-col items-end gap-1 shrink-0">
+      <button
+        onClick={() => {
+          setError(null)
+          startTransition(async () => {
+            const result = await removeCoachFromTeam(teamId, coachId)
+            if (result?.error) setError(result.error)
+          })
+        }}
+        disabled={pending}
+        className="text-[11px] text-[#8096AE] hover:text-[#C8102E] transition-colors disabled:opacity-50"
+        style={oswald}
+      >
+        {pending ? '…' : 'Remove'}
+      </button>
+      {error && <p role="alert" className="text-xs text-[#C8102E] text-right max-w-[16rem]">{error}</p>}
+    </div>
   )
 }
