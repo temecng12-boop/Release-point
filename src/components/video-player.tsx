@@ -1042,7 +1042,7 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <button onClick={toggleTracking} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${trackingEnabled ? btnOn : btnIdle}`} style={oswald}>
+            <button onClick={toggleTracking} className={`${btnBase} border border-[#DDE4ED] ${trackingEnabled ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`} style={oswald}>
               Tracking: {trackingEnabled ? 'On' : 'Off'}
             </button>
           </div>
