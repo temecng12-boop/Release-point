@@ -9,7 +9,10 @@ import {
   teamIdsNotOwned,
   pickCoachEditableFields,
   profilePageAccess,
+  isThePlayer,
   splitRosterByCoach,
+  canDeleteClip,
+  canDeleteClipItem,
   pickBullpenUpdates,
 } from '../auth/roster-access'
 
@@ -70,6 +73,35 @@ section('splitRosterByCoach (team page roster)')
   assert(JSON.stringify(others.map((r) => r.id)) === '["p2","p3"]', "other coaches' and coach-less players are split out")
   assert(splitRosterByCoach(COACH, []).own.length === 0, 'empty roster')
 }
+
+const PLAYER_USER = 'cccccccc-0000-4000-8000-000000000001'
+const FORMER_COACH = 'aaaaaaaa-0000-4000-8000-000000000003'
+const owned = { coach_id: COACH, user_id: PLAYER_USER }
+const coachless = { coach_id: null, user_id: PLAYER_USER }
+
+section('isThePlayer')
+assert(isThePlayer(PLAYER_USER, owned), 'player account matches')
+assert(!isThePlayer(COACH, owned), 'coach is not the player')
+assert(!isThePlayer(PLAYER_USER, { coach_id: COACH, user_id: null }), 'unclaimed player row: no one')
+
+section('canDeleteClip (deleteClip)')
+assert(canDeleteClip(COACH, FORMER_COACH, owned), 'current coach: allowed, whoever uploaded')
+assert(canDeleteClip(COACH, null, owned), 'current coach: allowed with no uploader recorded')
+assert(!canDeleteClip(FORMER_COACH, FORMER_COACH, owned), 'former coach who uploaded it: refused')
+assert(!canDeleteClip(OTHER, OTHER, coachless), 'coach who uploaded for a now coach-less player: refused')
+assert(canDeleteClip(PLAYER_USER, PLAYER_USER, owned), 'player deleting a clip they uploaded: allowed')
+assert(canDeleteClip(PLAYER_USER, PLAYER_USER, coachless), 'coach-less player deleting own upload: allowed')
+assert(!canDeleteClip(PLAYER_USER, COACH, owned), "player deleting the coach's upload: refused")
+assert(!canDeleteClip(COACH, COACH, null), 'unknown player: refused')
+
+section('canDeleteClipItem (deleteTimestampNote, deleteAnnotation)')
+assert(canDeleteClipItem(COACH, COACH, owned), 'current coach deleting their own note: allowed')
+assert(!canDeleteClipItem(COACH, PLAYER_USER, owned), "current coach deleting the player's note: refused (unchanged)")
+assert(!canDeleteClipItem(FORMER_COACH, FORMER_COACH, owned), 'former coach deleting their old note: refused')
+assert(canDeleteClipItem(PLAYER_USER, PLAYER_USER, owned), 'player deleting their own note: allowed')
+assert(!canDeleteClipItem(PLAYER_USER, COACH, owned), "player deleting the coach's note: refused")
+assert(!canDeleteClipItem(COACH, null, owned), 'note with no author: refused')
+assert(!canDeleteClipItem(COACH, COACH, null), 'unknown player: refused')
 
 section('pickBullpenUpdates (updateBullpenSession)')
 {

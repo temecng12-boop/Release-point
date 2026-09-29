@@ -10,6 +10,19 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
+import { canDeleteClip, canDeleteClipItem } from '@/lib/auth/roster-access'
+
+// Loads the coach and account ids of the player a clip belongs to.
+async function playerForClip(clipId: string) {
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+  if (!clip?.player_id) return null
+  const { data: player } = await supabaseAdmin
+    .from('players')
+    .select('coach_id, user_id')
+    .eq('id', clip.player_id)
+    .maybeSingle()
+  return (player as { coach_id: string | null; user_id: string | null } | null) ?? null
+}
 
 // Signed storage URLs: only for paths belonging to a player the caller may
 // see (read) or write. See src/lib/storage-access.ts.
@@ -239,12 +252,16 @@ export async function deleteAnnotation(annotationId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // The author may delete it only while they are still the player's current
+  // coach, or are the player themself.
   const { data: ann } = await supabaseAdmin
     .from('annotations')
-    .select('created_by')
+    .select('created_by, clip_id')
     .eq('id', annotationId)
-    .single()
-  if (!ann || ann.created_by !== user.id) return { error: 'Not authorized' }
+    .maybeSingle()
+  if (!ann) return { error: 'Not authorized' }
+  const player = await playerForClip(ann.clip_id as string)
+  if (!canDeleteClipItem(user.id, ann.created_by as string | null, player)) return { error: 'Not authorized' }
 
   const { error } = await supabaseAdmin.from('annotations').delete().eq('id', annotationId)
   if (error) return { error: error.message }
@@ -323,6 +340,17 @@ export async function deleteTimestampNote(noteId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // The author may delete it only while they are still the player's current
+  // coach, or are the player themself.
+  const { data: note } = await supabaseAdmin
+    .from('timestamp_notes')
+    .select('created_by, clip_id')
+    .eq('id', noteId)
+    .maybeSingle()
+  if (!note) return { error: 'Not authorized' }
+  const player = await playerForClip(note.clip_id as string)
+  if (!canDeleteClipItem(user.id, note.created_by as string | null, player)) return { error: 'Not authorized' }
 
   const { error } = await supabaseAdmin
     .from('timestamp_notes')
@@ -440,13 +468,14 @@ export async function deleteClip(clipId: string) {
 
   if (!clip) return { error: 'Clip not found' }
 
+  // The player's current coach, or the player deleting a clip they uploaded.
   const { data: player } = await supabaseAdmin
     .from('players')
-    .select('coach_id')
+    .select('coach_id, user_id')
     .eq('id', clip.player_id)
-    .single()
+    .maybeSingle()
 
-  if (clip.uploaded_by !== user.id && player?.coach_id !== user.id) {
+  if (!canDeleteClip(user.id, clip.uploaded_by as string | null, player)) {
     return { error: 'Not authorized' }
   }
 
