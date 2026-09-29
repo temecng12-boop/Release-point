@@ -1,5 +1,6 @@
 'use server'
 import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
+import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { revalidatePath } from 'next/cache'
@@ -572,26 +573,22 @@ export async function saveReframe(clipId: string, reframe: { left: number; top: 
   return { success: true }
 }
 
-// Coach notes on a clip. Previously written from the browser with the anon key,
-// which depends on the clips/players RLS policies; those recurse (42P17
-// "infinite recursion detected in policy for relation players") and the UI only
-// showed "Save failed". Now checked and written on the server like the other
-// clip actions, with the real error logged.
+// Coach notes on a clip (create, edit, clear). Written only here, on the
+// server with the service client, after the check below; the browser no
+// longer writes clips.notes directly.
 //
 // Who can edit: the player's direct coach (players.coach_id), or any coach on
 // one of the player's teams (organizer or assistant in team_coaches), the same
 // rule as the corrected 018 RLS policies. "Player's teams" means players.team_id
 // plus player_teams rows, because the app links players through player_teams.
-const MAX_CLIP_NOTES_LENGTH = 20000
-
-export async function saveClipNotes(clipId: string, notes: string) {
+// Blank text clears the notes (stored as null); see src/lib/clip-notes.ts.
+export async function saveClipNotes(clipId: string, notes: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Your session has expired. Please sign in again.' }
-  if (typeof notes !== 'string') return { error: 'Invalid notes.' }
-  if (notes.length > MAX_CLIP_NOTES_LENGTH) {
-    return { error: `Notes are too long (max ${MAX_CLIP_NOTES_LENGTH.toLocaleString()} characters).` }
-  }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+  const normalized = normalizeClipNotes(notes)
+  if (!normalized.ok) return { error: normalized.error }
 
   const { data: clip, error: clipError } = await supabaseAdmin
     .from('clips')
@@ -614,7 +611,7 @@ export async function saveClipNotes(clipId: string, notes: string) {
 
   const { data: updated, error } = await supabaseAdmin
     .from('clips')
-    .update({ notes })
+    .update({ notes: normalized.notes })
     .eq('id', clipId)
     .select('id')
   if (error) return { error: describeDbError('saveClipNotes', error, 'Could not save notes.') }
