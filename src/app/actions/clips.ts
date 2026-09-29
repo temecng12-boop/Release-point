@@ -3,11 +3,27 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
+import { decideStorageAccess } from '@/lib/storage-access'
 
-export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 'lessons' = 'clips') {
+// Signed storage URLs: only for paths belonging to a player the caller may
+// see (read) or write. See src/lib/storage-access.ts.
+const FILE_ACCESS_DENIED = 'You don\'t have access to this file.'
+
+async function checkStorageAccess(action: string, bucket: unknown, storagePath: unknown, mode: 'read' | 'write') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  if (!user) return { error: 'Not authenticated' as const }
+  const decision = await decideStorageAccess(supabaseAdmin, user.id, bucket, storagePath, mode)
+  if (!decision.allowed) {
+    console.warn(`[${action}] denied`, { userId: user.id, bucket, path: typeof storagePath === 'string' ? storagePath.slice(0, 200) : typeof storagePath, reason: decision.reason, teamCheck: decision.teamCheck })
+    return { error: FILE_ACCESS_DENIED }
+  }
+  return { ok: true as const }
+}
+
+export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 'lessons' = 'clips') {
+  const check = await checkStorageAccess('getSignedUploadUrl', bucket, storagePath, 'write')
+  if ('error' in check) return { error: check.error }
 
   const { data, error } = await supabaseAdmin.storage
     .from(bucket)
@@ -18,9 +34,8 @@ export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 
 }
 
 export async function getClipsSignedUrl(storagePath: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const check = await checkStorageAccess('getClipsSignedUrl', 'clips', storagePath, 'read')
+  if ('error' in check) return { error: check.error }
 
   const { data, error } = await supabaseAdmin.storage
     .from('clips')
@@ -31,9 +46,8 @@ export async function getClipsSignedUrl(storagePath: string) {
 }
 
 export async function getLessonSignedUrl(lessonPath: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const check = await checkStorageAccess('getLessonSignedUrl', 'lessons', lessonPath, 'read')
+  if ('error' in check) return { error: check.error }
 
   const { data, error } = await supabaseAdmin.storage
     .from('lessons')
