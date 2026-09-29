@@ -117,30 +117,6 @@ export async function createClip(data: {
 
   // Email the coach when a player uploads (fire-and-forget)
   if (newClip?.id) {
-    // Auto-link player to coach if coach uploaded for a player with no coach yet
-    try {
-      const { data: uploaderProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (uploaderProfile?.role === 'coach') {
-        const { data: playerCheck } = await supabaseAdmin
-          .from('players')
-          .select('coach_id')
-          .eq('id', data.player_id)
-          .single()
-
-        if (playerCheck && !playerCheck.coach_id) {
-          await supabaseAdmin
-            .from('players')
-            .update({ coach_id: user.id })
-            .eq('id', data.player_id)
-        }
-      }
-    } catch { /* non-critical */ }
-
     try {
       const { data: player } = await supabaseAdmin
         .from('players')

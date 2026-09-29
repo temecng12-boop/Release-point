@@ -38,6 +38,8 @@ interface Props {
   clips: Clip[]
   teams: Team[]
   sessions: BullpenSession[]
+  /** True if the viewer is this player's coach. Only the coach can add video. */
+  isOwnPlayer?: boolean
 }
 
 function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
@@ -45,7 +47,7 @@ function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
   return new Date(iso + (sessionDate ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function PlayerRow({ player, clips, teams, sessions }: Props) {
+export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer = true }: Props) {
   const [editOpen, setEditOpen]         = useState(false)
   const [bullpenOpen, setBullpenOpen]   = useState(false)
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
@@ -120,12 +122,20 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
                 <span className="text-[9px] bg-[#1C3A5C] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">{sessions.length}</span>
               )}
             </button>
-            <RecordButton playerId={player.id} playerName={player.full_name} consent={player} />
-            <UploadButton playerId={player.id} playerName={player.full_name} consent={player} showBlockedNotice={false} maxFiles={50} />
+            {isOwnPlayer && (
+              <>
+                <RecordButton playerId={player.id} playerName={player.full_name} consent={player} />
+                <UploadButton playerId={player.id} playerName={player.full_name} consent={player} showBlockedNotice={false} maxFiles={50} />
+              </>
+            )}
           </div>
         </div>
 
-        {!uploadAllowed && (
+        {!isOwnPlayer && (
+          <p className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#3D5166]">Only this player&apos;s coach can add video.</p>
+        )}
+
+        {isOwnPlayer && !uploadAllowed && (
           <div className="px-4 py-2 border-b border-[#DDE4ED]">
             <UploadBlockedNotice
               viewer="coach"

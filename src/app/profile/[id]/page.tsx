@@ -169,7 +169,8 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   </span>
                 </div>
               </div>
-              {/* Upload button for coach */}
+              {/* Upload button for the player's own coach only */}
+              {player.coach_id === user.id ? (
               <UploadButton
                 playerId={player.id}
                 playerName={player.full_name}
@@ -177,6 +178,9 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 maxFiles={50}
                 blockedAction={showMarkAdult ? <MarkAdultButton playerId={player.id} playerName={player.full_name} /> : undefined}
               />
+              ) : (
+                <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">

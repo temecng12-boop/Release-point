@@ -13,6 +13,7 @@ import {
   type PlayerConsentFields,
 } from '../consent'
 import { checkUploadConsent, canManagePlayerAge, setAdultConfirmation } from '../consent-server'
+import { canUploadForPlayerWith } from '../auth/upload-access'
 
 // ─── Minimal test harness (same style as ai-coach.test.ts) ─────────────────────
 
@@ -207,6 +208,37 @@ async function main() {
     })
     const r = await setAdultConfirmation(db, COACH, PLAYER, true)
     assert('error' in r && r.error === 'boom', 'update errors are returned')
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  section('canUploadForPlayer (who may upload, mocked client)')
+
+  {
+    const canUploadForPlayer = (userId: string, playerId: string, db: Parameters<typeof canUploadForPlayerWith>[0]) =>
+      canUploadForPlayerWith(db, userId, playerId)
+    const PLAYER_USER = 'cccccccc-0000-4000-8000-000000000001'
+    const withRow = (row: unknown) => mockDb({
+      players: () => ({ data: row, error: null }),
+      // Any profile lookup would mean the old "any coach" rule is back.
+      profiles: () => ({ data: { role: 'coach' }, error: null }),
+    })
+
+    const own = withRow({ coach_id: COACH, user_id: PLAYER_USER })
+    assert(await canUploadForPlayer(COACH, PLAYER, own.db), "player's own coach: allowed")
+    assert(await canUploadForPlayer(PLAYER_USER, PLAYER, own.db), 'the player themself: allowed')
+    assert(!(await canUploadForPlayer(OTHER_COACH, PLAYER, own.db)), 'another coach: refused')
+
+    const coachless = withRow({ coach_id: null, user_id: PLAYER_USER })
+    assert(!(await canUploadForPlayer(OTHER_COACH, PLAYER, coachless.db)), 'any coach for a coach-less player: refused')
+    assert(!coachless.queries.some((q) => q.table === 'profiles'), 'no role lookup (coach role grants nothing)')
+    assert(await canUploadForPlayer(PLAYER_USER, PLAYER, coachless.db), 'coach-less player uploading for themself: allowed')
+
+    const unlinked = withRow({ coach_id: null, user_id: null })
+    assert(!(await canUploadForPlayer(COACH, PLAYER, unlinked.db)), 'no coach and no linked account: refused')
+
+    const missing = withRow(null)
+    assert(!(await canUploadForPlayer(COACH, PLAYER, missing.db)), 'unknown player: refused')
+    assert(!(await canUploadForPlayer('', PLAYER, own.db)), 'empty user id: refused')
   }
 
   // ───────────────────────────────────────────────────────────────────────────
