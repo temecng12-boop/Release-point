@@ -1,4 +1,5 @@
 'use server'
+import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -218,7 +219,7 @@ export async function saveAnnotation(data: {
     origin_time: data.origin_time,
   }).select('id').single()
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('saveAnnotation', error, 'Could not save this mark.') }
   return { success: true, id: inserted.id as string }
 }
 
@@ -279,14 +280,32 @@ export async function saveTimestampNote(data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
-  const { data: note, error } = await supabaseAdmin
+  // Only send drawing_data when there are drawings, so text-only notes don't
+  // depend on that column (added in migration 019).
+  const hasDrawing = Array.isArray(data.drawing_data) && data.drawing_data.length > 0
+  const row: Record<string, unknown> = {
+    clip_id: data.clip_id,
+    created_by: user.id,
+    time_seconds: data.time_seconds,
+    body: data.body,
+  }
+  if (hasDrawing) row.drawing_data = data.drawing_data
+
+  const { data: inserted, error } = await supabaseAdmin
     .from('timestamp_notes')
-    .insert({ clip_id: data.clip_id, created_by: user.id, time_seconds: data.time_seconds, body: data.body, drawing_data: data.drawing_data ?? null })
-    .select('id, time_seconds, body, drawing_data')
+    .insert(row)
+    .select(hasDrawing ? 'id, time_seconds, body, drawing_data' : 'id, time_seconds, body')
     .single()
 
-  if (error) return { error: error.message }
-  return { success: true, note }
+  if (error) {
+    if (hasDrawing && isMissingColumnError(error, 'drawing_data')) {
+      console.error('[saveTimestampNote] timestamp_notes.drawing_data is missing; apply supabase/migrations/019_schema_drift_catchup.sql', error)
+      return { error: 'Drawings can\'t be saved yet because the database is missing an update (timestamp_notes.drawing_data). Remove the drawings to save the note as text only, or contact support.' }
+    }
+    return { error: describeDbError('saveTimestampNote', error, 'Could not save this note.') }
+  }
+  const note = inserted as unknown as { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
+  return { success: true, note: { ...note, drawing_data: note.drawing_data ?? null } }
 }
 
 export async function deleteTimestampNote(noteId: string) {
@@ -300,7 +319,7 @@ export async function deleteTimestampNote(noteId: string) {
     .eq('id', noteId)
     .eq('created_by', user.id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('deleteTimestampNote', error, 'Could not delete this note.') }
   return { success: true }
 }
 

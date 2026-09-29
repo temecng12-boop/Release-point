@@ -317,6 +317,8 @@ export default function VideoPlayer({
   const [stampMode,      setStampMode]        = useState(false)
   const [stampText,      setStampText]        = useState('')
   const [stampSaving,    setStampSaving]      = useState(false)
+  const [stampError,     setStampError]       = useState<string | null>(null)
+  const [markError,      setMarkError]        = useState<string | null>(null)
 
   // reframe
   type Crop = { left: number; top: number; right: number; bottom: number }
@@ -558,11 +560,13 @@ export default function VideoPlayer({
           origin_time: d.originTime ?? 0,
         }).then(result => {
           if (result?.error) {
+            setMarkError(result.error)
             annotationsRef.current = annotationsRef.current.filter(s => s !== d)
             setMarkList(prev => prev.filter(m => m.ref !== d))
             setMarkerCount(c => c - 1)
             drawFrame()
           } else if (result?.id) {
+            setMarkError(null)
             d.id = result.id
             setMarkList(prev => prev.map(m => m.ref === d ? { ...m } : m))
           }
@@ -710,17 +714,26 @@ export default function VideoPlayer({
       end:   s.end   ? { x: s.end.x   + ((s.currentAnchor?.x ?? 0) - (s.anchor?.x ?? 0)), y: s.end.y   + ((s.currentAnchor?.y ?? 0) - (s.anchor?.y ?? 0)) } : undefined,
     }))
     setStampSaving(true)
-    const result = await saveTimestampNote({
-      clip_id: clipId,
-      time_seconds: t,
-      body: stampText.trim(),
-      drawing_data: shapes.length ? shapes : null,
-    })
-    setStampSaving(false)
-    if (result?.note) {
-      window.dispatchEvent(new CustomEvent('rp:stamp-created', { detail: result.note }))
-      setStampText('')
-      setStampMode(false)
+    setStampError(null)
+    try {
+      const result = await saveTimestampNote({
+        clip_id: clipId,
+        time_seconds: t,
+        body: stampText.trim(),
+        drawing_data: shapes.length ? shapes : null,
+      })
+      if (result?.note) {
+        window.dispatchEvent(new CustomEvent('rp:stamp-created', { detail: result.note }))
+        setStampText('')
+        setStampMode(false)
+      } else {
+        setStampError(result?.error ?? 'Could not save this stamp. Please try again.')
+      }
+    } catch (err) {
+      console.error('[saveStamp] request failed', err)
+      setStampError('Could not save this stamp. Check your connection and try again.')
+    } finally {
+      setStampSaving(false)
     }
   }
 
@@ -1105,7 +1118,7 @@ export default function VideoPlayer({
           <input
             autoFocus
             value={stampText}
-            onChange={e => setStampText(e.target.value)}
+            onChange={e => { setStampText(e.target.value); setStampError(null) }}
             onKeyDown={e => { if (e.key === 'Enter') saveStamp(); if (e.key === 'Escape') { setStampMode(false); setStampText('') } }}
             placeholder="Describe this moment…"
             className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
@@ -1125,6 +1138,9 @@ export default function VideoPlayer({
             ✕
           </button>
         </div>
+      )}
+      {isCoach && stampMode && stampError && (
+        <p role="alert" className="mt-1 text-xs text-[#C8102E]">Stamp not saved: {stampError}</p>
       )}
 
       {/* Lesson recording */}
@@ -1203,6 +1219,7 @@ export default function VideoPlayer({
       <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
         {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">· coach annotations</span>}
+        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8102E]">Mark not saved: {markError}</p>}
       </div>
     </div>
   )
