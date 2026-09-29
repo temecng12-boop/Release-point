@@ -62,3 +62,46 @@ export function splitRosterByCoach<T extends { coach_id: string | null }>(
   for (const p of players) (isPlayersOwnCoach(userId, p) ? own : others).push(p)
   return { own, others }
 }
+
+export type BullpenPitchBlock = { pitch_type: string; target: number; thrown: number; focus: string }
+export type BullpenSessionUpdates = {
+  pitches?: BullpenPitchBlock[]
+  notes?: string
+  status?: 'planned' | 'complete'
+}
+
+function toPitchBlock(v: unknown): BullpenPitchBlock | null {
+  if (!v || typeof v !== 'object') return null
+  const r = v as Record<string, unknown>
+  if (typeof r.pitch_type !== 'string') return null
+  const target = Number(r.target ?? 0)
+  const thrown = Number(r.thrown ?? 0)
+  if (!Number.isFinite(target) || !Number.isFinite(thrown)) return null
+  return { pitch_type: r.pitch_type, target, thrown, focus: typeof r.focus === 'string' ? r.focus : '' }
+}
+
+/**
+ * Keeps only the bullpen session fields a coach may change: pitches, notes and
+ * status. Anything else (player_id, coach_id, ids, dates) is dropped. Returns
+ * null if a provided field has the wrong shape.
+ */
+export function pickBullpenUpdates(updates: unknown): BullpenSessionUpdates | null {
+  if (!updates || typeof updates !== 'object') return null
+  const u = updates as Record<string, unknown>
+  const out: BullpenSessionUpdates = {}
+  if (u.pitches !== undefined) {
+    if (!Array.isArray(u.pitches)) return null
+    const blocks = u.pitches.map(toPitchBlock)
+    if (blocks.some((b) => b === null)) return null
+    out.pitches = blocks as BullpenPitchBlock[]
+  }
+  if (u.notes !== undefined) {
+    if (typeof u.notes !== 'string') return null
+    out.notes = u.notes
+  }
+  if (u.status !== undefined) {
+    if (u.status !== 'planned' && u.status !== 'complete') return null
+    out.status = u.status
+  }
+  return out
+}

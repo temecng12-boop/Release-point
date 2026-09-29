@@ -10,6 +10,7 @@ import {
   pickCoachEditableFields,
   profilePageAccess,
   splitRosterByCoach,
+  pickBullpenUpdates,
 } from '../auth/roster-access'
 
 let passed = 0
@@ -68,6 +69,25 @@ section('splitRosterByCoach (team page roster)')
   assert(JSON.stringify(own.map((r) => r.id)) === '["p1","p4"]', 'own players: only coach_id = caller')
   assert(JSON.stringify(others.map((r) => r.id)) === '["p2","p3"]', "other coaches' and coach-less players are split out")
   assert(splitRosterByCoach(COACH, []).own.length === 0, 'empty roster')
+}
+
+section('pickBullpenUpdates (updateBullpenSession)')
+{
+  const picked = pickBullpenUpdates({
+    pitches: [{ pitch_type: 'FB', target: 10, thrown: 4, focus: 'command', extra: 'x' }],
+    notes: 'ok', status: 'complete',
+    player_id: 'evil', coach_id: OTHER, id: 'x', created_at: '2020-01-01', session_date: '2020-01-01',
+  })
+  assert(picked !== null && JSON.stringify(Object.keys(picked).sort()) === '["notes","pitches","status"]', 'player_id, coach_id and other keys are dropped', JSON.stringify(picked))
+  assert(JSON.stringify(picked?.pitches) === '[{"pitch_type":"FB","target":10,"thrown":4,"focus":"command"}]', 'pitch blocks keep only known fields')
+  assert(JSON.stringify(pickBullpenUpdates({ player_id: 'evil', coach_id: OTHER })) === '{}', 'only forbidden keys: nothing to update')
+  assert(pickBullpenUpdates({ status: 'deleted' }) === null, 'unknown status: rejected')
+  assert(pickBullpenUpdates({ pitches: 'x' }) === null, 'pitches must be an array')
+  assert(pickBullpenUpdates({ pitches: [{ target: 1 }] }) === null, 'pitch block without a pitch type: rejected')
+  assert(pickBullpenUpdates({ notes: 5 }) === null, 'notes must be a string')
+  assert(pickBullpenUpdates(null) === null, 'no updates object: rejected')
+  const noThrown = pickBullpenUpdates({ pitches: [{ pitch_type: 'SL', target: 5 }] })
+  assert(noThrown?.pitches?.[0].thrown === 0 && noThrown.pitches[0].focus === '', 'missing thrown/focus default to 0 and empty')
 }
 
 section('Results')
