@@ -54,7 +54,7 @@ export default function AboutPage() {
           <div className="grid sm:grid-cols-2 gap-6">
             {[
               { title: 'Film on a phone', body: 'Coaches record bullpen sessions, at-bats, and live games on their phones. The clips sit there. Players never see them with any context attached.' },
-              { title: 'Metrics in a text thread', body: 'Spin rate, exit velocity, launch angle. Coaches collect this from Rapsodo and Trackman sessions, then send raw numbers over text. It means nothing without context.' },
+              { title: 'Metrics in a text thread', body: 'Spin rate, exit velocity, launch angle. Coaches collect this from pitch- and swing-tracking sessions, then send raw numbers over text. It means nothing without context.' },
               { title: 'Notes that disappear', body: 'Coaching cues from a Tuesday bullpen session. A swing adjustment from a cage visit. A note about arm path on the 3-2 changeup. Gone by the following week.' },
               { title: 'No feedback loop', body: "Players practice, games happen, data is collected. But the line between what a player does and what a coach observes is never closed. Development becomes guesswork." },
             ].map(item => (
@@ -228,7 +228,7 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-5 max-w-2xl">
             <p className="text-[#456080] leading-relaxed">
-              Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Rapsodo, Trackman, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
+              Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Pitch tracking, swing tracking, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
             </p>
             <p className="text-[#456080] leading-relaxed">
               We are building the software layer that connects coaches, players, and data, so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
