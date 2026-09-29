@@ -786,17 +786,20 @@ export default function VideoPlayer({
   async function uploadLesson(mimeType: string) {
     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
     const path = `${playerId}/${clipId}/lesson.${ext}`
-    const blob = new Blob(lessonChunksRef.current, { type: mimeType })
+    // Strip codec parameters — Supabase MIME check only matches the base type
+    const baseMime = mimeType.split(';')[0].trim()
+    const blob = new Blob(lessonChunksRef.current, { type: baseMime })
 
     const urlResult = await getSignedUploadUrl(path, 'lessons')
     if ('error' in urlResult) { setLessonError('Upload failed'); setLessonPhase('idle'); return }
 
     const res = await fetch(urlResult.signedUrl, {
-      method: 'PUT', body: blob, headers: { 'Content-Type': mimeType },
+      method: 'PUT', body: blob, headers: { 'Content-Type': baseMime },
     })
     if (!res.ok) { setLessonError('Upload failed. Try again.'); setLessonPhase('idle'); return }
 
-    await saveLessonPath(clipId, path)
+    const saveResult = await saveLessonPath(clipId, path)
+    if (saveResult && 'error' in saveResult) { setLessonError('Saved video but failed to attach to clip. Try again.'); setLessonPhase('idle'); return }
 
     const signedResult = await getLessonSignedUrl(path)
     if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl ?? null)

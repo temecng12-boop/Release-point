@@ -283,8 +283,7 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   if (!user) return { error: 'Not authenticated' }
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
-  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
   const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
   if (error) return { error: error.message }
   revalidatePath(`/clips/${clipId}`)
@@ -297,8 +296,7 @@ export async function deleteLessonPath(clipId: string) {
   if (!user) return { error: 'Not authenticated' }
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
-  if (player?.coach_id !== user.id) return { error: 'Not authorized' }
+  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
   if (clip.lesson_path) {
     await supabaseAdmin.storage.from('lessons').remove([clip.lesson_path])
   }
