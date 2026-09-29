@@ -121,6 +121,9 @@ export async function invitePlayer(
   if (linkData?.properties?.action_link) {
     const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
     const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'
+    // TODO(Compliance): guardian email wording. This invite goes to the address
+    // the coach entered, which may be a guardian's. Wording is in
+    // sendPlayerInviteEmail (src/lib/email.ts).
     await sendPlayerInviteEmail({
       toEmail: playerEmail,
       playerName: playerName || undefined,
@@ -130,7 +133,10 @@ export async function invitePlayer(
   }
 
   revalidatePath('/', 'layout')
+  const who = playerName || 'The player'
   return {
-    success: `Invite sent to ${playerEmail}! ${playerName ? `${playerName} will` : 'They will'} receive an email to set up their account.`,
+    success: ageStatus === 'adult'
+      ? `Invite sent to ${playerEmail}. ${who} is marked 18+.`
+      : `Invite sent to ${playerEmail}. ${who} is marked under 18: video can't be added until guardian consent is on file.`,
   }
 }
