@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { saveClipNotes } from '@/app/actions/clips'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -17,22 +17,32 @@ export default function TextNotes({
   const isCoach = role === 'coach'
   const [notes, setNotes] = useState(initialNotes ?? '')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
+  const [saveError, setSaveError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const notesRef = useRef(notes)
-  notesRef.current = notes
 
   async function persistNotes(text: string) {
     setSaveStatus('saving')
-    const { error } = await createClient().from('clips').update({ notes: text }).eq('id', clipId)
+    let error: string | null = null
+    try {
+      const result = await saveClipNotes(clipId, text)
+      if (result?.error) error = result.error
+    } catch (err) {
+      console.error('[TextNotes] save request failed', err)
+      error = 'Could not save notes. Check your connection and try again.'
+    }
     if (error) {
+      setSaveError(error)
       setSaveStatus('error')
       return
     }
+    setSaveError(null)
     setSaveStatus('saved')
     window.dispatchEvent(new CustomEvent('clip-notes-saved'))
   }
 
   function onNotesChange(text: string) {
+    notesRef.current = text
     setNotes(text)
     setSaveStatus('pending')
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -40,7 +50,7 @@ export default function TextNotes({
   }
 
   function onNotesBlur() {
-    if (saveStatus === 'pending') {
+    if (saveStatus === 'pending' || saveStatus === 'error') {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       persistNotes(notesRef.current)
     }
@@ -72,6 +82,10 @@ export default function TextNotes({
         notes
           ? <p className="text-sm text-[#0F1F33] whitespace-pre-wrap">{notes}</p>
           : <p className="text-sm text-[#3D5166]">No notes from coach yet.</p>
+      )}
+
+      {isCoach && saveStatus === 'error' && saveError && (
+        <p role="alert" className="mt-2 text-xs text-[#C8102E]">{saveError}</p>
       )}
     </div>
   )
