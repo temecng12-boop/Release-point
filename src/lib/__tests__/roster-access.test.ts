@@ -95,6 +95,10 @@ assert(canDeleteClip(PLAYER_USER, PLAYER_USER, owned), 'player deleting a clip t
 assert(canDeleteClip(PLAYER_USER, PLAYER_USER, coachless), 'coach-less player deleting own upload: allowed')
 assert(!canDeleteClip(PLAYER_USER, COACH, owned), "player deleting the coach's upload: refused")
 assert(!canDeleteClip(COACH, COACH, null), 'unknown player: refused')
+// Uploader deleted (uploaded_by is NULL, migration 022): NULL never matches a user.
+assert(!canDeleteClip(PLAYER_USER, null, owned), 'no uploader recorded: the player may not delete it')
+assert(!canDeleteClip(PLAYER_USER, undefined, coachless), 'no uploader recorded, coach-less player: refused')
+assert(!canDeleteClip('', null, { coach_id: null, user_id: null }), 'empty user id vs all-NULL row: refused')
 
 section('canDeleteClipItem (deleteTimestampNote, deleteAnnotation)')
 assert(canDeleteClipItem(COACH, COACH, owned), 'current coach deleting their own note: allowed')
@@ -104,6 +108,8 @@ assert(canDeleteClipItem(PLAYER_USER, PLAYER_USER, owned), 'player deleting thei
 assert(!canDeleteClipItem(PLAYER_USER, COACH, owned), "player deleting the coach's note: refused")
 assert(!canDeleteClipItem(COACH, null, owned), 'note with no author: refused')
 assert(!canDeleteClipItem(COACH, COACH, null), 'unknown player: refused')
+assert(!canDeleteClipItem(PLAYER_USER, null, owned), 'item with no author: the player may not delete it')
+assert(!canDeleteClipItem('', null, { coach_id: null, user_id: null }), 'empty user id vs all-NULL row: refused')
 
 section('canUseAiCoachFor (api/ai-chat)')
 assert(canUseAiCoachFor(COACH, owned), 'own coach: allowed')
