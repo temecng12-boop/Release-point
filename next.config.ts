@@ -4,11 +4,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // COEP only on dashboard — required for FFmpeg.wasm (SharedArrayBuffer).
+        // Applying it globally blocks cross-origin iframes (YouTube embeds on /clips/compare).
+        source: '/dashboard(.*)',
         headers: [
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-          // credentialless allows cross-origin resources without CORS headers
-          // while still enabling SharedArrayBuffer for FFmpeg.wasm
           { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
         ],
       },
