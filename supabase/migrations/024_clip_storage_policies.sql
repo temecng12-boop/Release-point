@@ -34,7 +34,8 @@
 --   * any direct PostgREST / storage API call someone makes with their own JWT.
 --
 -- Rules, mirroring the clips table policies in 002 as left by 018 and 021:
---   read:   the player's own coach, the player, a linked guardian
+--   read:   the player's own coach, a coach on one of the player's teams
+--           (team_coaches, 018), the player, a linked guardian
 --   insert: the player's own coach (any object under the player's folder);
 --           the player, for their own top-level clip files only. Both only
 --           when the player has an 18+ confirmation or guardian consent (023).
@@ -117,6 +118,22 @@ AS $$
   )
 $$;
 
+-- A coach (organizer or assistant, team_coaches from 018) on one of the
+-- player's teams: players.team_id or a player_teams row. Read access only.
+CREATE OR REPLACE FUNCTION public.rls_is_players_team_coach(p_player_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.team_coaches tc
+    WHERE tc.coach_id = auth.uid()
+      AND (
+        tc.team_id IN (SELECT p.team_id FROM public.players p WHERE p.id = p_player_id AND p.team_id IS NOT NULL)
+        OR tc.team_id IN (SELECT pt.team_id FROM public.player_teams pt WHERE pt.player_id = p_player_id)
+      )
+  )
+$$;
+
 -- True if the object is the video of a clip the current user uploaded.
 CREATE OR REPLACE FUNCTION public.rls_is_own_clip_video(p_name text)
 RETURNS boolean
@@ -131,10 +148,12 @@ $$;
 REVOKE ALL ON FUNCTION public.rls_is_players_coach(uuid)   FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.rls_is_player_self(uuid)     FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.rls_is_player_guardian(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.rls_is_players_team_coach(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.rls_is_own_clip_video(text)  FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.rls_is_players_coach(uuid)   TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rls_is_player_self(uuid)     TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rls_is_player_guardian(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rls_is_players_team_coach(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rls_is_own_clip_video(text)  TO authenticated;
 GRANT EXECUTE ON FUNCTION public.clip_object_player_id(text)    TO authenticated;
 GRANT EXECUTE ON FUNCTION public.clip_object_is_top_level(text) TO authenticated;
@@ -152,6 +171,7 @@ CREATE POLICY "clips_bucket_select" ON storage.objects
     AND public.clip_object_player_id(name) IS NOT NULL
     AND (
       public.rls_is_players_coach(public.clip_object_player_id(name))
+      OR public.rls_is_players_team_coach(public.clip_object_player_id(name))
       OR public.rls_is_player_self(public.clip_object_player_id(name))
       OR public.rls_is_player_guardian(public.clip_object_player_id(name))
     )
