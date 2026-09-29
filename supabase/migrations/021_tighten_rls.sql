@@ -1,9 +1,14 @@
 -- ============================================================================
--- Migration 014: tighten row-level security
+-- Migration 021: tighten row-level security
 -- ============================================================================
--- Written from a static review of migrations 001-013 only. The LIVE database
--- may differ (dashboard edits, objects defined outside the migrations).
--- Review against the live policy state before applying.
+-- Runs after 018 (team_coaches) and 019/020. Written from a review of the
+-- migrations; the LIVE database may differ (dashboard edits, objects defined
+-- outside the migrations). Review against the live policy state before
+-- applying.
+--
+-- Section 0's helper functions and four players/guardians policies have the
+-- same definitions as 018, so re-creating them here changes nothing.
+-- player_teams access is set by 022.
 --
 -- Idempotent where practical: policies use DROP POLICY IF EXISTS, functions use
 -- CREATE OR REPLACE, and triggers use DROP TRIGGER IF EXISTS.
@@ -126,27 +131,8 @@ CREATE POLICY "bullpen_guardian_select" ON bullpen_sessions
 
 
 -- ============================================================================
--- 2. player_teams: RLS was never enabled (migrations 011 / 012)
+-- 2. player_teams: see migration 022
 -- ============================================================================
-ALTER TABLE player_teams ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "player_teams_coach_all"     ON player_teams;
-DROP POLICY IF EXISTS "player_teams_player_select" ON player_teams;
-
--- Coaches manage links for teams they own. New links must also point at a
--- player on their roster.
-CREATE POLICY "player_teams_coach_all" ON player_teams
-  FOR ALL TO authenticated
-  USING (team_id IN (SELECT id FROM teams WHERE coach_id = auth.uid()))
-  WITH CHECK (
-    team_id   IN (SELECT id FROM teams   WHERE coach_id = auth.uid())
-    AND player_id IN (SELECT id FROM players WHERE coach_id = auth.uid())
-  );
-
--- Players see their own team memberships.
-CREATE POLICY "player_teams_player_select" ON player_teams
-  FOR SELECT TO authenticated
-  USING (player_id IN (SELECT id FROM players WHERE user_id = auth.uid()));
 
 
 -- ============================================================================
