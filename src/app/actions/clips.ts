@@ -11,6 +11,7 @@ import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 import { canDeleteClip, canDeleteClipItem } from '@/lib/auth/roster-access'
+import { clipFilesToRemove } from '@/lib/clip-storage'
 
 // Loads the coach and account ids of the player a clip belongs to.
 async function playerForClip(clipId: string) {
@@ -479,19 +480,25 @@ export async function deleteClip(clipId: string) {
     return { error: 'Not authorized' }
   }
 
+  // lesson_path is read separately in case that column isn't migrated yet.
+  const { data: lessonRow } = await supabaseAdmin.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
+  const lessonPath = (lessonRow as { lesson_path?: string | null } | null)?.lesson_path ?? null
+
   await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
 
-  if (clip.storage_path) {
-    await supabase.storage.from('clips').remove([clip.storage_path])
-  }
-  if (clip.voice_path) {
-    await supabase.storage.from('clips').remove([clip.voice_path])
-  }
-
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
+
+  // Files are removed only after the check above passed and the clip row is
+  // gone, with the service client (the caller's session may not be allowed to
+  // delete another uploader's files), and only inside this player's folder.
+  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path, lessonPath])
+  if (files.length > 0) {
+    const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
+    if (storageError) console.error('[deleteClip] storage cleanup failed', clipId, storageError.message)
+  }
 
   revalidatePath('/dashboard')
   return { success: true }
