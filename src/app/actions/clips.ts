@@ -17,6 +17,19 @@ export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 
   return { signedUrl: data.signedUrl, token: data.token, path: data.path }
 }
 
+export async function getClipsSignedUrl(storagePath: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('clips')
+    .createSignedUrl(storagePath, 3600)
+
+  if (error || !data) return { error: error?.message ?? 'Failed to create signed URL' }
+  return { signedUrl: data.signedUrl }
+}
+
 export async function getLessonSignedUrl(lessonPath: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

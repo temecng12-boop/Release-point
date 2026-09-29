@@ -125,7 +125,7 @@ export default function ClipTabs({
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
             {active === 'Timestamps' && (
-              <TimestampNotes clipId={clipId} role={role} initialNotes={initialTsNotes} />
+              <TimestampNotes clipId={clipId} playerId={playerId} role={role} initialNotes={initialTsNotes} />
             )}
             {active === 'Notes' && (
               <TextNotes clipId={clipId} role={role} initialNotes={initialNotes} />
