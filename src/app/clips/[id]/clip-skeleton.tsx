@@ -1,4 +1,9 @@
-export default function ClipLoading() {
+// Skeleton shown while a clip's data loads. Rendered as the Suspense fallback
+// inside page.tsx, after the access check, rather than as a route-level
+// loading.tsx: a loading.tsx boundary starts streaming a 200 before the page
+// can call notFound(), so unauthorized or missing clips got the not-found UI
+// with HTTP 200 instead of a real 404.
+export default function ClipSkeleton() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}

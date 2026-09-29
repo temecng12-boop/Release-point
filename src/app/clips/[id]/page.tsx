@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -9,6 +10,7 @@ import ClipTitle from './clip-title'
 import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
+import ClipSkeleton from './clip-skeleton'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -31,6 +33,33 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id)
   if (!access.allowed) notFound()
 
+  // Everything above runs before any HTML is sent, so notFound() and redirect()
+  // produce real 404 / 307 responses. The rest of the page streams in behind
+  // the skeleton.
+  return (
+    <Suspense fallback={<ClipSkeleton />}>
+      <ClipContent id={id} clip={clip} userId={user.id} userMetadataRole={user.user_metadata?.role} />
+    </Suspense>
+  )
+}
+
+type ClipRow = {
+  id: string
+  title: string
+  storage_path: string
+  created_at: string
+  session_date: string | null
+  player_id: string
+  notes: string | null
+  voice_path: string | null
+}
+
+async function ClipContent({ id, clip, userId, userMetadataRole }: {
+  id: string
+  clip: ClipRow
+  userId: string
+  userMetadataRole: unknown
+}) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
   const { data: checklistData, error: checklistError } = await supabaseAdmin
@@ -53,10 +82,10 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
-  const role = (profile?.role ?? user.user_metadata?.role ?? 'player') as 'coach' | 'player'
+  const role = (profile?.role ?? userMetadataRole ?? 'player') as 'coach' | 'player'
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')
