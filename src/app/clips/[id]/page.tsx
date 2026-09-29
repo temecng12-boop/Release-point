@@ -38,7 +38,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   // the skeleton.
   return (
     <Suspense fallback={<ClipSkeleton />}>
-      <ClipContent id={id} clip={clip} userId={user.id} userMetadataRole={user.user_metadata?.role} />
+      <ClipContent id={id} clip={clip} userId={user.id} />
     </Suspense>
   )
 }
@@ -54,11 +54,10 @@ type ClipRow = {
   voice_path: string | null
 }
 
-async function ClipContent({ id, clip, userId, userMetadataRole }: {
+async function ClipContent({ id, clip, userId }: {
   id: string
   clip: ClipRow
   userId: string
-  userMetadataRole: unknown
 }) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
@@ -85,7 +84,8 @@ async function ClipContent({ id, clip, userId, userMetadataRole }: {
     .eq('id', userId)
     .single()
 
-  const role = (profile?.role ?? userMetadataRole ?? 'player') as 'coach' | 'player'
+  // Role comes from profiles only; user_metadata is set by the client at signup.
+  const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')

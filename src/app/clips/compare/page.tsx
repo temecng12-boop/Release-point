@@ -21,7 +21,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     .eq('id', user.id)
     .single()
 
-  const role = (profile?.role ?? user.user_metadata?.role ?? 'player') as 'coach' | 'player'
+  // Role comes from profiles only; user_metadata is set by the client at signup.
+  const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
   async function loadClip(clipId: string): Promise<ClipData | null> {
     const { data: clip } = await supabaseAdmin
