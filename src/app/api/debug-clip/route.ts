@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { canViewPlayerContent } from '@/lib/clip-access'
 
 export async function GET(request: NextRequest) {
   const clipId = request.nextUrl.searchParams.get('id')
@@ -12,6 +13,11 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'coach') return NextResponse.json({ error: 'coaches only' }, { status: 403 })
+
+  // Only for clips this coach may see; otherwise don't reveal whether it exists.
+  const { data: owner } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+  const access = await canViewPlayerContent(supabaseAdmin, user.id, owner?.player_id as string | undefined)
+  if (!access.allowed) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
   // Test 1: basic select (no lesson_path)
   const { data: clip1, error: e1 } = await supabaseAdmin
