@@ -26,23 +26,23 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 const AGENTS = {
   randy: {
     name: 'Randy',
-    role: 'Pitching Coach',
+    role: 'The Big Unit',
     color: '#C8102E',
     bg: '#FFF5F5',
     border: '#FBD0D6',
-    description: "Velocity, spin, movement, and mechanics — connected to how great pitchers actually think about their craft.",
-    placeholder: "What felt off today? Or ask about today's numbers…",
-    intro: "I've got your numbers from this session. Tell me what felt off, or I can walk you through what the data is showing.",
+    description: "6'10\". 4,875 strikeouts. Randy Johnson didn't nibble. He attacked. Your mechanics and pitch data — no sugarcoating.",
+    placeholder: "What are we fixing?",
+    intro: "I've got your numbers. Let's get to it — what are we working on?",
   },
   barry: {
     name: 'Barry',
-    role: 'Hitting Coach',
+    role: 'The All-Time OBP',
     color: '#1C3A5C',
     bg: '#F0F4F8',
     border: '#C0CFE0',
-    description: "Exit velocity, launch angle, bat path, and swing mechanics — grounded in how elite hitters have always talked about contact.",
-    placeholder: "What felt off at the plate? Or ask about today's numbers…",
-    intro: "I've got today's exit velocity and launch data. Tell me what felt off, or ask me what the numbers are saying.",
+    description: "Barry Bonds didn't chase. He knew his pitch, knew his zone, and made pitchers come to him. Your swing data — same approach.",
+    placeholder: "What's the issue at the plate?",
+    intro: "I've got your exit velocity and launch numbers. What are we looking at?",
   },
 }
 
