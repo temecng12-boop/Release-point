@@ -26,7 +26,10 @@ export default function ComparePlayer({ clips }: Props) {
   const [synced, setSynced] = useState(!hasYoutube)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState<number[]>(clips.map(() => 0))
+  const [speed, setSpeed] = useState(1)
   const syncingRef = useRef(false)
+
+  const SPEEDS = [0.25, 0.5, 1, 1.5] as const
 
   // Add clip inline state
   const [addYtUrl, setAddYtUrl] = useState('')
@@ -76,6 +79,26 @@ export default function ComparePlayer({ clips }: Props) {
 
   function togglePlayPause() {
     playing ? handlePause() : handlePlay()
+  }
+
+  function changeSpeed(s: number) {
+    setSpeed(s)
+    clips.forEach((clip, i) => {
+      if (!clip.youtubeId) {
+        const v = videoRefs.current[i]
+        if (v) v.playbackRate = s
+      }
+    })
+  }
+
+  function stepFrame(direction: -1 | 1) {
+    const frameMs = 1 / 30
+    clips.forEach((clip, i) => {
+      if (!clip.youtubeId) {
+        const v = videoRefs.current[i]
+        if (v) v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + direction * frameMs))
+      }
+    })
   }
 
   function extractYouTubeId(url: string): string | null {
@@ -257,55 +280,81 @@ export default function ComparePlayer({ clips }: Props) {
 
       {/* Shared controls — only for non-YouTube clips */}
       {!hasYoutube && (
-        <div className="flex items-center justify-center gap-4 bg-white border border-[#DDE4ED] rounded-xl px-6 py-4 shadow-sm">
-          <button
-            onClick={() => {
-              clips.forEach((clip, i) => {
-                if (!clip.youtubeId) {
-                  const v = videoRefs.current[i]
-                  if (v) v.currentTime = Math.max(0, v.currentTime - 5)
-                }
-              })
-            }}
-            className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
-            title="−5 seconds"
-          >
-            <svg className="w-4 h-4 text-[#456080]" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
-            </svg>
-          </button>
-
-          <button
-            onClick={togglePlayPause}
-            className="w-12 h-12 rounded-full bg-[#C8102E] hover:bg-[#9E0E24] flex items-center justify-center transition-colors shadow-md"
-          >
-            {playing ? (
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+        <div className="bg-white border border-[#DDE4ED] rounded-xl px-6 py-4 shadow-sm space-y-3">
+          {/* Playback row */}
+          <div className="flex items-center justify-center gap-3">
+            {/* −5s */}
+            <button
+              onClick={() => clips.forEach((clip, i) => { if (!clip.youtubeId) { const v = videoRefs.current[i]; if (v) v.currentTime = Math.max(0, v.currentTime - 5) } })}
+              className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
+              title="−5 seconds"
+            >
+              <svg className="w-4 h-4 text-[#456080]" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
               </svg>
-            ) : (
-              <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-              </svg>
-            )}
-          </button>
+            </button>
 
-          <button
-            onClick={() => {
-              clips.forEach((clip, i) => {
-                if (!clip.youtubeId) {
-                  const v = videoRefs.current[i]
-                  if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5)
-                }
-              })
-            }}
-            className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
-            title="+5 seconds"
-          >
-            <svg className="w-4 h-4 text-[#456080]" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
-            </svg>
-          </button>
+            {/* Frame back */}
+            <button
+              onClick={() => stepFrame(-1)}
+              className="w-8 h-8 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors text-[10px] text-[#456080] font-bold"
+              title="Previous frame"
+              style={oswald}
+            >
+              ‹
+            </button>
+
+            {/* Play/Pause */}
+            <button
+              onClick={togglePlayPause}
+              className="w-12 h-12 rounded-full bg-[#C8102E] hover:bg-[#9E0E24] flex items-center justify-center transition-colors shadow-md"
+            >
+              {playing ? (
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+
+            {/* Frame forward */}
+            <button
+              onClick={() => stepFrame(1)}
+              className="w-8 h-8 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors text-[10px] text-[#456080] font-bold"
+              title="Next frame"
+              style={oswald}
+            >
+              ›
+            </button>
+
+            {/* +5s */}
+            <button
+              onClick={() => clips.forEach((clip, i) => { if (!clip.youtubeId) { const v = videoRefs.current[i]; if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5) } })}
+              className="w-9 h-9 rounded-lg bg-[#EEF2F7] hover:bg-[#DDE4ED] flex items-center justify-center transition-colors"
+              title="+5 seconds"
+            >
+              <svg className="w-4 h-4 text-[#456080]" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Speed row */}
+          <div className="flex items-center justify-center gap-2">
+            {(SPEEDS as readonly number[]).map(s => (
+              <button
+                key={s}
+                onClick={() => changeSpeed(s)}
+                className={`px-3 py-1 rounded text-[11px] transition-colors ${speed === s ? 'bg-[#C8102E] text-white' : 'bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080]'}`}
+                style={oswald}
+              >
+                {s === 1 ? '1x' : `${s}x`}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

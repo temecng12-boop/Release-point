@@ -14,7 +14,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         className="flex items-center px-5 h-14 border-b border-[#DDE4ED]"
         style={{ backgroundColor: 'rgba(255,255,255,0.97)' }}
       >
-        <Logo size="sm" href="/" />
+        <Logo size="sm" href="/dashboard" />
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">

@@ -25,7 +25,7 @@ interface Props {
   initialName: string
   initialTeamName: string
   initialBio?: string
-  initialCollege?: string
+  initialSchools?: string[]
   initialPlayingCareer?: string
   initialCoachingSince?: number | null
   initialCertifications?: string[]
@@ -39,7 +39,7 @@ export default function EditProfileForm({
   initialName,
   initialTeamName,
   initialBio = '',
-  initialCollege = '',
+  initialSchools = [],
   initialPlayingCareer = '',
   initialCoachingSince = null,
   initialCertifications = [],
@@ -51,7 +51,8 @@ export default function EditProfileForm({
   const [name, setName] = useState(initialName)
   const [teamName, setTeamName] = useState(initialTeamName)
   const [bio, setBio] = useState(initialBio)
-  const [college, setCollege] = useState(initialCollege)
+  const [schoolInput, setSchoolInput] = useState('')
+  const [schools, setSchools] = useState<string[]>(initialSchools)
   const [playingCareer, setPlayingCareer] = useState(initialPlayingCareer)
   const [coachingSince, setCoachingSince] = useState(initialCoachingSince?.toString() ?? '')
   const [certInput, setCertInput] = useState('')
@@ -63,6 +64,14 @@ export default function EditProfileForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  function addSchool() {
+    const val = schoolInput.trim()
+    if (val && !schools.includes(val)) {
+      setSchools([...schools, val])
+    }
+    setSchoolInput('')
+  }
 
   function addCert() {
     const val = certInput.trim()
@@ -82,7 +91,7 @@ export default function EditProfileForm({
       full_name: name,
       team_name: teamName,
       bio: bio || undefined,
-      college: college || undefined,
+      schools,
       playing_career: playingCareer || undefined,
       coaching_since: coachingSince ? parseInt(coachingSince) : null,
       certifications,
@@ -135,23 +144,54 @@ export default function EditProfileForm({
       <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
         <div className="p-6 space-y-5">
           <p className="text-xs text-[#C8102E] tracking-[0.3em]" style={oswald}>Baseball Background</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
-              <label className={labelClass} style={oswald}>College / University</label>
-              <input type="text" value={college} onChange={e => setCollege(e.target.value)} placeholder="e.g. University of Florida" className={inputClass} />
+              <label className={labelClass} style={oswald}>Schools / Universities</label>
+              {schools.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 p-2 bg-[#F8FAFC] rounded-lg border border-[#DDE4ED]">
+                  {schools.map(s => (
+                    <span key={s} className="flex items-center gap-1.5 text-xs bg-[#1C3A5C] text-white px-2.5 py-1 rounded-full shrink-0">
+                      {s}
+                      <button
+                        type="button"
+                        onClick={() => setSchools(schools.filter(x => x !== s))}
+                        className="opacity-60 hover:opacity-100 leading-none min-h-0"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={schoolInput}
+                  onChange={e => setSchoolInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSchool() } }}
+                  placeholder="e.g. University of Florida"
+                  className={`${inputClass} flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={addSchool}
+                  className="px-4 py-2 text-sm bg-[#1C3A5C] text-white rounded-lg hover:bg-[#0F1F33] transition-colors shrink-0"
+                  style={oswald}
+                >
+                  Add
+                </button>
+              </div>
             </div>
-            <div>
-              <label className={labelClass} style={oswald}>Coaching Since</label>
-              <input
-                type="number"
-                value={coachingSince}
-                onChange={e => setCoachingSince(e.target.value)}
-                placeholder="2010"
-                min="1960"
-                max="2030"
-                className={inputClass}
-              />
-            </div>
+          </div>
+          <div className="sm:max-w-[50%]">
+            <label className={labelClass} style={oswald}>Coaching Since</label>
+            <input
+              type="number"
+              value={coachingSince}
+              onChange={e => setCoachingSince(e.target.value)}
+              placeholder="2010"
+              min="1960"
+              max="2030"
+              className={inputClass}
+            />
           </div>
           <div>
             <label className={labelClass} style={oswald}>Highest Playing Level</label>

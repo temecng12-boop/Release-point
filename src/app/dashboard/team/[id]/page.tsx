@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
+import AddCoachForm from './add-coach-form'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -22,7 +23,26 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     .eq('id', id)
     .single()
 
-  if (!team || team.coach_id !== user.id) notFound()
+  if (!team) notFound()
+
+  // Check if current user is a coach on this team (organizer or assistant)
+  const { data: myMembership } = await supabaseAdmin
+    .from('team_coaches')
+    .select('role')
+    .eq('team_id', id)
+    .eq('coach_id', user.id)
+    .single()
+
+  if (!myMembership) notFound()
+
+  const isOrganizer = myMembership.role === 'organizer'
+
+  // Fetch all coaches on this team with their profile info
+  const { data: teamCoaches } = await supabaseAdmin
+    .from('team_coaches')
+    .select('coach_id, role, profiles(full_name, email)')
+    .eq('team_id', id)
+    .order('role', { ascending: true }) // organizer first
 
   const { data: teamPlayerLinks } = await supabaseAdmin
     .from('player_teams')
@@ -115,6 +135,16 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <TeamInviteForm teamId={id} />
+
+        <AddCoachForm
+          teamId={id}
+          coaches={(teamCoaches ?? []).map(c => ({
+            coach_id: c.coach_id as string,
+            role: c.role as string,
+            profiles: Array.isArray(c.profiles) ? (c.profiles[0] ?? null) : c.profiles,
+          }))}
+          isOrganizer={isOrganizer}
+        />
 
         <TeamLeaderboard entries={leaderboardEntries} />
 

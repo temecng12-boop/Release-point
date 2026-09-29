@@ -5,7 +5,7 @@ import SiteFooter from '@/components/SiteFooter'
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 export const metadata = {
-  title: 'About | Release Point',
+  title: 'About',
   description: 'The purpose, technology, and people behind Release Point.',
 }
 

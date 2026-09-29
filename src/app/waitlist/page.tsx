@@ -3,7 +3,7 @@ import Logo from '@/components/Logo'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-export const metadata = { title: 'Join the Waitlist | Release Point' }
+export const metadata = { title: 'Join the Waitlist' }
 
 export default function WaitlistPage() {
   return (

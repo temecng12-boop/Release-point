@@ -21,15 +21,9 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
         <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-4" style={oswald}>Add Player to Roster</p>
         <form ref={formRef} action={action} className="space-y-3">
           <input type="hidden" name="team_id" value={teamId} />
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Name</label>
-              <input type="text" name="full_name" placeholder="Player's full name" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Guardian Name</label>
-              <input type="text" name="guardian_name" placeholder="Parent / guardian name" required className={inputClass} />
-            </div>
+          <div>
+            <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Name</label>
+            <input type="text" name="full_name" placeholder="Player's full name" className={inputClass} />
           </div>
           <div>
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Email</label>
@@ -59,7 +53,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
           )}
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          Guardian receives a consent email. Player appears on the roster after they consent.
+          Player receives an invite email to set up their account and join the roster.
         </p>
       </div>
     </div>

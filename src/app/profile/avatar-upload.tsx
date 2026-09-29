@@ -240,7 +240,7 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
           onChange={e => { const f = e.target.files?.[0]; if (f) handleRawFile(f); e.target.value = '' }}
         />
 
-        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-[#1C3A5C] to-[#456080] flex items-center justify-center relative">
+        <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-[#1C3A5C] to-[#456080] flex items-center justify-center relative">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />

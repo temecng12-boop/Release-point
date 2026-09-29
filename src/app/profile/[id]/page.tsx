@@ -161,7 +161,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 </div>
               </div>
               {/* Upload button for coach */}
-              <UploadButton playerId={player.id} playerName={player.full_name} />
+              <UploadButton playerId={player.id} playerName={player.full_name} maxFiles={50} />
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">

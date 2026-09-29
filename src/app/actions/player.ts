@@ -162,6 +162,7 @@ export async function updateProfile(data: {
   team_name?: string
   bio?: string
   college?: string
+  schools?: string[]
   playing_career?: string
   coaching_since?: number | null
   certifications?: string[]

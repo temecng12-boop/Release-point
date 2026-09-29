@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
+import BulkUploadModal from './bulk-upload-modal'
 
 const COMPRESS_THRESHOLD_MB = 30
 const FFMPEG_CORE_VERSION = '0.12.6'
@@ -51,14 +52,17 @@ type Phase = 'idle' | 'naming' | 'compressing' | 'uploading'
 export default function UploadButton({
   playerId,
   playerName,
+  maxFiles = 20,
 }: {
   playerId: string
   playerName: string
+  maxFiles?: number
 }) {
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
   const [error, setError]             = useState<string | null>(null)
   const [title, setTitle]             = useState('')
+  const [bulkFiles, setBulkFiles]     = useState<File[] | null>(null)
   const inputRef    = useRef<HTMLInputElement>(null)
   const pendingFile = useRef<File | null>(null)
   const router      = useRouter()
@@ -191,6 +195,18 @@ export default function UploadButton({
     )
   }
 
+  // ── bulk modal ────────────────────────────────────────────────────────────
+  if (bulkFiles) {
+    return (
+      <BulkUploadModal
+        playerId={playerId}
+        playerName={playerName}
+        files={bulkFiles}
+        onClose={() => { setBulkFiles(null); if (inputRef.current) inputRef.current.value = '' }}
+      />
+    )
+  }
+
   // ── idle / uploading trigger ──────────────────────────────────────────────
   return (
     <div className="flex flex-col items-end gap-1">
@@ -198,10 +214,21 @@ export default function UploadButton({
         ref={inputRef}
         type="file"
         accept="video/mp4,video/quicktime,video/*"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleFileSelected(file)
+          const files = Array.from(e.target.files ?? [])
+          if (!files.length) return
+          if (files.length > maxFiles) {
+            setError(`Max ${maxFiles} videos at a time`)
+            e.target.value = ''
+            return
+          }
+          if (files.length > 1) {
+            setBulkFiles(files)
+          } else {
+            handleFileSelected(files[0])
+          }
           e.target.value = ''
         }}
       />

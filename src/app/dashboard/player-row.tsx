@@ -116,7 +116,7 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
               )}
             </button>
             <RecordButton playerId={player.id} playerName={player.full_name} />
-            <UploadButton playerId={player.id} playerName={player.full_name} />
+            <UploadButton playerId={player.id} playerName={player.full_name} maxFiles={50} />
           </div>
         </div>
 
