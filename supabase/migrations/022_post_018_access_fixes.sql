@@ -6,9 +6,14 @@
 --      they can view or teams they coach. Writes are service-role only.
 --   3. clips.uploaded_by and pitch_metrics.created_by: nullable, and the
 --      foreign key to auth.users becomes ON DELETE SET NULL.
+--   4. players: team coaches (organizers and assistants) can read their
+--      team's players but not change them. Only the direct coach
+--      (players.coach_id) can insert, update or delete through RLS.
 --
--- Safe to re-run. Runs as one transaction: if 018 hasn't been applied, it
--- stops at the first check and changes nothing.
+-- Needs 018, 019 and 020 applied first. Safe to re-run. Runs as one
+-- transaction: if a prerequisite is missing, it stops at the first check and
+-- changes nothing. The app's server code uses the service role and is
+-- unaffected.
 
 BEGIN;
 
@@ -20,6 +25,21 @@ BEGIN
   END IF;
   IF to_regclass('public.player_teams') IS NULL THEN
     RAISE EXCEPTION 'Migration 022 needs the player_teams table (migrations 011/012). Nothing was changed.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  IF to_regprocedure('public.rls_my_coached_player_ids()') IS NULL THEN
+    RAISE EXCEPTION 'Migration 022 needs migration 018 (rls_my_coached_player_ids). Nothing was changed.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'players' AND column_name = 'career_stats') THEN
+    RAISE EXCEPTION 'Migration 022 needs migration 019 (schema drift catch-up) first. Nothing was changed.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'pitch_metrics'
+                    AND column_name = 'spin_axis' AND data_type = 'numeric') THEN
+    RAISE EXCEPTION 'Migration 022 needs migration 020 (numeric spin_axis) first. Nothing was changed.'
       USING ERRCODE = 'P0001';
   END IF;
 END
@@ -179,6 +199,39 @@ BEGIN
   END LOOP;
 END
 $$;
+
+
+-- ============================================================================
+-- 4. players: team coaches read only; direct coach writes
+-- ============================================================================
+-- 018's players_coach_all (FOR ALL) let any coach on the player's team update
+-- or delete the row. It is split per command: SELECT keeps 018's reach;
+-- INSERT, UPDATE and DELETE need coach_id = auth.uid(). WITH CHECK also
+-- requires the new row's coach_id to be the caller, so a coach can't hand a
+-- player to someone else. The guardian and claim policies are unchanged
+-- (021's players_restrict_update trigger limits which columns they touch).
+DROP POLICY IF EXISTS "players_coach_all"    ON public.players;
+DROP POLICY IF EXISTS "players_coach_select" ON public.players;
+DROP POLICY IF EXISTS "players_coach_insert" ON public.players;
+DROP POLICY IF EXISTS "players_coach_update" ON public.players;
+DROP POLICY IF EXISTS "players_coach_delete" ON public.players;
+
+CREATE POLICY "players_coach_select" ON public.players
+  FOR SELECT TO authenticated
+  USING (coach_id = auth.uid() OR id IN (SELECT public.rls_my_coached_player_ids()));
+
+CREATE POLICY "players_coach_insert" ON public.players
+  FOR INSERT TO authenticated
+  WITH CHECK (coach_id = auth.uid());
+
+CREATE POLICY "players_coach_update" ON public.players
+  FOR UPDATE TO authenticated
+  USING      (coach_id = auth.uid())
+  WITH CHECK (coach_id = auth.uid());
+
+CREATE POLICY "players_coach_delete" ON public.players
+  FOR DELETE TO authenticated
+  USING (coach_id = auth.uid());
 
 COMMIT;
 
