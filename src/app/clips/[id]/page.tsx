@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canViewPlayerContent } from '@/lib/clip-access'
-import { canUseAiCoachFor } from '@/lib/auth/roster-access'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -39,7 +38,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   // the skeleton.
   return (
     <Suspense fallback={<ClipSkeleton />}>
-      <ClipContent id={id} clip={clip} userId={user.id} />
+      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} />
     </Suspense>
   )
 }
@@ -55,10 +54,12 @@ type ClipRow = {
   voice_path: string | null
 }
 
-async function ClipContent({ id, clip, userId }: {
+async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
   id: string
   clip: ClipRow
   userId: string
+  /** False for guardians: they see a notice instead of the AI Coach. */
+  aiCoachAvailable: boolean
 }) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
@@ -90,7 +91,7 @@ async function ClipContent({ id, clip, userId }: {
 
   const { data: playerRow } = await supabaseAdmin
     .from('players')
-    .select('full_name, age_group, position, coach_id, user_id')
+    .select('full_name, age_group, position')
     .eq('id', clip.player_id)
     .single()
 
@@ -302,7 +303,7 @@ async function ClipContent({ id, clip, userId }: {
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
-            aiCoachAvailable={canUseAiCoachFor(userId, playerRow)}
+            aiCoachAvailable={aiCoachAvailable}
           />
         </div>
       </main>

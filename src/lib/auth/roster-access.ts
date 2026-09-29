@@ -109,7 +109,10 @@ export function canDeleteClipItem(userId: string, createdBy: string | null | und
   return isPlayersOwnCoach(userId, player) || isThePlayer(userId, player)
 }
 
-/** Who may use the AI coach for a player's data: their own coach or the player. */
+/**
+ * Direct AI coach access to a player's data: their own coach or the player.
+ * Team coaches are also allowed; loadAiChatContext checks that separately.
+ */
 export function canUseAiCoachFor(userId: string, player: PlayerAccessIds): boolean {
   return isPlayersOwnCoach(userId, player) || isThePlayer(userId, player)
 }

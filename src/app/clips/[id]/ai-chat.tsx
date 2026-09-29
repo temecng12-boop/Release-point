@@ -144,7 +144,7 @@ export default function AIChat({
           </p>
         </div>
         <p className="p-4 text-sm text-[#456080]">
-          The AI Coach isn&apos;t available for guardians. It&apos;s for the player and their coach.
+          The AI Coach isn&apos;t available for guardians. It&apos;s for the player and their coaches.
         </p>
       </div>
     )
