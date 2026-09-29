@@ -321,7 +321,7 @@ export default async function HomePage() {
             </div>
           </SpotlightCard>
 
-          {/* Rapsodo */}
+          {/* Pitch data */}
           <SpotlightCard
             className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
