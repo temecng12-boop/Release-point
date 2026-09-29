@@ -99,12 +99,13 @@ test('direct coach reads and writes clips and lessons', async () => {
   }
 })
 
-test('team (assistant) coach reads and writes through team_coaches + player_teams', async () => {
+test('team (assistant) coach gets read links only', async () => {
   const db = fakeDb(base())
-  const r = await decideStorageAccess(db, ASST, 'clips', clipUpload, 'write')
-  assert.deepEqual(r, { allowed: true, playerId: P1, via: 'team_coach', teamCheck: 'ok' })
-  assert.equal(await allowed(db, ASST, 'lessons', lesson, 'write'), true)
   assert.equal(await allowed(db, ASST, 'clips', tsVoice, 'read'), true)
+  assert.equal(await allowed(db, ASST, 'lessons', lesson, 'read'), true)
+  const r = await decideStorageAccess(db, ASST, 'clips', clipUpload, 'write')
+  assert.deepEqual(r, { allowed: false, reason: 'read-only access', teamCheck: 'ok' })
+  assert.equal(await allowed(db, ASST, 'lessons', lesson, 'write'), false)
 })
 
 test('guardian is read-only', async () => {
@@ -116,9 +117,11 @@ test('guardian is read-only', async () => {
   assert.equal(await allowed(db, GUARD, 'lessons', lesson, 'write'), false)
 })
 
-test('guardian who is also a team coach of the player can write', async () => {
+test('guardian who is also a team coach of the player is still read-only', async () => {
   const db = fakeDb(base())
-  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), true)
+  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'read'), true)
+  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), false)
+  assert.equal(await allowed(db, GUARD_COACH, 'lessons', `${P2}/c/lesson.webm`, 'write'), false)
 })
 
 test('stranger, off-team coach and signed-out caller are denied', async () => {
@@ -156,7 +159,7 @@ test('team_coaches missing (018 not applied): team path skipped, direct access u
   assert.equal(await allowed(db, GUARD, 'clips', tsVoice, 'read'), true)
   assert.equal(await allowed(db, GUARD, 'clips', clipUpload, 'write'), false)
   assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'read'), true)   // still a guardian
-  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), false) // team path unavailable
+  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), false)
 })
 
 test('player_teams missing: team path skipped, direct access unchanged', async () => {
