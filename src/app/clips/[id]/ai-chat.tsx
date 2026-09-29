@@ -26,23 +26,23 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 const AGENTS = {
   randy: {
     name: 'Randy',
-    role: 'Pitching Agent',
+    role: 'Pitching Coach',
     color: '#C8102E',
     bg: '#FFF5F5',
     border: '#FBD0D6',
-    description: 'Pitch design, mechanics, Rapsodo and Trackman pitching data, velocity, spin, break profile, and arm health.',
-    placeholder: 'Ask Randy about mechanics, pitch design, Rapsodo data…',
-    intro: "I'm Randy, your pitching AI. I have access to this session's Trackman and Rapsodo data. Ask me about mechanics, pitch design, or what to work on.",
+    description: "Velocity, spin, movement, and mechanics — connected to how great pitchers actually think about their craft.",
+    placeholder: "What felt off today? Or ask about today's numbers…",
+    intro: "I've got your numbers from this session. Tell me what felt off, or I can walk you through what the data is showing.",
   },
   barry: {
     name: 'Barry',
-    role: 'Hitting Agent',
+    role: 'Hitting Coach',
     color: '#1C3A5C',
     bg: '#F0F4F8',
     border: '#C0CFE0',
-    description: 'Exit velocity, launch angle, barrel rate, bat path, swing mechanics, Rapsodo and Trackman hitting data.',
-    placeholder: 'Ask Barry about exit velo, launch angle, swing path…',
-    intro: "I'm Barry, your hitting AI. I can read exit velocity, launch angle, barrel rate, attack angle, and any Trackman or Rapsodo hitting data loaded for this session. Ask me about swing mechanics or what to work on.",
+    description: "Exit velocity, launch angle, bat path, and swing mechanics — grounded in how elite hitters have always talked about contact.",
+    placeholder: "What felt off at the plate? Or ask about today's numbers…",
+    intro: "I've got today's exit velocity and launch data. Tell me what felt off, or ask me what the numbers are saying.",
   },
 }
 
@@ -145,7 +145,7 @@ export default function AIChat({
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-5 space-y-4">
         <div>
           <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os}>AI Coach</p>
-          <p className="text-sm text-[#0F1F33]">Choose your analyst before you start.</p>
+          <p className="text-sm text-[#0F1F33]">Pick who you want to talk to.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
