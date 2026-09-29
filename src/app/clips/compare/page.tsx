@@ -35,9 +35,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
 
     const { data: playerRow } = await supabaseAdmin
       .from('players')
-      .select('full_name, coach_id, user_id')
+      .select('full_name, coach_id, user_id, guardian_id')
       .eq('id', clip.player_id)
-      .single()
+      .maybeSingle()
 
     // Same rule as the clip page: player, direct coach, team coach or guardian.
     const access = await canViewPlayerContent(supabaseAdmin, user!.id, clip.player_id)
@@ -161,6 +161,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   ])
 
   if (!clipB) notFound()
+  // A requested slot the caller can't view is a 404 too, not silently dropped.
+  if ((c && clipC === null) || (d && clipD === null)) notFound()
 
   // Build clips array — only include slots that resolved successfully
   const clips: ClipData[] = [clipA, clipB]

@@ -17,6 +17,7 @@ export type PlayerAccessRow = {
  *  - the player's coach (players.coach_id)
  *  - the player themself (players.user_id)
  *  - a guardian linked to the player (players.guardian_id -> guardians.user_id)
+ * Future: upstream's team coaches (team_coaches) would be added here.
  */
 export async function canViewPlayer(userId: string, player: PlayerAccessRow | null | undefined): Promise<boolean> {
   if (!player) return false
