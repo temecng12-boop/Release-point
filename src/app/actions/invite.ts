@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendPlayerInviteEmail } from '@/lib/email'
+import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
 export async function invitePlayer(
   _prevState: { error?: string; success?: string } | undefined,
@@ -24,9 +25,22 @@ export async function invitePlayer(
   const playerName  = ((formData.get('full_name') as string | null) ?? '').trim()
   const playerEmail = ((formData.get('player_email') as string | null) ?? '').trim().toLowerCase()
   const teamId  = formData.get('team_id') as string | null
-  const teamIds = teamId ? [teamId] : (formData.getAll('team_ids') as string[])
+  const teamIds = [...new Set((teamId ? [teamId] : (formData.getAll('team_ids') as string[])).filter(Boolean))]
 
   if (!playerEmail) return { error: 'Player email is required' }
+
+  // Every team in the invite must belong to this coach. Checked before any
+  // player row is created or claimed.
+  if (teamIds.length > 0) {
+    const { data: ownedTeams, error: teamsError } = await supabaseAdmin
+      .from('teams')
+      .select('id')
+      .eq('coach_id', user.id)
+      .in('id', teamIds)
+    if (teamsError) return { error: 'Could not check teams. Please try again.' }
+    const owned = ((ownedTeams ?? []) as { id: string }[]).map((t) => t.id)
+    if (teamIdsNotOwned(teamIds, owned).length > 0) return { error: 'Invalid team' }
+  }
 
   // Create player row
   const { data: player, error: playerError } = await supabaseAdmin
@@ -49,9 +63,9 @@ export async function invitePlayer(
 
     if (existing) {
       if (!existing.coach_id) {
-        // Unlinked (signed up independently) — claim them for this coach
-        await supabaseAdmin.from('players').update({ coach_id: user.id }).eq('id', existing.id)
-        playerId = existing.id
+        // Signed up on their own with no coach. Knowing their email is not
+        // enough to attach them to a roster, so refuse rather than claim them.
+        return { error: SELF_SIGNED_UP_PLAYER_MESSAGE }
       } else if (existing.coach_id === user.id) {
         playerId = existing.id
       } else {
