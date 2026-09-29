@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 016: row-level security for the `clips` storage bucket (RP-041)
+-- Migration 024: row-level security for the `clips` storage bucket (RP-041)
 -- ============================================================================
 -- DRAFT. Written from the repo only; review against the live storage policies
 -- before applying. RLS policies are OR'ed together, so any broader policy that
@@ -8,7 +8,7 @@
 --   SELECT policyname, cmd, roles, qual, with_check
 --   FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects';
 --
--- Depends on 014 (tightened RLS) and 015 (player_has_video_consent).
+-- Depends on 021 (tightened RLS) and 023 (player_has_video_consent).
 --
 -- Path layout in the `clips` bucket, from the app code:
 --   <playerId>/<timestamp>.<ext>          clip video    (upload-button, record-button)
@@ -33,11 +33,11 @@
 --   * deleteClip's storage remove() calls (DELETE),
 --   * any direct PostgREST / storage API call someone makes with their own JWT.
 --
--- Rules, mirroring the clips table policies in 002 as left by 014:
+-- Rules, mirroring the clips table policies in 002 as left by 018 and 021:
 --   read:   the player's own coach, the player, a linked guardian
 --   insert: the player's own coach (any object under the player's folder);
 --           the player, for their own top-level clip files only. Both only
---           when the player has an 18+ confirmation or guardian consent (015).
+--           when the player has an 18+ confirmation or guardian consent (023).
 --   update: the player's own coach
 --   delete: the player's own coach; the player, only for a clip video they
 --           uploaded themself (matches deleteClip: uploader or coach)
