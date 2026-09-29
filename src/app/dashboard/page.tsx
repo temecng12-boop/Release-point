@@ -2,23 +2,22 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { signOut } from '@/app/actions/auth'
 import UploadButton from './upload-button'
 import CreateTeamButton from './create-team-button'
-import PlayerRoster from './player-roster'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-const glass = {
-  background: '#ffffff',
-  border: '1px solid #e2e8f0',
-}
-const glassDark = {
-  background: '#f8fafc',
-  border: '1px solid #e2e8f0',
+function fmtDate(iso: string) {
+  const d = new Date(iso)
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export default async function DashboardPage() {
@@ -38,97 +37,89 @@ export default async function DashboardPage() {
   const isCoach = (profile?.role ?? user.user_metadata?.role) === 'coach'
 
   // ── Coach data ──────────────────────────────────────────────────────────────
-  const { data: teams } = isCoach
+  // Fetch all teams where this user is a coach (organizer OR assistant)
+  const { data: teamCoachRows } = isCoach
     ? await supabaseAdmin
-        .from('teams')
-        .select('id, name, age_group')
+        .from('team_coaches')
+        .select('team_id, role, teams(id, name, age_group, coach_id)')
         .eq('coach_id', user.id)
-        .order('created_at')
     : { data: null }
 
+  const teams = (teamCoachRows ?? []).map(r => {
+    const t = Array.isArray(r.teams) ? r.teams[0] : r.teams
+    return { id: t?.id as string, name: t?.name as string, age_group: t?.age_group as string | null, myRole: r.role }
+  }).filter(t => t.id)
+
+  const teamIds = teams.map(t => t.id)
+
+  // Player links across all teams
+  const { data: allPlayerLinks } = isCoach && teamIds.length > 0
+    ? await supabaseAdmin
+        .from('player_teams')
+        .select('player_id, team_id')
+        .in('team_id', teamIds)
+    : { data: [] }
+
+  const allTeamPlayerIds = [...new Set((allPlayerLinks ?? []).map(l => l.player_id))]
+
+  // Also include players directly assigned to this coach
   const { data: directPlayers } = isCoach
     ? await supabaseAdmin
         .from('players')
-        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
+        .select('id')
         .eq('coach_id', user.id)
-        .order('full_name')
     : { data: null }
 
-  // Also get players linked via team membership (players who joined a team but have no coach_id set)
-  const teamIds = teams?.map(t => t.id) ?? []
-  let allTeamMemberIds: string[] = []
-  if (isCoach && teamIds.length > 0) {
-    const { data: teamLinks } = await supabaseAdmin
-      .from('player_teams')
-      .select('player_id')
-      .in('team_id', teamIds)
-    allTeamMemberIds = teamLinks?.map(l => l.player_id) ?? []
-  }
+  const directPlayerIds = (directPlayers ?? []).map(p => p.id)
+  const allPlayerIds = [...new Set([...allTeamPlayerIds, ...directPlayerIds])]
 
-  // Get team-only players (those not already in directPlayers)
-  const directPlayerIds = directPlayers?.map(p => p.id) ?? []
-  const teamOnlyIds = allTeamMemberIds.filter(id => !directPlayerIds.includes(id))
-
-  const { data: teamOnlyPlayers } = isCoach && teamOnlyIds.length > 0
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
-        .in('id', teamOnlyIds)
-        .order('full_name')
-    : { data: null }
-
-  // Merge all players
-  const players = [
-    ...(directPlayers ?? []),
-    ...(teamOnlyPlayers ?? []),
-  ]
-
-  const playerIds = players.map(p => p.id)
-
-  let playerTeams: { player_id: string; team_id: string }[] = []
-  if (isCoach && playerIds.length > 0) {
-    const { data: ptData } = await supabaseAdmin
-      .from('player_teams')
-      .select('player_id, team_id')
-      .in('player_id', playerIds)
-    playerTeams = (ptData as typeof playerTeams | null) ?? []
-  }
-
-  const { data: allClips } = isCoach && playerIds.length > 0
-    ? await supabaseAdmin
-        .from('clips')
-        .select('id, player_id')
-        .in('player_id', playerIds)
-    : { data: [] }
-
-  const clipCounts: Record<string, number> = {}
-  for (const clip of allClips ?? []) {
-    clipCounts[clip.player_id] = (clipCounts[clip.player_id] ?? 0) + 1
-  }
-
-  const { data: recentClips } = isCoach && playerIds.length > 0
+  // All clips across all players
+  const { data: allClips } = isCoach && allPlayerIds.length > 0
     ? await supabaseAdmin
         .from('clips')
         .select('id, title, created_at, session_date, player_id')
-        .in('player_id', playerIds)
+        .in('player_id', allPlayerIds)
         .order('created_at', { ascending: false })
-        .limit(6)
     : { data: [] }
 
-  const { data: allSessions } = isCoach && playerIds.length > 0
+  // Per-team stats computed in JS
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const teamStats = teams.map(team => {
+    const memberIds = (allPlayerLinks ?? [])
+      .filter(l => l.team_id === team.id)
+      .map(l => l.player_id)
+    const teamClips = (allClips ?? []).filter(c => memberIds.includes(c.player_id))
+    const sortedClips = [...teamClips].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    const lastClip = sortedClips[0] ?? null
+    const activePlayers = new Set(
+      teamClips.filter(c => new Date(c.created_at) > thirtyDaysAgo).map(c => c.player_id)
+    ).size
+    return {
+      ...team,
+      playerCount: memberIds.length,
+      clipCount: teamClips.length,
+      lastActivity: lastClip
+        ? (lastClip.session_date ?? lastClip.created_at)
+        : null,
+      activePlayerCount: activePlayers,
+    }
+  })
+
+  // Recent clips for the activity feed (last 6)
+  const recentClips = (allClips ?? []).slice(0, 6)
+
+  // Player name lookup for recent clips
+  const recentPlayerIds = [...new Set(recentClips.map(c => c.player_id))]
+  const { data: recentPlayers } = recentPlayerIds.length > 0
     ? await supabaseAdmin
-        .from('bullpen_sessions')
-        .select('id, player_id, session_date, status, pitches, notes, created_at')
-        .in('player_id', playerIds)
-        .order('created_at', { ascending: false })
+        .from('players')
+        .select('id, full_name')
+        .in('id', recentPlayerIds)
     : { data: [] }
-
-  void allSessions
-
-  const playersWithTeams = (players ?? []).map(p => ({
-    ...p,
-    teamIds: playerTeams.filter(pt => pt.player_id === p.id).map(pt => pt.team_id),
-  }))
+  const playerNameMap = Object.fromEntries((recentPlayers ?? []).map(p => [p.id, p.full_name]))
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
@@ -158,7 +149,7 @@ export default async function DashboardPage() {
         .order('created_at')
     : { data: [] }
 
-  function fmtDate(sessionDate: string | null, createdAt: string) {
+  function fmtClipDate(sessionDate: string | null, createdAt: string) {
     const iso = sessionDate ?? createdAt
     return new Date(iso + (sessionDate ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
@@ -208,200 +199,181 @@ export default async function DashboardPage() {
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
         {isCoach ? (
           <>
-            {/* ── Coach Hero ── */}
-            <div className="relative rounded-2xl overflow-hidden" style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-            }}>
+            {/* ── Compact coach hero ── */}
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+            >
               <div className="h-px bg-[#E8102A]" />
-              <div className="absolute top-0 right-0 w-80 h-80 pointer-events-none" style={{
-                background: 'radial-gradient(circle, rgba(232,16,42,0.04) 0%, transparent 65%)',
-              }} />
-
-              <div className="relative px-7 py-7">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-6">
-                  {/* Avatar */}
+              <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div
-                    className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl text-white shrink-0 font-bold"
-                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)', boxShadow: '0 4px 12px rgba(232,16,42,0.2)' }}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white shrink-0 font-bold"
+                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)' }}
                   >
                     {(profile?.full_name ?? user.email ?? 'C').split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-0.5" style={os}>Head Coach</p>
-                    <h1 className="text-2xl text-slate-950 truncate leading-tight tracking-tight" style={os}>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Head Coach</p>
+                    <h1 className="text-lg text-slate-950 truncate leading-tight tracking-tight" style={os}>
                       {profile?.full_name ?? user.email?.split('@')[0] ?? 'Coach'}
                     </h1>
-                    {profile?.team_name && (
-                      <p className="text-sm text-slate-500 mt-0.5">{profile.team_name}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-5 shrink-0">
-                    {[
-                      { n: players?.length ?? 0,       l: 'Players' },
-                      { n: teams?.length ?? 0,          l: 'Teams'   },
-                      { n: (allClips ?? []).length,     l: 'Clips'   },
-                    ].map(s => (
-                      <div key={s.l} className="text-center">
-                        <p className="text-2xl text-slate-950 leading-none tracking-tight" style={os}>{s.n}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5" style={os}>{s.l}</p>
-                      </div>
-                    ))}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
-                  <CreateTeamButton />
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-2 text-[12px] px-4 py-2 rounded-lg transition-colors text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                    style={{ ...os, border: '1px solid #e2e8f0' }}
-                  >
-                    Edit Profile
-                  </Link>
+                <div className="flex items-center gap-6 shrink-0">
+                  {[
+                    { n: allPlayerIds.length, l: 'Players' },
+                    { n: teams.length,         l: 'Teams'   },
+                    { n: (allClips ?? []).length, l: 'Clips' },
+                  ].map(s => (
+                    <div key={s.l} className="text-center">
+                      <p className="text-xl text-slate-950 leading-none tracking-tight" style={os}>{s.n}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5" style={os}>{s.l}</p>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <CreateTeamButton />
+                    <Link
+                      href="/clips/compare"
+                      className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg transition-colors text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                      style={{ ...os, border: '1px solid #e2e8f0' }}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+                      </svg>
+                      Compare
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ── Onboarding wizard ── */}
-            {(teams?.length ?? 0) === 0 && (players?.length ?? 0) === 0 && (
+            {teams.length === 0 && allPlayerIds.length === 0 && (
               <CoachOnboardingWizard hasTeams={false} hasPlayers={false} />
             )}
-            {(teams?.length ?? 0) > 0 && (players?.length ?? 0) === 0 && (
-              <CoachOnboardingWizard hasTeams={true} hasPlayers={false} firstTeamId={teams![0].id} />
+            {teams.length > 0 && allPlayerIds.length === 0 && (
+              <CoachOnboardingWizard hasTeams={true} hasPlayers={false} firstTeamId={teams[0].id} />
             )}
-            {(teams?.length ?? 0) > 0 && (players?.length ?? 0) > 0 && (allClips?.length ?? 0) === 0 && (
-              <CoachOnboardingWizard hasTeams={true} hasPlayers={true} hasClips={false} firstTeamId={teams![0].id} />
+            {teams.length > 0 && allPlayerIds.length > 0 && (allClips ?? []).length === 0 && (
+              <CoachOnboardingWizard hasTeams={true} hasPlayers={true} hasClips={false} firstTeamId={teams[0].id} />
             )}
 
-            {/* ── Content Grid ── */}
-            <div className="grid md:grid-cols-[1fr_1.6fr] gap-4">
+            {/* ── Teams grid ── */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Your Teams</p>
+                <span className="text-[11px] text-slate-400" style={os}>{teams.length} {teams.length === 1 ? 'team' : 'teams'}</span>
+              </div>
 
-              {/* Left: Teams */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[12px] tracking-[0.2em] text-[#E8102A]" style={os}>Your Teams</p>
-                  <span className="text-[11px] text-slate-400" style={os}>{teams?.length ?? 0} total</span>
+              {teams.length === 0 ? (
+                <div className="rounded-xl px-5 py-12 text-center" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                  <p className="text-sm text-slate-500 mb-4">No teams yet.</p>
+                  <CreateTeamButton />
                 </div>
-
-                {!teams || teams.length === 0 ? (
-                  <div className="rounded-xl px-5 py-10 text-center" style={glass}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-slate-100">
-                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-slate-500 mb-4">No teams yet.</p>
-                    <CreateTeamButton />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {teams.map(team => {
-                      const count = playerTeams.filter(pt => pt.team_id === team.id).length
-                      const clips  = (allClips ?? []).filter(c => players?.some(p => p.id === c.player_id && playerTeams.some(pt => pt.player_id === p.id && pt.team_id === team.id))).length
-                      return (
-                        <Link
-                          key={team.id}
-                          href={`/dashboard/team/${team.id}`}
-                          className="group flex items-center gap-4 rounded-xl px-4 py-4 transition-all relative overflow-hidden"
-                          style={{ ...glass, borderLeftColor: '#E8102A', borderLeftWidth: 2 }}
-                        >
-                          <div className="pl-2 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-[14px] text-slate-950 truncate font-semibold" style={os}>{team.name}</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {teamStats.map(team => (
+                    <Link
+                      key={team.id}
+                      href={`/dashboard/team/${team.id}`}
+                      className="group rounded-xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
+                      style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+                    >
+                      <div className="h-0.5 bg-[#E8102A]" />
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div className="min-w-0">
+                            <h3 className="text-[15px] text-slate-950 truncate font-semibold leading-tight" style={os}>
+                              {team.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {team.age_group && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-full shrink-0 text-slate-500" style={{ ...os, border: '1px solid #e2e8f0' }}>
+                                <span className="text-[10px] text-slate-500 px-1.5 py-0.5 rounded" style={{ ...os, border: '1px solid #e2e8f0' }}>
                                   {team.age_group}
                                 </span>
                               )}
+                              {team.myRole === 'assistant' && (
+                                <span className="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-100" style={os}>
+                                  Assistant
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[12px] text-slate-500">
-                              {count} {count === 1 ? 'player' : 'players'}
-                              {clips > 0 ? ` · ${clips} clips` : ''}
-                            </p>
                           </div>
-                          <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+                        </div>
 
-              {/* Right: Recent Clips */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[12px] tracking-[0.2em] text-[#E8102A]" style={os}>Recent Clips</p>
-                  {(recentClips ?? []).length > 0 && (
-                    <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total</span>
-                  )}
+                        <div className="grid grid-cols-3 gap-2 pt-3" style={{ borderTop: '1px solid #f1f5f9' }}>
+                          <div>
+                            <p className="text-[17px] text-slate-950 leading-none tracking-tight" style={os}>{team.playerCount}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Players</p>
+                          </div>
+                          <div>
+                            <p className="text-[17px] text-slate-950 leading-none tracking-tight" style={os}>{team.clipCount}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Clips</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${team.activePlayerCount > 0 ? 'bg-green-500' : 'bg-slate-300'}`} />
+                              <p className="text-[11px] text-slate-600 truncate">
+                                {team.activePlayerCount > 0 ? `${team.activePlayerCount} active` : 'No activity'}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {team.lastActivity ? fmtDate(team.lastActivity) : 'No clips yet'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-
-                {!recentClips || recentClips.length === 0 ? (
-                  <div className="rounded-xl px-5 py-10 text-center" style={glass}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-slate-100">
-                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-slate-500">No clips yet. Add players and upload their first session.</p>
-                  </div>
-                ) : (
-                  <div className="rounded-xl overflow-hidden" style={glass}>
-                    {(recentClips ?? []).map((clip, i) => {
-                      const player = players?.find(p => p.id === clip.player_id)
-                      const sessionLabel = clip.session_date
-                        ? new Date(clip.session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                        : new Date(clip.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                      return (
-                        <Link
-                          key={clip.id}
-                          href={`/clips/${clip.id}`}
-                          transitionTypes={['nav-forward']}
-                          className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-slate-50"
-                          style={{ borderBottom: i < (recentClips?.length ?? 1) - 1 ? '1px solid #f1f5f9' : undefined }}
-                        >
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                            <svg className="w-4 h-4 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] text-slate-700 truncate font-medium group-hover:text-slate-950 transition-colors">{clip.title}</p>
-                            <p className="text-[12px] text-slate-400 mt-0.5">
-                              {player?.full_name ?? 'Unknown'} · {sessionLabel}
-                            </p>
-                          </div>
-                          {i === 0 && (
-                            <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
-                          )}
-                          <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* ── Players roster ── */}
-            {(players?.length ?? 0) > 0 && (
+            {/* ── Recent activity feed ── */}
+            {recentClips.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-[12px] tracking-[0.2em] text-[#E8102A]" style={os}>
-                    All Players ({players?.length ?? 0})
-                  </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Recent Activity</p>
+                  <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total clips</span>
                 </div>
-                <PlayerRoster
-                  players={playersWithTeams}
-                  teams={teams ?? []}
-                  clipCounts={clipCounts}
-                />
+                <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                  {recentClips.map((clip, i) => {
+                    const label = clip.session_date
+                      ? new Date(clip.session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      : new Date(clip.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    return (
+                      <Link
+                        key={clip.id}
+                        href={`/clips/${clip.id}`}
+                        className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-slate-50"
+                        style={{ borderBottom: i < recentClips.length - 1 ? '1px solid #f1f5f9' : undefined }}
+                      >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
+                          <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] text-slate-700 truncate group-hover:text-slate-950 transition-colors">{clip.title}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {playerNameMap[clip.player_id] ?? 'Unknown'} · {label}
+                          </p>
+                        </div>
+                        {i === 0 && (
+                          <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
+                        )}
+                        <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </>
@@ -455,45 +427,15 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* No clips empty state */}
             {(!myClips || myClips.length === 0) ? (
               <div className="space-y-4">
-                <p className="text-xs text-white/25 tracking-[0.3em]" style={os}>Get Started</p>
                 <div className="grid sm:grid-cols-3 gap-3">
                   {[
-                    {
-                      icon: (
-                        <svg className="w-7 h-7 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-                        </svg>
-                      ),
-                      title: 'Upload a Clip',
-                      desc: 'Film your bullpen or game appearance and upload it. Your coach gets notified instantly.',
-                    },
-                    {
-                      icon: (
-                        <svg className="w-7 h-7 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                      ),
-                      title: 'Track Metrics',
-                      desc: 'Your coach uploads Rapsodo data linked to your clips: velocity, spin rate, movement.',
-                    },
-                    {
-                      icon: (
-                        <svg className="w-7 h-7 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                        </svg>
-                      ),
-                      title: 'Get Feedback',
-                      desc: 'Coaches draw directly on your video and leave voice notes. See exactly what to work on.',
-                    },
+                    { title: 'Upload a Clip', desc: 'Film your bullpen or game appearance and upload it. Your coach gets notified instantly.' },
+                    { title: 'Track Metrics', desc: 'Your coach uploads Rapsodo data linked to your clips: velocity, spin rate, movement.' },
+                    { title: 'Get Feedback',  desc: 'Coaches draw directly on your video and leave voice notes. See exactly what to work on.' },
                   ].map(card => (
-                    <div key={card.title} className="rounded-xl p-5" style={glass}>
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
-                        style={{ background: 'rgba(232,16,42,0.1)' }}>
-                        {card.icon}
-                      </div>
+                    <div key={card.title} className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
                       <h3 className="text-sm text-slate-950 mb-2 tracking-tight" style={os}>{card.title}</h3>
                       <p className="text-sm text-slate-500 leading-relaxed">{card.desc}</p>
                     </div>
@@ -501,49 +443,18 @@ export default async function DashboardPage() {
                 </div>
 
                 {playerRow && (
-                  <div className="rounded-xl px-6 py-10 text-center transition-colors"
-                    style={{ ...glassDark, borderStyle: 'dashed' }}>
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 bg-slate-100">
-                      <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </div>
+                  <div className="rounded-xl px-6 py-10 text-center" style={{ background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
                     <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
                     <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
                     <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
                   </div>
                 )}
-
-                <Link
-                  href="/player-settings"
-                  className="flex items-center gap-4 rounded-xl px-5 py-4 transition-colors group hover:bg-slate-50"
-                  style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
-                >
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-800 font-medium tracking-tight" style={os}>Complete Your Profile</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Add height, weight, high school, travel team, and college interests.</p>
-                  </div>
-                  <svg className="w-5 h-5 text-slate-300 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
               </div>
             ) : (
-              /* Has clips */
               <div className="space-y-4">
-                {(myMetrics?.length ?? 0) === 0 && (
-                  <div className="rounded-xl px-5 py-4 text-center" style={glass}>
-                    <p className="text-xs text-slate-500">No pitch metrics yet. Upload a Rapsodo CSV on any clip to start tracking.</p>
-                  </div>
-                )}
                 {(myMetrics?.length ?? 0) > 0 && (
                   <>
-                    <div className="rounded-xl overflow-hidden" style={glass}>
+                    <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
                       <div className="h-0.5 bg-[#E8102A]" />
                       <div className="p-5">
                         <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-4" style={os}>Career Stats</p>
@@ -564,12 +475,9 @@ export default async function DashboardPage() {
                     </div>
 
                     {bestPitch && (
-                      <div className="relative rounded-xl overflow-hidden" style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                      }}>
+                      <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
                         <div className="h-px bg-[#E8102A]" />
-                        <div className="relative p-5">
+                        <div className="p-5">
                           <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
                           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                             <div>
@@ -585,22 +493,6 @@ export default async function DashboardPage() {
                                 {myClipTitleMap[bestPitch.clip_id] ?? ''}
                               </p>
                             </div>
-                            {(bestPitch.horizontal_break != null || bestPitch.vertical_break != null) && (
-                              <div className="flex gap-4 ml-auto">
-                                {bestPitch.horizontal_break != null && (
-                                  <div className="text-center">
-                                    <p className="text-lg text-slate-950 tracking-tight" style={os}>{bestPitch.horizontal_break}</p>
-                                    <p className="text-[13px] text-slate-400">HB</p>
-                                  </div>
-                                )}
-                                {bestPitch.vertical_break != null && (
-                                  <div className="text-center">
-                                    <p className="text-lg text-slate-950 tracking-tight" style={os}>{bestPitch.vertical_break}</p>
-                                    <p className="text-[13px] text-slate-400">VB</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -620,9 +512,8 @@ export default async function DashboardPage() {
                     <Link
                       key={clip.id}
                       href={`/clips/${clip.id}`}
-                      transitionTypes={['nav-forward']}
                       className="group flex items-center gap-3 sm:gap-4 rounded-xl px-4 sm:px-5 py-3 sm:py-4 transition-all"
-                      style={glass}
+                      style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
                     >
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
                         <svg className="w-5 h-5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
@@ -630,24 +521,14 @@ export default async function DashboardPage() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-700 group-hover:text-slate-950 truncate font-medium transition-colors">{clip.title}</p>
+                        <p className="text-sm text-slate-700 group-hover:text-slate-950 truncate transition-colors">{clip.title}</p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {fmtDate((clip as { session_date?: string | null }).session_date ?? null, clip.created_at)}
+                          {fmtClipDate((clip as { session_date?: string | null }).session_date ?? null, clip.created_at)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {(clip as { voice_path?: string | null }).voice_path && (
-                          <span className="flex items-center gap-1 text-[10px] text-slate-500 px-2 py-0.5 rounded-full bg-slate-100">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
-                            </svg>
-                            Voice
-                          </span>
-                        )}
-                        {i === 0 && (
-                          <span className="text-xs bg-[#E8102A] text-white px-2 py-0.5 rounded" style={os}>Latest</span>
-                        )}
-                      </div>
+                      {i === 0 && (
+                        <span className="text-xs bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>Latest</span>
+                      )}
                       <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
