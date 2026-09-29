@@ -37,3 +37,20 @@ export async function loadTeamCoaches(teamId: string): Promise<TeamCoach[]> {
   })
   return mergeTeamCoaches(coachRows, (profiles ?? []) as ProfileRow[], emails)
 }
+
+/** Find an auth user by email (case-insensitive), paging through all users. */
+export async function findAuthUserByEmail(email: string): Promise<{ id: string; email: string } | null | 'error'> {
+  const target = email.trim().toLowerCase()
+  const perPage = 1000
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      console.error('[findAuthUserByEmail] listUsers failed', error.message)
+      return 'error'
+    }
+    const hit = data.users.find(u => u.email?.toLowerCase() === target)
+    if (hit) return { id: hit.id, email: hit.email ?? target }
+    if (data.users.length < perPage) return null
+  }
+  return null
+}
