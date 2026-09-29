@@ -9,6 +9,8 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const FROM = 'Release Point <notifications@releasepointai.com>'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://releasepointai.com'
 
+// TODO(Compliance): guardian email wording. The coach may enter a guardian's
+// address for players under 18; this copy is written to the player.
 export async function sendPlayerInviteEmail({
   toEmail,
   playerName,
