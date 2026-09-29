@@ -104,6 +104,31 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  // Fetch adjacent clips for prev/next navigation (same player, ordered by created_at)
+  const [{ data: prevClipRow }, { data: nextClipRow }] = await Promise.all([
+    supabaseAdmin
+      .from('clips')
+      .select('id, title, session_date, created_at')
+      .eq('player_id', clip.player_id)
+      .lt('created_at', clip.created_at)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('clips')
+      .select('id, title, session_date, created_at')
+      .eq('player_id', clip.player_id)
+      .gt('created_at', clip.created_at)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  function fmtNavDate(row: { session_date: string | null; created_at: string }) {
+    const iso = row.session_date ?? row.created_at
+    return new Date(iso + (row.session_date ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   let voiceUrl: string | null = null
   if (clip.voice_path) {
     const { data: signedVoice } = await supabaseAdmin.storage
@@ -163,18 +188,56 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
       />
 
       <main className="max-w-5xl mx-auto px-4 md:px-6 py-5 pb-24">
-        {/* Compare button */}
-        <div className="flex justify-end mb-3">
-          <Link
-            href={`/clips/compare?a=${id}`}
-            className="text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-            style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            Compare
-          </Link>
+        {/* Top nav bar: prev/next clips + compare */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          {/* Previous clip (older) */}
+          {prevClipRow ? (
+            <Link
+              href={`/clips/${prevClipRow.id}`}
+              className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38%]"
+              style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
+            >
+              <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="truncate leading-tight">
+                <span className="text-[#8096AE] mr-1">{fmtNavDate(prevClipRow)}</span>
+                <span className="truncate">{prevClipRow.title}</span>
+              </span>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          {/* Right side: compare + next clip */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/clips/compare?a=${id}`}
+              className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors"
+              style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              </svg>
+              Compare
+            </Link>
+
+            {nextClipRow && (
+              <Link
+                href={`/clips/${nextClipRow.id}`}
+                className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38vw]"
+                style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
+              >
+                <span className="truncate leading-tight">
+                  <span className="text-[#8096AE] mr-1">{fmtNavDate(nextClipRow)}</span>
+                  <span className="truncate">{nextClipRow.title}</span>
+                </span>
+                <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            )}
+          </div>
         </div>
 
         <ClipTitle clipId={id} initialTitle={clip.title} />
