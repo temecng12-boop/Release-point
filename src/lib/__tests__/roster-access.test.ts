@@ -15,6 +15,7 @@ import {
   canDeleteClipItem,
   canUseAiCoachFor,
   pickBullpenUpdates,
+  ownTeamIdsByPlayer,
 } from '../auth/roster-access'
 
 let passed = 0
@@ -130,7 +131,23 @@ section('pickBullpenUpdates (updateBullpenSession)')
   assert(noThrown?.pitches?.[0].thrown === 0 && noThrown.pitches[0].focus === '', 'missing thrown/focus default to 0 and empty')
 }
 
-section('Results')
+section('ownTeamIdsByPlayer (team page edit form)')
+{
+  const links = [
+    { player_id: 'p1', team_id: 't1' },
+    { player_id: 'p1', team_id: 't2' },
+    { player_id: 'p1', team_id: 'x9' },
+    { player_id: 'p2', team_id: 't2' },
+    { player_id: 'p2', team_id: 't2' },
+  ]
+  const m = ownTeamIdsByPlayer(links, ['t1', 't2'])
+  assert(JSON.stringify(m.p1) === '["t1","t2"]', "a player on two of the coach's teams gets both (not just the team being viewed)")
+  assert(!m.p1.includes('x9'), "another coach's team is left out")
+  assert(JSON.stringify(m.p2) === '["t2"]', 'duplicate links collapse')
+  assert(m.p3 === undefined, 'player with no own-team links: absent')
+  assert(Object.keys(ownTeamIdsByPlayer(links, [])).length === 0, 'coach with no teams: nothing')
+}
+
 const total = passed + failed
 console.log(`\n  ${passed}/${total} passed${failed > 0 ? `, ${failed} FAILED` : ' ✓'}`)
 if (failed > 0) process.exit(1)
