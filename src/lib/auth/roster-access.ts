@@ -72,6 +72,25 @@ export function splitRosterByCoach<T extends { coach_id: string | null }>(
 }
 
 /**
+ * Groups team links by player, keeping only links to the caller's own teams.
+ * The edit form sends back the full set of a player's teams, so it must be
+ * given every one of the coach's teams the player is on, not just one.
+ */
+export function ownTeamIdsByPlayer(
+  links: readonly { player_id: string; team_id: string }[],
+  ownTeamIds: readonly string[],
+): Record<string, string[]> {
+  const own = new Set(ownTeamIds)
+  const out: Record<string, string[]> = {}
+  for (const l of links) {
+    if (!own.has(l.team_id)) continue
+    const list = (out[l.player_id] ??= [])
+    if (!list.includes(l.team_id)) list.push(l.team_id)
+  }
+  return out
+}
+
+/**
  * Who may delete a clip: the player's current coach, or the player deleting a
  * clip they uploaded themselves. A former coach (or anyone else who once
  * uploaded) may not.

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { splitRosterByCoach } from '@/lib/auth/roster-access'
+import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
@@ -80,6 +80,27 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const rosterCount = (players?.length ?? 0) + (otherPlayers?.length ?? 0)
 
   const playerIds = players?.map((p) => p.id) ?? []
+
+  // The edit form saves the player's full set of this coach's teams, so give
+  // it all of the coach's teams and every one of them the player is on.
+  // Otherwise saving here would drop the player from the coach's other teams.
+  const { data: coachTeams } = await supabaseAdmin
+    .from('teams')
+    .select('id, name')
+    .eq('coach_id', user.id)
+    .order('created_at')
+  const coachTeamIds = (coachTeams ?? []).map((t) => t.id as string)
+  const { data: ownPlayerLinks } = playerIds.length > 0 && coachTeamIds.length > 0
+    ? await supabaseAdmin
+        .from('player_teams')
+        .select('player_id, team_id')
+        .in('player_id', playerIds)
+        .in('team_id', coachTeamIds)
+    : { data: [] }
+  const teamIdsByPlayer = ownTeamIdsByPlayer(
+    (ownPlayerLinks ?? []) as { player_id: string; team_id: string }[],
+    coachTeamIds,
+  )
   const { data: clips } = playerIds.length > 0
     ? await supabaseAdmin
         .from('clips')
@@ -178,9 +199,9 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               {(players ?? []).map((p) => (
                 <PlayerRow
                   key={p.id}
-                  player={{ ...p, teamIds: [id] }}
+                  player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
-                  teams={[team]}
+                  teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}
                   sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}
                 />
               ))}
