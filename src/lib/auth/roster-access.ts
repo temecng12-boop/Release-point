@@ -49,6 +49,14 @@ export function profilePageAccess(
   return isPlayersOwnCoach(userId, player) ? 'view' : 'not-found'
 }
 
+export type PlayerAccessIds = { coach_id: string | null; user_id: string | null } | null | undefined
+
+/** True only if `userId` is the player's own account (players.user_id). */
+export function isThePlayer(userId: string | null | undefined, player: PlayerAccessIds): boolean {
+  if (!userId || !player) return false
+  return player.user_id !== null && player.user_id === userId
+}
+
 /**
  * Splits a team roster into the caller's own players and everyone else
  * (other coaches' players, or players with no coach).
@@ -61,6 +69,25 @@ export function splitRosterByCoach<T extends { coach_id: string | null }>(
   const others: T[] = []
   for (const p of players) (isPlayersOwnCoach(userId, p) ? own : others).push(p)
   return { own, others }
+}
+
+/**
+ * Who may delete a clip: the player's current coach, or the player deleting a
+ * clip they uploaded themselves. A former coach (or anyone else who once
+ * uploaded) may not.
+ */
+export function canDeleteClip(userId: string, uploadedBy: string | null | undefined, player: PlayerAccessIds): boolean {
+  if (isPlayersOwnCoach(userId, player)) return true
+  return isThePlayer(userId, player) && !!uploadedBy && uploadedBy === userId
+}
+
+/**
+ * Who may delete a timestamp note or annotation: its author, and only while
+ * they are still the player's current coach or are the player themself.
+ */
+export function canDeleteClipItem(userId: string, createdBy: string | null | undefined, player: PlayerAccessIds): boolean {
+  if (!createdBy || createdBy !== userId) return false
+  return isPlayersOwnCoach(userId, player) || isThePlayer(userId, player)
 }
 
 export type BullpenPitchBlock = { pitch_type: string; target: number; thrown: number; focus: string }
