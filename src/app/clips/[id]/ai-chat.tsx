@@ -26,23 +26,23 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 const AGENTS = {
   randy: {
     name: 'Randy',
-    role: 'The Big Unit',
+    role: 'Pitching',
     color: '#C8102E',
     bg: '#FFF5F5',
     border: '#FBD0D6',
-    description: "6'10\". 4,875 strikeouts. Randy Johnson didn't nibble. He attacked. Your mechanics and pitch data — no sugarcoating.",
-    placeholder: "What are we fixing?",
-    intro: "I've got your numbers. Let's get to it — what are we working on?",
+    description: 'Mechanics, velocity, spin, and pitch design.',
+    placeholder: 'Ask Randy anything about pitching…',
+    intro: "I've got your numbers. What are we working on?",
   },
   barry: {
     name: 'Barry',
-    role: 'The All-Time OBP',
+    role: 'Hitting',
     color: '#1C3A5C',
     bg: '#F0F4F8',
     border: '#C0CFE0',
-    description: "Barry Bonds didn't chase. He knew his pitch, knew his zone, and made pitchers come to him. Your swing data — same approach.",
-    placeholder: "What's the issue at the plate?",
-    intro: "I've got your exit velocity and launch numbers. What are we looking at?",
+    description: 'Swing mechanics, exit velocity, and bat path.',
+    placeholder: 'Ask Barry anything about hitting…',
+    intro: "I've got your numbers. What are we working on?",
   },
 }
 
