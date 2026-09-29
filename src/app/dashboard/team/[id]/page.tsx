@@ -5,6 +5,7 @@ import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
 import AddCoachForm from './add-coach-form'
+import { loadTeamCoaches } from '@/lib/team-coaches'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -37,12 +38,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const isOrganizer = myMembership.role === 'organizer'
 
-  // Fetch all coaches on this team with their profile info
-  const { data: teamCoaches } = await supabaseAdmin
-    .from('team_coaches')
-    .select('coach_id, role, profiles(full_name, email)')
-    .eq('team_id', id)
-    .order('role', { ascending: true }) // organizer first
+  // All coaches on this team with name and email (organizer first)
+  const teamCoaches = await loadTeamCoaches(id)
 
   const { data: teamPlayerLinks } = await supabaseAdmin
     .from('player_teams')
@@ -138,11 +135,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
         <AddCoachForm
           teamId={id}
-          coaches={(teamCoaches ?? []).map(c => ({
-            coach_id: c.coach_id as string,
-            role: c.role as string,
-            profiles: Array.isArray(c.profiles) ? (c.profiles[0] ?? null) : c.profiles,
-          }))}
+          coaches={teamCoaches}
           isOrganizer={isOrganizer}
         />
 
