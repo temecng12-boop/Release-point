@@ -80,6 +80,7 @@ export default function ClipTabs({
   playerPosition: string | null
 }) {
   const [active, setActive] = useState<Tab>('Timestamps')
+  const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
   const isPitcher = isPitcherPosition(playerPosition)
   const TABS = getTabs(isPitcher)
 
@@ -143,7 +144,8 @@ export default function ClipTabs({
                   playerId={playerId}
                   playerAgeGroup={playerAgeGroup}
                   playerPosition={playerPosition}
-                  initialMetrics={initialMetrics}
+                  initialMetrics={metrics}
+                  onMetricsChange={setMetrics}
                 />
               ) : (
                 <HittingMetricsTab
@@ -160,7 +162,7 @@ export default function ClipTabs({
                 playerName={playerName}
                 playerAgeGroup={playerAgeGroup}
                 playerPosition={playerPosition}
-                metrics={initialMetrics}
+                metrics={metrics}
                 checklist={initialChecklist}
                 coachNotes={initialNotes}
               />

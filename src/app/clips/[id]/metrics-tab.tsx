@@ -105,6 +105,7 @@ export default function MetricsTab({
   role,
   playerAgeGroup,
   initialMetrics,
+  onMetricsChange,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -112,12 +113,20 @@ export default function MetricsTab({
   playerAgeGroup: string | null
   playerPosition: string | null
   initialMetrics: MetricRow[]
+  onMetricsChange?: (metrics: MetricRow[]) => void
 }) {
   const isCoach = role === 'coach'
   const fileRef = useRef<HTMLInputElement>(null)
   const pdfRef  = useRef<HTMLInputElement>(null)
 
   const [metrics, setMetrics] = useState<MetricRow[]>(initialMetrics)
+  function updateMetrics(updater: (prev: MetricRow[]) => MetricRow[]) {
+    setMetrics(prev => {
+      const next = updater(prev)
+      onMetricsChange?.(next)
+      return next
+    })
+  }
   const [preview, setPreview] = useState<ParsedRow[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -149,7 +158,7 @@ export default function MetricsTab({
     if (result?.error) {
       setManualError(result.error)
     } else if (result?.metric) {
-      setMetrics(prev => [...prev, result.metric as MetricRow])
+      updateMetrics(prev => [...prev, result.metric as MetricRow])
       setManualForm(emptyManual)
       setShowManual(false)
     }
@@ -200,7 +209,7 @@ export default function MetricsTab({
 
       if (error) throw error
 
-      setMetrics(prev => [...prev, ...(data as MetricRow[])])
+      updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPreview(null)
       if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
@@ -248,7 +257,7 @@ export default function MetricsTab({
         .insert(inserts)
         .select('id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break')
       if (error) throw error
-      setMetrics(prev => [...prev, ...(data as MetricRow[])])
+      updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPdfPreview(null)
       if (pdfRef.current) pdfRef.current.value = ''
     } catch (err) {
