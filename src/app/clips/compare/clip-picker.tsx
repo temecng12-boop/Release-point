@@ -140,7 +140,7 @@ export default function ClipPicker({ sourceClipId, sourceClipTitle, clips, targe
                 type="text"
                 value={query}
                 onChange={e => handleQueryChange(e.target.value)}
-                placeholder="Search pitchers, drills, mechanics…"
+                placeholder="Search pitchers, hitters, drills, mechanics…"
                 className="w-full text-sm bg-[#F8FAFC] border border-[#DDE4ED] rounded-full px-4 py-2.5 pr-10 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
               />
               <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8096AE]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,7 +191,7 @@ export default function ClipPicker({ sourceClipId, sourceClipTitle, clips, targe
               <svg className="w-10 h-10 mx-auto mb-3 opacity-20" viewBox="0 0 24 24" fill="#FF0000">
                 <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
-              <p className="text-sm text-[#8096AE]">Search YouTube for a pitcher, drill, or mechanic.</p>
+              <p className="text-sm text-[#8096AE]">Search YouTube for a pitcher, hitter, drill, or mechanic.</p>
               <p className="text-xs text-[#AAB8C8] mt-1">Works with YouTube Shorts too.</p>
             </div>
           )}

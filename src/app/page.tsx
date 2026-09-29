@@ -71,7 +71,7 @@ export default async function HomePage() {
               <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-8"
                 style={{ background: 'rgba(232,16,42,0.07)', border: '1px solid rgba(232,16,42,0.18)' }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#E8102A] animate-pulse shrink-0" />
-                <span className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Created by Pitchers · Trusted by Coaches</span>
+                <span className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Created by Pitchers · Built for Coaches</span>
               </div>
 
               <h1 className="text-[clamp(48px,8vw,88px)] leading-[0.86] mb-8 text-slate-950 tracking-tight" style={os}>
@@ -80,7 +80,7 @@ export default async function HomePage() {
 
               {/* Live data counters */}
               <div className="mb-10 py-6 border-y border-slate-100">
-                <p className="text-[9px] text-slate-400 tracking-[0.3em] mb-4" style={os}>Live from the platform</p>
+                <p className="text-[9px] text-slate-400 tracking-[0.3em] mb-4" style={os}>Example data</p>
                 <LiveStats />
               </div>
 
@@ -200,7 +200,7 @@ export default async function HomePage() {
                   <div className="flex flex-col">
                     <div className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
                       <p className="text-[9px] tracking-[0.2em] text-[#E8102A]" style={os}>Pitch Metrics</p>
-                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Jan 22</p>
+                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Jan 22 · Example data</p>
                     </div>
                     {[
                       { label: 'Velocity',  value: '89 mph',  pct: 80, color: '#E8102A' },
@@ -283,7 +283,7 @@ export default async function HomePage() {
                 Annotate<br />Every<br />Frame.
               </h3>
               <p className="text-sm text-slate-500 leading-[1.85]">
-                Draw directly on video. Mark arm angles, hip rotation, and release points. Every annotation timestamped and shared instantly.
+                Draw directly on video. Mark arm angles, swing paths, hip rotation, and release points. Every annotation timestamped and shared instantly.
               </p>
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
                 <div className="relative overflow-hidden" style={{ paddingBottom: '66.67%' }}>
@@ -338,6 +338,7 @@ export default async function HomePage() {
               </h3>
               <p className="text-[10px] text-slate-400 mb-5">TrackMan · CSV · PDF</p>
               <PitchMetrics />
+              <p className="text-[10px] text-slate-400 mt-4" style={os}>Example data</p>
             </div>
           </SpotlightCard>
 
@@ -356,6 +357,7 @@ export default async function HomePage() {
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-5 tracking-tight" style={os}>
                 An Expert<br />In Every<br />Session.
               </h3>
+              <p className="text-[10px] text-slate-400 mb-3" style={os}>Example data</p>
               <div className="space-y-2.5">
                 <div className="flex justify-end">
                   <div className="max-w-[88%] bg-[#E8102A] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
@@ -411,9 +413,9 @@ export default async function HomePage() {
 
       {/* ── Age groups ── */}
       <section className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <p className="text-[10px] tracking-[0.3em] text-slate-400 mb-6" style={os}>All pitchers welcome · All levels</p>
+        <p className="text-[10px] tracking-[0.3em] text-slate-400 mb-6" style={os}>All pitchers and hitters welcome · All levels</p>
         <div className="flex items-center justify-center flex-wrap gap-2">
-          {['Youth', 'Middle School', 'High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches'].map((age) => (
+          {['Youth', 'Middle School', 'High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches', 'Hitting Coaches'].map((age) => (
             <span key={age}
               className="px-5 py-2 rounded-lg text-xs text-slate-500 hover:text-[#E8102A] hover:border-[#E8102A]/30 hover:bg-red-50 transition-all cursor-default"
               style={{ ...os, border: '1px solid #e2e8f0' }}
