@@ -1,7 +1,7 @@
 // Loads what the AI Coach should know about a clip, on the server, for the
 // signed-in user. Only import from Route Handlers / Server Actions.
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { isCoachOnPlayersTeam } from '@/lib/team-access'
+import { canViewPlayerContent } from '@/lib/clip-access'
 import type { CoachClipDetails, CoachHittingMetrics, CoachMetric, CoachPhaseRow, CoachTimestampNote } from './prompt'
 
 export type LoadedClipContext = {
@@ -22,22 +22,6 @@ export type ClipContextResult =
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Same people who can open the clip page: the player's direct coach, a coach on
-// one of the player's teams (018), the player, or the player's guardian.
-async function canView(userId: string, playerId: string, player: { coach_id: string | null; user_id: string | null; guardian_id: string | null; team_id: string | null }) {
-  if (player.coach_id === userId || player.user_id === userId) return true
-  if (player.guardian_id) {
-    const { data } = await supabaseAdmin
-      .from('guardians')
-      .select('id')
-      .eq('id', player.guardian_id)
-      .eq('user_id', userId)
-      .maybeSingle()
-    if (data) return true
-  }
-  return isCoachOnPlayersTeam(userId, playerId, player.team_id)
-}
-
 export async function loadClipContext(userId: string, clipId: string): Promise<ClipContextResult> {
   if (!UUID_RE.test(clipId)) return { ok: false, status: 404, message: 'Clip not found' }
 
@@ -54,11 +38,15 @@ export async function loadClipContext(userId: string, clipId: string): Promise<C
 
   const { data: player } = await supabaseAdmin
     .from('players')
-    .select('full_name, age_group, position, coach_id, user_id, guardian_id, team_id')
+    .select('full_name, age_group, position')
     .eq('id', clip.player_id)
     .maybeSingle()
-  // Unauthorized callers get the same 404 so clip existence isn't revealed.
-  if (!player || !(await canView(userId, clip.player_id, player))) return { ok: false, status: 404, message: 'Clip not found' }
+  // Same people who can open the clip page (src/lib/clip-access.ts): the
+  // player, their direct coach, a coach on one of their teams, or a linked
+  // guardian. Unauthorized callers get the same 404 so clip existence isn't revealed.
+  if (!player || !(await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)).allowed) {
+    return { ok: false, status: 404, message: 'Clip not found' }
+  }
 
   // Columns added by later migrations are read separately so a missing column
   // only drops that piece of context instead of failing the whole request.

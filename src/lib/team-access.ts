@@ -1,37 +1,19 @@
 // Team-based coach access, checked on the server with the service client.
 // Only import from Route Handlers / Server Actions.
+//
+// The rule itself lives in src/lib/clip-access.ts (teamCoachAccess, used by
+// canViewPlayerContent); this is a thin wrapper so write paths and the read
+// check can't drift apart.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { teamCoachAccess, type AccessDb } from '@/lib/clip-access'
 
 /**
  * True if userId is an organizer or assistant coach (team_coaches) on any team
- * the player is on. "Player's teams" = players.team_id plus player_teams rows;
- * the app links players through player_teams. Same rule as the corrected 018
- * RLS helpers.
+ * the player is on (players.team_id plus player_teams rows).
  *
  * Fails closed: if team_coaches or player_teams can't be read (for example
- * migration 018 hasn't been applied yet), returns false and logs why.
+ * migration 018 hasn't been applied yet), returns false; clip-access logs why.
  */
 export async function isCoachOnPlayersTeam(userId: string, playerId: string, playerTeamId: string | null): Promise<boolean> {
-  const teamIds = new Set<string>()
-  if (playerTeamId) teamIds.add(playerTeamId)
-
-  const { data: links, error: linksError } = await supabaseAdmin
-    .from('player_teams')
-    .select('team_id')
-    .eq('player_id', playerId)
-  if (linksError) console.error('[team-access] player_teams lookup failed', { code: linksError.code, message: linksError.message })
-  for (const l of links ?? []) teamIds.add(l.team_id as string)
-  if (teamIds.size === 0) return false
-
-  const { data: membership, error } = await supabaseAdmin
-    .from('team_coaches')
-    .select('team_id')
-    .eq('coach_id', userId)
-    .in('team_id', [...teamIds])
-    .limit(1)
-  if (error) {
-    console.error('[team-access] team_coaches lookup failed (is migration 018 applied?)', { code: error.code, message: error.message })
-    return false
-  }
-  return (membership ?? []).length > 0
+  return (await teamCoachAccess(supabaseAdmin as unknown as AccessDb, userId, playerId, playerTeamId)) === 'yes'
 }

@@ -353,22 +353,18 @@ export async function deleteLessonPath(clipId: string) {
   return { success: true }
 }
 
+// The player, their direct coach, or a coach on one of their teams. Team
+// membership uses the shared rule in src/lib/clip-access.ts (players.team_id
+// plus player_teams), instead of a separate team_id-only lookup.
 async function isCoachForPlayer(userId: string, playerId: string): Promise<boolean> {
   const { data: player } = await supabaseAdmin
     .from('players')
     .select('coach_id, team_id, user_id')
     .eq('id', playerId)
-    .single()
+    .maybeSingle()
   if (!player) return false
   if (player.coach_id === userId || player.user_id === userId) return true
-  if (!player.team_id) return false
-  const { data: membership } = await supabaseAdmin
-    .from('team_coaches')
-    .select('coach_id')
-    .eq('team_id', player.team_id)
-    .eq('coach_id', userId)
-    .single()
-  return !!membership
+  return isCoachOnPlayersTeam(userId, playerId, player.team_id as string | null)
 }
 
 export async function deleteVoicePath(clipId: string) {
