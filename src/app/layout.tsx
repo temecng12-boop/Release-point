@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import SwUpdateReload from '@/components/sw-update-reload'
 import { Oswald } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className="min-h-full antialiased">
         {children}
         <SpeedInsights />
+        <SwUpdateReload />
         <Script
           id="sw-register"
           strategy="afterInteractive"

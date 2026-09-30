@@ -1,6 +1,7 @@
 'use server'
 import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
-import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } from '@/lib/clip-notes'
+import { normalizeClipNotes } from '@/lib/clip-notes'
+import { writeClipNotesAtomic } from '@/lib/clip-notes-write'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
@@ -651,22 +652,29 @@ export async function saveClipNotes(clipId: string, notes: string | null, expect
     || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
   if (!allowed) return { error: 'Only the player\'s coaches can edit these notes.' }
 
-  // Stale-write guard (QA-002): refuse to overwrite notes that changed since
-  // this client loaded or last saved them. No version column exists, so the
-  // notes text itself is the version (check-then-write; no migration).
-  if (isStaleClipNotesWrite(clip.notes as string | null, expectedNotes)) {
-    return { error: CLIP_NOTES_CONFLICT_ERROR, conflict: true }
-  }
+  // Stale-write guard (QA-002), atomic: the update only applies if the note
+  // is still what this client last saw; a save whose response was lost is
+  // recognised on retry. See src/lib/clip-notes-write.ts.
+  const result = await writeClipNotesAtomic(supabaseAdmin, clipId, (clip.notes as string | null) ?? null, normalized.notes, expectedNotes)
+  if (result.ok) return { success: true, notes: result.notes }
+  if (result.conflict) return { error: result.error, conflict: true }
+  if (result.dbError === 'missing') return { error: 'Clip not found' }
+  return { error: describeDbError('saveClipNotes', result.dbError, 'Could not save notes.') }
+}
 
-  const { data: updated, error } = await supabaseAdmin
-    .from('clips')
-    .update({ notes: normalized.notes })
-    .eq('id', clipId)
-    .select('id')
-  if (error) return { error: describeDbError('saveClipNotes', error, 'Could not save notes.') }
-  if (!updated || updated.length === 0) {
-    console.error('[saveClipNotes] update matched no rows', { clipId })
-    return { error: 'Could not save notes. Please refresh and try again.' }
-  }
-  return { success: true, notes: normalized.notes }
+// Current coach notes, for the editor to recover after a lost save response.
+// Same readers as the clip page's notes: the player's coaches.
+export async function getClipNotes(clipId: string): Promise<{ notes: string | null } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Your session has expired. Please sign in again.' }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, notes').eq('id', clipId).maybeSingle()
+  if (!clip) return { error: 'Clip not found' }
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id, team_id').eq('id', clip.player_id).maybeSingle()
+  if (!player) return { error: 'Clip not found' }
+  const allowed = player.coach_id === user.id
+    || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
+  if (!allowed) return { error: 'Not authorized' }
+  return { notes: (clip.notes as string | null) ?? null }
 }

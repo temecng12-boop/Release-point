@@ -20,6 +20,11 @@ const KINDS = {
   lesson: { column: 'lesson_path', bucket: 'lessons', valid: isLessonPathFor },
 } as const
 
+export const REMOVE_FAILED = {
+  voice: 'Could not delete the voice note file. Please try again.',
+  lesson: 'Could not delete the lesson file. Please try again.',
+} as const
+
 export async function removeClipMediaAsOwnCoach(client: unknown, userId: string | null | undefined, clipId: string, kind: keyof typeof KINDS): Promise<{ success: true; error?: undefined } | { error: string; success?: undefined }> {
   if (!userId) return { error: 'Not authenticated' }
   const db = client as Client
@@ -32,7 +37,11 @@ export async function removeClipMediaAsOwnCoach(client: unknown, userId: string 
   const path = row[k.column]
   if (path && k.valid(path, row.player_id, clipId)) {
     const { error } = await db.storage.from(k.bucket).remove([path])
-    if (error) console.error(`[remove ${kind}] storage remove failed`, { clipId, message: error.message })
+    if (error) {
+      // Keep the column pointing at the file so it isn't orphaned; the coach can retry.
+      console.error(`[remove ${kind}] storage remove failed; ${k.column} kept`, { clipId, message: error.message })
+      return { error: REMOVE_FAILED[kind] }
+    }
   } else if (path) {
     console.warn(`[remove ${kind}] stored path is outside this clip's folder; file left in place`, { clipId })
   }

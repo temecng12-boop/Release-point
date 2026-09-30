@@ -846,7 +846,8 @@ export default function VideoPlayer({
   }
 
   async function deleteLesson() {
-    await deleteLessonPath(clipId)
+    const res = await deleteLessonPath(clipId)
+    if (res && 'error' in res && res.error) { setLessonError(res.error); return }
     setLessonUrl(null)
   }
 

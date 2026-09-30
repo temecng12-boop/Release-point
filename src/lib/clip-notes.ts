@@ -30,3 +30,17 @@ export function isStaleClipNotesWrite(current: string | null | undefined, expect
   const norm = (v: string | null | undefined) => (typeof v === 'string' && v.trim() !== '' ? v : null)
   return norm(current) !== norm(expected)
 }
+
+/** Blank and null are the same note. */
+export function sameClipNotes(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !isStaleClipNotesWrite(a, b ?? null)
+}
+
+/**
+ * Lost-response recovery (client side). After a failed request or a conflict
+ * the client rereads the stored note. If it equals the text the client last
+ * tried to save, that save did commit: adopt it as the new baseline.
+ */
+export function recoverClipNotesBaseline(stored: string | null, attempted: string | null): { recovered: true; baseline: string | null } | { recovered: false } {
+  return sameClipNotes(stored, attempted) ? { recovered: true, baseline: stored } : { recovered: false }
+}

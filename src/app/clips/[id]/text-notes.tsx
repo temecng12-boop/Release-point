@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { saveClipNotes } from '@/app/actions/clips'
+import { saveClipNotes, getClipNotes } from '@/app/actions/clips'
+import { recoverClipNotesBaseline, sameClipNotes } from '@/lib/clip-notes'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -33,22 +34,43 @@ export default function TextNotes({
   async function persistNotesNow(text: string) {
     setSaveStatus('saving')
     let error: string | null = null
+    let unsure = false   // the save may have committed (lost response or conflict)
     try {
       const result = await saveClipNotes(clipId, text, baselineRef.current)
-      if (result?.error) error = result.error
+      if (result?.error) { error = result.error; unsure = 'conflict' in result && !!result.conflict }
       else if (result && 'notes' in result) baselineRef.current = result.notes ?? null
     } catch (err) {
       console.error('[TextNotes] save request failed', err)
       error = 'Could not save notes. Check your connection and try again.'
+      unsure = true
     }
+    if (error && unsure && await recoverBaseline(text)) error = null
     if (error) {
       setSaveError(error)
       setSaveStatus('error')
       return
     }
     setSaveError(null)
-    setSaveStatus('saved')
+    // Typed more while this save was in flight/recovering: save that too.
+    if (!sameClipNotes(notesRef.current, baselineRef.current) && debounceRef.current === null) {
+      return persistNotesNow(notesRef.current)
+    }
+    setSaveStatus(debounceRef.current === null ? 'saved' : 'pending')
     window.dispatchEvent(new CustomEvent('clip-notes-saved'))
+  }
+
+  // Reread the stored note; if it is what we tried to save, that save landed
+  // and its text becomes the baseline.
+  async function recoverBaseline(attempted: string): Promise<boolean> {
+    try {
+      const res = await getClipNotes(clipId)
+      if (!('notes' in res)) return false
+      const r = recoverClipNotesBaseline(res.notes, attempted)
+      if (r.recovered) baselineRef.current = r.baseline
+      return r.recovered
+    } catch {
+      return false
+    }
   }
 
   function onNotesChange(text: string) {
@@ -56,12 +78,13 @@ export default function TextNotes({
     setNotes(text)
     setSaveStatus('pending')
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => persistNotes(text), 1800)
+    debounceRef.current = setTimeout(() => { debounceRef.current = null; persistNotes(text) }, 1800)
   }
 
   function onNotesBlur() {
     if (saveStatus === 'pending' || saveStatus === 'error') {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = null
       persistNotes(notesRef.current)
     }
   }
@@ -84,6 +107,7 @@ export default function TextNotes({
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           onBlur={onNotesBlur}
+          data-unsaved={saveStatus === 'saved' ? undefined : 'true'}
           placeholder="Type coaching notes here…"
           rows={5}
           className="w-full text-sm bg-white border border-[#DDE4ED] rounded-md p-3 text-[#0F1F33] placeholder:text-[#3D5166] resize-none focus:outline-none focus:border-[#456080]"
