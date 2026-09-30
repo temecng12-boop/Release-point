@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { canViewPlayerContent } from '@/lib/clip-access'
-import { groupLessonsByClip, loadLessons } from '@/lib/lessons'
+import { loadLessonFeedback } from '@/lib/lessons'
 import LessonList from './lesson-list'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -16,17 +15,9 @@ function fmtDate(iso: string, dateOnly: boolean) {
  * direct coach or team coach).
  */
 export default async function LessonFeedbackSection({ playerId, viewerId }: { playerId: string; viewerId: string }) {
-  const access = await canViewPlayerContent(supabaseAdmin, viewerId, playerId)
-  if (!access.allowed) return null
-  let data: Awaited<ReturnType<typeof loadLessons>>
-  try {
-    data = await loadLessons(supabaseAdmin, { playerId })
-  } catch (e) {
-    console.error('[LessonFeedbackSection] load failed', e)
-    return null
-  }
-  const groups = groupLessonsByClip(data.lessons, data.clips)
-  const canManage = access.via === 'coach' || access.via === 'team_coach'
+  const data = await loadLessonFeedback(supabaseAdmin, viewerId, playerId)
+  if (!data) return null
+  const { groups, canManage } = data
 
   return (
     <section className="bg-white rounded-xl border border-[#DDE4ED] shadow-sm p-5">

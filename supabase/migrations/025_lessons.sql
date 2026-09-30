@@ -32,8 +32,9 @@ CREATE INDEX        IF NOT EXISTS lessons_player_created_idx   ON public.lessons
 CREATE INDEX        IF NOT EXISTS lessons_clip_idx             ON public.lessons (clip_id);
 
 -- Players the signed-in user may view: coached (direct or team, 018 helper), own
--- player row, or linked guardian. Same definition as the prod run-list's 3b step.
-CREATE OR REPLACE FUNCTION public.rls_my_viewable_player_ids()
+-- player row, or linked guardian. Its own name, so an existing
+-- rls_my_viewable_player_ids (lessons-bucket step) is never replaced.
+CREATE OR REPLACE FUNCTION public.rls_lessons_viewable_player_ids()
 RETURNS SETOF uuid
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
@@ -44,8 +45,8 @@ AS $$
   SELECT p.id FROM public.players p
   WHERE p.guardian_id IN (SELECT g.id FROM public.guardians g WHERE g.user_id = auth.uid())
 $$;
-REVOKE ALL ON FUNCTION public.rls_my_viewable_player_ids() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.rls_my_viewable_player_ids() TO authenticated;
+REVOKE ALL ON FUNCTION public.rls_lessons_viewable_player_ids() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.rls_lessons_viewable_player_ids() TO authenticated;
 
 -- Read-only for signed-in viewers; the app writes with the service role.
 ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
@@ -55,7 +56,7 @@ GRANT ALL ON public.lessons TO service_role;
 DROP POLICY IF EXISTS "lessons_select_viewable" ON public.lessons;
 CREATE POLICY "lessons_select_viewable" ON public.lessons
   FOR SELECT TO authenticated
-  USING (player_id IN (SELECT public.rls_my_viewable_player_ids()));
+  USING (player_id IN (SELECT public.rls_lessons_viewable_player_ids()));
 
 -- Backfill: one row per clip that already has a lesson (recorder unknown -> NULL).
 INSERT INTO public.lessons (clip_id, player_id, coach_id, media_path, mime, created_at)
@@ -79,7 +80,8 @@ SELECT (SELECT count(*) FROM public.clips WHERE lesson_path IS NOT NULL) AS clip
 -- Check: expect every column true.
 SELECT to_regclass('public.lessons') IS NOT NULL                                            AS table_ok,
        (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.lessons'::regclass)         AS rls_on,
-       EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lessons' AND policyname = 'lessons_select_viewable') AS policy_ok,
+       EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'lessons' AND policyname = 'lessons_select_viewable'
+               AND qual LIKE '%rls_lessons_viewable_player_ids%')                          AS policy_ok,
        NOT has_table_privilege('anon', 'public.lessons', 'SELECT')                          AS anon_no_read,
        NOT (has_table_privilege('authenticated', 'public.lessons', 'INSERT')
          OR has_table_privilege('authenticated', 'public.lessons', 'UPDATE')

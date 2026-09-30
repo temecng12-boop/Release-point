@@ -12,7 +12,7 @@ import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ClipSkeleton from './clip-skeleton'
 import LessonList from '@/components/lessons/lesson-list'
-import { loadLessons, type LessonItem } from '@/lib/lessons'
+import { canManageLessons, loadLessons, type LessonItem } from '@/lib/lessons'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -176,7 +176,7 @@ async function ClipContent({ id, clip, userId, userMetadataRole }: {
 
   // Every lesson for this clip, newest first (falls back to clips.lesson_path before 025).
   const lessonAccess = await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)
-  const canManageLessons = lessonAccess.allowed && (lessonAccess.via === 'coach' || lessonAccess.via === 'team_coach')
+  const canManage = lessonAccess.allowed && canManageLessons(lessonAccess.via)
   let clipLessons: LessonItem[] = []
   try {
     clipLessons = (await loadLessons(supabaseAdmin, { clipId: id })).lessons
@@ -278,6 +278,7 @@ async function ClipContent({ id, clip, userId, userMetadataRole }: {
           role={role}
           initialAnnotations={rawAnnotations ?? []}
           initialReframe={initialReframe}
+          canRecordLesson={canManage}
         />
 
         {clipLessons.length > 0 && (
@@ -285,7 +286,7 @@ async function ClipContent({ id, clip, userId, userMetadataRole }: {
             <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
               {role === 'coach' ? 'Lesson Recordings' : 'Lessons from your coach'} · {clipLessons.length}
             </p>
-            <LessonList lessons={clipLessons} canManage={canManageLessons} />
+            <LessonList lessons={clipLessons} canManage={canManage} />
           </section>
         )}
 

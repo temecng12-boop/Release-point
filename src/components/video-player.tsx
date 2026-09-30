@@ -271,6 +271,7 @@ export default function VideoPlayer({
   role,
   initialAnnotations = [],
   initialReframe = null,
+  canRecordLesson,
 }: {
   src: string
   clipId: string
@@ -278,8 +279,11 @@ export default function VideoPlayer({
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
+  /** Lesson recording is for the player's direct coach only (defaults to role === 'coach'). */
+  canRecordLesson?: boolean
 }) {
   const isCoach = role === 'coach'
+  const canRecord = canRecordLesson ?? isCoach
 
   const videoRef       = useRef<HTMLVideoElement>(null)
   const overlayRef     = useRef<HTMLCanvasElement>(null)
@@ -1173,7 +1177,7 @@ export default function VideoPlayer({
       )}
 
       {/* Lesson recording */}
-      {isCoach && lessonPhase !== 'idle' ? (
+      {canRecord && lessonPhase !== 'idle' ? (
         <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
           <span className="w-2 h-2 rounded-full bg-[#C8102E] animate-pulse shrink-0" />
           <span className="text-xs text-[#C8102E]" style={oswald}>
@@ -1188,7 +1192,7 @@ export default function VideoPlayer({
             {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
           </button>
         </div>
-      ) : isCoach && (
+      ) : canRecord && (
         <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>
           <button
             onClick={startLessonRecording}

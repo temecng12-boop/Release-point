@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { formatLessonDuration, groupLessonsByClip, isMissingTableError, loadLessons, LESSONS_MISSING_MESSAGE, type LessonRow } from '../lessons'
+import { canManageLessons, formatLessonDuration, groupLessonsByClip, isMissingTableError, loadLessonFeedback, loadLessons, LESSONS_MISSING_MESSAGE, type LessonRow } from '../lessons'
 import { deleteLessonRecord, saveLessonRecord, LESSON_DENIED } from '../lessons-write'
 import { newLessonPath } from '../lesson-path'
 import { fakeSupabase, type FakeTables } from './helpers/fake-supabase'
@@ -70,10 +70,10 @@ test('save: direct coach adds a row, keeps older lessons and files, points clips
   assert.deepEqual(f.removed, [])   // never deletes older lesson files
 })
 
-test('save: team assistant allowed; player, guardian, off-team coach and signed-out denied', async () => {
+test('save: direct coach only; team assistant, player, guardian, off-team coach and signed-out denied', async () => {
   const path = newLessonPath(P1, C1, 'video/mp4')
-  assert.deepEqual(await saveLessonRecord(fakeSupabase(world()).client, ASST, C1, path), { success: true })
-  for (const who of [PLAYER, GUARD, OFF]) {
+  assert.deepEqual(await saveLessonRecord(fakeSupabase(world()).client, COACH, C1, path), { success: true })
+  for (const who of [ASST, PLAYER, GUARD, OFF]) {
     const f = fakeSupabase(world())
     assert.deepEqual(await saveLessonRecord(f.client, who, C1, path), { error: LESSON_DENIED }, who)
     assert.equal((f.tables.lessons as unknown[]).length, 0)
@@ -140,4 +140,43 @@ test('loadLessons: by player and clip with coach names; falls back to clips.less
   const legacy = await loadLessons(fakeSupabase(w2).client, { playerId: P1 })
   assert.equal(legacy.legacy, true)
   assert.deepEqual(legacy.lessons.map(l => [l.id, l.media_path]), [[`legacy:${C1}`, `${P1}/${C1}/lesson.webm`]])
+})
+
+test('save/delete: team assistant can view but not save or delete (direct coach only)', async () => {
+  const f = fakeSupabase(world())
+  const path = newLessonPath(P1, C1, 'video/webm', 1, 'x')
+  assert.deepEqual(await saveLessonRecord(f.client, ASST, C1, path), { error: LESSON_DENIED })
+  await saveLessonRecord(f.client, COACH, C1, path)
+  const id = (f.tables.lessons as Record<string, unknown>[])[0].id as string
+  assert.deepEqual(await deleteLessonRecord(f.client, ASST, id), { error: LESSON_DENIED })
+  assert.deepEqual(f.removed, [])
+  const view = await loadLessonFeedback(f.client, ASST, P1)
+  assert.equal(view?.canManage, false)
+  assert.equal(view?.groups[0].lessons.length, 1)
+  assert.equal((await loadLessonFeedback(f.client, COACH, P1))?.canManage, true)
+  assert.equal(canManageLessons('team_coach'), false)
+  assert.equal(canManageLessons('coach'), true)
+})
+
+test('degrades without the lessons table: save works, feedback falls back to clips.lesson_path, or hides on errors', async () => {
+  // 025 not applied: recording still saves (clips.lesson_path) and the section shows it.
+  const w = world(); w.lessons = 'missing'
+  const f = fakeSupabase(w)
+  const path = newLessonPath(P1, C1, 'video/webm')
+  assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, path), { success: true, warning: LESSONS_MISSING_MESSAGE })
+  const view = await loadLessonFeedback(f.client, PLAYER, P1)
+  assert.equal(view?.legacy, true)
+  assert.deepEqual(view?.groups.map(g => [g.clip.id, g.lessons.map(l => l.media_path)]), [[C1, [path]]])
+  // Clip page path: loadLessons by clip also falls back.
+  assert.deepEqual((await loadLessons(f.client, { clipId: C1 })).lessons.map(l => l.id), [`legacy:${C1}`])
+  // Neither 025 nor 019 (no clips.lesson_path): empty, no crash.
+  const w2 = world(); w2.lessons = 'missing'
+  const empty = await loadLessonFeedback(fakeSupabase(w2, { missingColumns: { clips: ['lesson_path'] } }).client, PLAYER, P1)
+  assert.deepEqual(empty?.groups, [])
+  // Any other DB error: the section hides (null) instead of throwing.
+  const broken = fakeSupabase(world(), { failSelect: { lessons: { code: '500', message: 'boom' } } })
+  assert.equal(await loadLessonFeedback(broken.client, PLAYER, P1), null)
+  await assert.rejects(loadLessons(broken.client, { clipId: C1 }))   // clip page wraps this in try/catch
+  // Viewers without access get nothing.
+  assert.equal(await loadLessonFeedback(fakeSupabase(world()).client, OFF, P1), null)
 })

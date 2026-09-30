@@ -1,6 +1,7 @@
 // Lesson history (public.lessons, migration 025). Reads use the service-role
 // client after the caller's access has been checked; the pure helpers are
 // shared by the clip page, the player page and tests.
+import { canViewPlayerContent } from './clip-access'
 
 export type LessonRow = {
   id: string
@@ -17,6 +18,11 @@ export type LessonItem = LessonRow & { coach_name: string | null }
 export type LessonGroup = { clip: LessonClip; lessons: LessonItem[] }
 
 type DbError = { code?: string; message?: string } | null | undefined
+
+/** Saving and deleting lessons is for the player's direct coach only; team coaches view. */
+export function canManageLessons(via: string | null | undefined): boolean {
+  return via === 'coach'
+}
 
 /** PostgREST / Postgres "table not found" (025 not applied yet). */
 export function isMissingTableError(e: DbError): boolean {
@@ -101,4 +107,22 @@ export async function loadLessons(client: unknown, filter: { playerId: string } 
     for (const p of (pr.data ?? []) as { id: string; full_name: string | null }[]) names[p.id] = p.full_name
   }
   return { lessons: rows.map(r => ({ ...r, coach_name: r.coach_id ? names[r.coach_id] ?? null : null })), clips, legacy }
+}
+
+/**
+ * Data for the "Coach's Lesson Feedback" section. Null means render nothing:
+ * the viewer can't view the player, or lessons couldn't be loaded (logged,
+ * never thrown, so the page still renders). Before 025 it falls back to
+ * clips.lesson_path; before 019 as well it is simply empty.
+ */
+export async function loadLessonFeedback(client: unknown, viewerId: string, playerId: string): Promise<{ groups: LessonGroup[]; canManage: boolean; legacy: boolean } | null> {
+  try {
+    const access = await canViewPlayerContent(client, viewerId, playerId)
+    if (!access.allowed) return null
+    const data = await loadLessons(client, { playerId })
+    return { groups: groupLessonsByClip(data.lessons, data.clips), canManage: canManageLessons(access.via), legacy: data.legacy }
+  } catch (e) {
+    console.error('[lessons] feedback load failed', e)
+    return null
+  }
 }

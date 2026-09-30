@@ -1,7 +1,8 @@
 // Server-side writes for lesson recordings (service-role client, caller checked).
-// Rules: only the player's coaches (direct or team) may add or delete lessons,
-// the same write rule as the lessons bucket (src/lib/storage-access.ts); the path
-// must be a lesson file for exactly that player and clip (src/lib/lesson-path.ts).
+// Rules: only the player's DIRECT coach (players.coach_id) may add or delete
+// lessons; team coaches can view them but not manage them. The lessons-bucket
+// write check (src/lib/storage-access.ts) must also pass, and the path must be a
+// lesson file for exactly that player and clip (src/lib/lesson-path.ts).
 // New recordings never delete older ones.
 import { decideStorageAccess } from './storage-access'
 import { isLessonPathFor } from './lesson-path'
@@ -26,7 +27,17 @@ type Client = {
 
 export type LessonWriteResult = { success: true; warning?: string } | { error: string }
 
-export const LESSON_DENIED = 'Only this player\'s coaches can save or delete lessons.'
+export const LESSON_DENIED = 'Only this player\'s coach can save or delete lessons.'
+
+/** Direct coach of the player (players.coach_id), after the storage write check for the path passed. */
+async function isDirectCoachWriter(client: unknown, userId: string, playerId: string, path: string): Promise<{ ok: boolean; reason: string }> {
+  const access = await decideStorageAccess(client, userId, 'lessons', path, 'write')
+  if (!access.allowed) return { ok: false, reason: access.reason }
+  if (access.playerId !== playerId.toLowerCase()) return { ok: false, reason: 'path is for another player' }
+  const { data } = await (client as Client).from('players').select('coach_id').eq('id', playerId).maybeSingle()
+  if ((data as { coach_id?: string | null } | null)?.coach_id !== userId) return { ok: false, reason: `not the direct coach (${access.via})` }
+  return { ok: true, reason: 'direct coach' }
+}
 
 export async function saveLessonRecord(
   client: unknown,
@@ -44,8 +55,8 @@ export async function saveLessonRecord(
     console.warn('[saveLesson] rejected path', { clipId, lessonPath })
     return { error: 'Invalid lesson file' }
   }
-  const access = await decideStorageAccess(client, userId, 'lessons', lessonPath, 'write')
-  if (!access.allowed) {
+  const access = await isDirectCoachWriter(client, userId, playerId, lessonPath)
+  if (!access.ok) {
     console.warn('[saveLesson] denied', { userId, clipId, reason: access.reason })
     return { error: LESSON_DENIED }
   }
@@ -78,22 +89,22 @@ export async function saveLessonRecord(
 export async function deleteLessonRecord(client: unknown, userId: string | null | undefined, lessonId: string): Promise<LessonWriteResult & { clipId?: string }> {
   if (!userId) return { error: 'Not authenticated' }
   const db = client as Client
-  let clipId: string, mediaPath: string, legacy = false
+  let clipId: string, mediaPath: string, playerId: string, legacy = false
   if (lessonId.startsWith('legacy:')) {
     clipId = lessonId.slice('legacy:'.length)
-    const { data } = await db.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
-    const p = (data as { lesson_path?: string | null } | null)?.lesson_path
-    if (!p) return { error: 'Lesson not found' }
-    mediaPath = p; legacy = true
+    const { data } = await db.from('clips').select('player_id, lesson_path').eq('id', clipId).maybeSingle()
+    const c = data as { player_id?: string; lesson_path?: string | null } | null
+    if (!c?.lesson_path || !c.player_id) return { error: 'Lesson not found' }
+    mediaPath = c.lesson_path; playerId = c.player_id; legacy = true
   } else {
-    const { data, error } = await db.from('lessons').select('clip_id, media_path').eq('id', lessonId).maybeSingle()
+    const { data, error } = await db.from('lessons').select('clip_id, player_id, media_path').eq('id', lessonId).maybeSingle()
     if (error && isMissingTableError(error)) return { error: 'Lesson not found' }
-    const row = data as { clip_id: string; media_path: string } | null
+    const row = data as { clip_id: string; player_id: string; media_path: string } | null
     if (!row) return { error: 'Lesson not found' }
-    clipId = row.clip_id; mediaPath = row.media_path
+    clipId = row.clip_id; mediaPath = row.media_path; playerId = row.player_id
   }
-  const access = await decideStorageAccess(client, userId, 'lessons', mediaPath, 'write')
-  if (!access.allowed) {
+  const access = await isDirectCoachWriter(client, userId, playerId, mediaPath)
+  if (!access.ok) {
     console.warn('[deleteLesson] denied', { userId, lessonId, reason: access.reason })
     return { error: LESSON_DENIED }
   }
