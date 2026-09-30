@@ -16,7 +16,7 @@ function fmtDateTime(iso: string) {
 // MediaRecorder webm files have no duration (Infinity), so the bar can't be
 // dragged (QA-005). Seeking far past the end makes the browser work out the
 // real length; then jump back to the start.
-function fixInfiniteDuration(e: SyntheticEvent<HTMLVideoElement>) {
+function fixInfiniteDuration(e: SyntheticEvent<HTMLMediaElement>) {
   const v = e.currentTarget
   if (Number.isFinite(v.duration)) return
   const back = () => { if (Number.isFinite(v.duration)) { v.removeEventListener('durationchange', back); v.currentTime = 0 } }
@@ -76,8 +76,9 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
         )}
       </div>
       {error && <p role="alert" className="text-xs text-[#C8102E] mt-1">{error}</p>}
-      {open && media?.format === 1 && (
-        <video src={media.url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
+      {open && media?.format === 1 && (lesson.mime?.startsWith('audio/')
+        ? <audio src={media.url} controls autoPlay onLoadedMetadata={fixInfiniteDuration} className="w-full mt-2" />
+        : <video src={media.url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
       )}
       {open && media?.format === 2 && (
         <LessonReplay timeline={media.timeline} audioUrl={media.audioUrl} videoUrl={media.videoUrl} durationMs={media.durationMs} />

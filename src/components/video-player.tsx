@@ -269,8 +269,6 @@ function sampleTimeline(rec: TimelineRecorder | null, video: HTMLVideoElement | 
 function viewCrop(reframeMode: boolean, c: { left: number; top: number; right: number; bottom: number }): TimelineCrop {
   return reframeMode ? { l: 0, t: 0, r: 1, b: 1 } : { l: c.left / 100, t: c.top / 100, r: c.right / 100, b: c.bottom / 100 }
 }
-/** The lessons bucket only accepts video/* types; an audio-only mp4/webm is stored under its container type. */
-function storageType(mime: string) { return mime.toLowerCase().includes('mp4') ? 'video/mp4' : 'video/webm' }
 
 // ── style helpers ──────────────────────────────────────────────────────────
 const TOOLS = [
@@ -978,7 +976,9 @@ export default function VideoPlayer({
     // Strip codec parameters — Supabase MIME check only matches the base type
     const baseMime = mimeType.split(';')[0].trim()
     const isAudio = baseMime.startsWith('audio/')
-    const uploadType = isAudio ? storageType(baseMime) : baseMime
+    // The real type (audio/mp4, audio/webm, or video/* for the fallback recorder):
+    // the same value goes to the upload, the file and the lessons row (026 allows audio/*).
+    const uploadType = baseMime
     const blob = new Blob(lessonChunksRef.current, { type: uploadType })
     lessonChunksRef.current = []
     if (blob.size === 0) { setLessonError('Nothing was recorded. Try again.'); setLessonPhase('idle'); return }

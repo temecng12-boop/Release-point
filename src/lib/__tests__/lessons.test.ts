@@ -218,18 +218,18 @@ test('save: timeline lesson stores the validated timeline with format_version 2;
   assert.equal(row.format_version, 2); assert.equal(row.mime, 'audio/mp4')
   assert.equal('junk' in (row.timeline as object), false)
   const bad = fakeSupabase(world())
-  const r = await saveLessonRecord(bad.client, COACH, C1, path, { timeline: { ...TL, v: 3 } })
+  const r = await saveLessonRecord(bad.client, COACH, C1, path, { mime: 'audio/mp4', timeline: { ...TL, v: 3 } })
   assert.ok('error' in r && /Invalid lesson timeline/.test(r.error))
   assert.equal((bad.tables.lessons as unknown[]).length, 0)
   const w = world(); w.lessons = 'missing'
-  assert.deepEqual(await saveLessonRecord(fakeSupabase(w).client, COACH, C1, path, { timeline: TL }), { success: true, warning: LESSONS_MISSING_TIMELINE_MESSAGE })
+  assert.deepEqual(await saveLessonRecord(fakeSupabase(w).client, COACH, C1, path, { mime: 'audio/mp4', timeline: TL }), { success: true, warning: LESSONS_MISSING_TIMELINE_MESSAGE })
 })
 
 test('replay source: v2 signs lesson audio + original clip video after read checks; v1 and legacy play the file', async () => {
   const f = fakeSupabase(world())
   const v1 = newLessonPath(P1, C1, 'video/webm', 1, 'v1'), v2 = newLessonPath(P1, C1, 'audio/mp4', 2, 'v2')
   await saveLessonRecord(f.client, COACH, C1, v1)
-  await saveLessonRecord(f.client, COACH, C1, v2, { timeline: TL, durationMs: 5000 })
+  await saveLessonRecord(f.client, COACH, C1, v2, { mime: 'audio/mp4', timeline: TL, durationMs: 5000 })
   const [r1, r2] = (f.tables.lessons as Record<string, unknown>[]).map(r => r.id as string)
   assert.deepEqual(await loadLessonReplay(f.client, PLAYER, r1), { format: 1, mediaPath: v1 })
   const src = await loadLessonReplay(f.client, ASST, r2)
@@ -265,4 +265,20 @@ test('QA-003: every recording is kept: several lessons on one clip, none overwri
   assert.deepEqual(f.removed, [])                                             // no file deleted
   assert.ok(!f.log.some(l => l.startsWith('delete')))                          // no row deleted
   assert.ok((f.tables.lessons as Record<string, unknown>[]).every(r => r.duration_ms === 10_000 || r.clip_id === C2))
+})
+
+test('save: the lessons row keeps the real upload type (audio/* for timelines, video/* for video lessons)', async () => {
+  const f = fakeSupabase(world())
+  const webmAudio = newLessonPath(P1, C1, 'audio/webm;codecs=opus', 1, 'wa'), mp4Audio = newLessonPath(P1, C1, 'audio/mp4', 2, 'ma'), vid = newLessonPath(P1, C1, 'video/webm', 3, 'v')
+  assert.ok(webmAudio.endsWith('.webm') && mp4Audio.endsWith('.mp4'))
+  assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, webmAudio, { mime: 'audio/webm;codecs=opus', timeline: TL }), { success: true })
+  assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, mp4Audio, { mime: 'audio/mp4;codecs=mp4a.40.2', timeline: TL }), { success: true })
+  assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, vid, { mime: 'video/webm;codecs=vp9,opus' }), { success: true })
+  assert.deepEqual((f.tables.lessons as Record<string, unknown>[]).map(r => [r.mime, r.format_version ?? 1]), [['audio/webm', 2], ['audio/mp4', 2], ['video/webm', 1]])
+  // Mislabeled or unsupported types are refused.
+  const g = fakeSupabase(world())
+  assert.deepEqual(await saveLessonRecord(g.client, COACH, C1, mp4Audio, { mime: 'audio/webm' }), { error: 'Unsupported lesson file type' })
+  assert.deepEqual(await saveLessonRecord(g.client, COACH, C1, mp4Audio, { mime: 'text/html' }), { error: 'Unsupported lesson file type' })
+  assert.deepEqual(await saveLessonRecord(g.client, COACH, C1, mp4Audio, { mime: 'video/mp4', timeline: TL }), { error: 'Invalid lesson timeline: the recording must be audio' })
+  assert.equal((g.tables.lessons as unknown[]).length, 0)
 })

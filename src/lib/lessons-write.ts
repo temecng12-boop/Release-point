@@ -5,7 +5,7 @@
 // lesson file for exactly that player and clip (src/lib/lesson-path.ts).
 // New recordings never delete older ones.
 import { decideStorageAccess } from './storage-access'
-import { isLessonPathFor } from './lesson-path'
+import { isLessonPathFor, lessonBaseMime, lessonMimeMatchesPath } from './lesson-path'
 import { isMissingTableError, LESSONS_MISSING_MESSAGE } from './lessons'
 import { MAX_TIMELINE_BYTES, TIMELINE_VERSION, validateTimeline, timelineBytes } from './lesson-timeline/schema'
 
@@ -65,6 +65,15 @@ export async function saveLessonRecord(
     return { error: LESSON_DENIED }
   }
 
+  // The stored type is the real one the file was uploaded with (audio/* for
+  // timeline lessons, video/* for older video lessons), never relabeled.
+  let mime: string | null = null
+  if (meta.mime != null) {
+    mime = lessonBaseMime(meta.mime)
+    if (!mime || !lessonMimeMatchesPath(mime, lessonPath)) return { error: 'Unsupported lesson file type' }
+  }
+  if (meta.timeline != null && !mime?.startsWith('audio/')) return { error: 'Invalid lesson timeline: the recording must be audio' }
+
   // Timeline lessons (format 2): audio file + validated event timeline.
   let timeline = null
   if (meta.timeline != null) {
@@ -81,7 +90,7 @@ export async function saveLessonRecord(
     ? Math.min(Math.round(meta.durationMs), 2_147_483_647) : null
   const { error: insertError } = await db.from('lessons').insert({
     clip_id: clipId, player_id: playerId, coach_id: userId, media_path: lessonPath,
-    mime: meta.mime ? String(meta.mime).split(';')[0].trim().slice(0, 100) : null,
+    mime,
     duration_ms: duration,
     ...(timeline ? { timeline, format_version: TIMELINE_VERSION } : {}),
   })
