@@ -4,6 +4,7 @@
 // write check (src/lib/storage-access.ts) must also pass, and the path must be a
 // lesson file for exactly that player and clip (src/lib/lesson-path.ts).
 // New recordings never delete older ones.
+import { lessonTotalMs } from './lesson-recording'
 import { decideStorageAccess } from './storage-access'
 import { isLessonPathFor, lessonBaseMime, lessonMimeMatchesPath } from './lesson-path'
 import { isMissingTableError, LESSONS_MISSING_MESSAGE } from './lessons'
@@ -86,8 +87,10 @@ export async function saveLessonRecord(
     timeline = checked.timeline
   }
 
-  const duration = meta.durationMs != null && Number.isFinite(meta.durationMs) && meta.durationMs >= 0
-    ? Math.min(Math.round(meta.durationMs), 2_147_483_647) : null
+  // QA-005: always keep a length. The recorder measures it (webm files report
+  // Infinity); for timeline lessons fall back to the timeline's own length.
+  const measured = lessonTotalMs(meta.durationMs, timeline?.durationMs)
+  const duration = measured == null ? null : Math.min(measured, 2_147_483_647)
   const { error: insertError } = await db.from('lessons').insert({
     clip_id: clipId, player_id: playerId, coach_id: userId, media_path: lessonPath,
     mime,

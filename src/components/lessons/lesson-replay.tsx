@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Timeline } from '@/lib/lesson-timeline/schema'
 import { cropTransform, TimelineCursor, visiblePoints, type ReplayState } from '@/lib/lesson-timeline/state'
 import { ReplaySync, type Timers } from '@/lib/lesson-timeline/sync'
+import { lessonTotalMs } from '@/lib/lesson-recording'
 
 const INK_WIDTH = 7
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -53,8 +54,10 @@ export default function LessonReplay({ timeline, audioUrl, videoUrl, durationMs 
   const [pos, setPos] = useState(0)
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // MediaRecorder webm often reports duration = Infinity; the timeline knows the length.
-  const total = durationMs ?? timeline.durationMs
+  const [audioMs, setAudioMs] = useState<number | null>(null)
+  // MediaRecorder webm often reports duration = Infinity, so use the stored
+  // length, then the timeline's, then the audio's once it is known (QA-005/007).
+  const total = lessonTotalMs(durationMs, timeline.durationMs, audioMs) ?? 0
   const portrait = timeline.clip.w < timeline.clip.h
 
   useEffect(() => {
@@ -85,7 +88,10 @@ export default function LessonReplay({ timeline, audioUrl, videoUrl, durationMs 
     const onEnded = () => { sync.pause(); setPlaying(false) }
     const onAudioError = () => setError('Could not play the lesson audio. Try again.')
     const onVideoError = () => setError('Could not load the clip video for this lesson.')
+    const onAudioDuration = () => { if (Number.isFinite(audio.duration) && audio.duration > 0) setAudioMs(audio.duration * 1000) }
     audio.addEventListener('ended', onEnded)
+    audio.addEventListener('loadedmetadata', onAudioDuration)
+    audio.addEventListener('durationchange', onAudioDuration)
     audio.addEventListener('error', onAudioError)
     video.addEventListener('error', onVideoError)
     // First frame + marks before anyone presses play.
@@ -93,6 +99,8 @@ export default function LessonReplay({ timeline, audioUrl, videoUrl, durationMs 
     return () => {
       cancelAnimationFrame(raf); window.clearInterval(iv)
       audio.removeEventListener('ended', onEnded)
+      audio.removeEventListener('loadedmetadata', onAudioDuration)
+      audio.removeEventListener('durationchange', onAudioDuration)
       audio.removeEventListener('error', onAudioError)
       video.removeEventListener('error', onVideoError)
       sync.pause()
@@ -149,13 +157,13 @@ export default function LessonReplay({ timeline, audioUrl, videoUrl, durationMs 
           {playing ? '❚❚ Pause' : '▶ Play'}
         </button>
         <input
-          type="range" min={0} max={Math.max(1, total)} step={10} value={Math.min(pos, total)}
+          type="range" min={0} max={Math.max(1, total)} step={10} value={Math.min(pos, Math.max(1, total))} disabled={total <= 0}
           onPointerDown={onScrubStart} onKeyDown={onScrubStart} onChange={onScrub}
           onPointerUp={onScrubEnd} onKeyUp={onScrubEnd} onBlur={onScrubEnd}
           aria-label="Lesson position"
           className="flex-1 accent-[#C8102E] cursor-pointer h-1"
         />
-        <span className="text-xs text-[#8096AE] font-mono tabular-nums shrink-0">{fmt(pos)} / {fmt(total)}</span>
+        <span className="text-xs text-[#8096AE] font-mono tabular-nums shrink-0">{fmt(pos)} / {total > 0 ? fmt(total) : '–:––'}</span>
       </div>
       {error && <p role="alert" className="text-xs text-[#C8102E] mt-1">{error}</p>}
     </div>

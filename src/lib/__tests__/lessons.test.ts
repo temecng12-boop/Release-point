@@ -282,3 +282,16 @@ test('save: the lessons row keeps the real upload type (audio/* for timelines, v
   assert.deepEqual(await saveLessonRecord(g.client, COACH, C1, mp4Audio, { mime: 'video/mp4', timeline: TL }), { error: 'Invalid lesson timeline: the recording must be audio' })
   assert.equal((g.tables.lessons as unknown[]).length, 0)
 })
+
+test('QA-005: every lesson stores duration_ms: recorded length first, timeline length when the recorder gave none', async () => {
+  const f = fakeSupabase(world())
+  const a = newLessonPath(P1, C1, 'audio/webm', 1, 'a'), b = newLessonPath(P1, C1, 'audio/webm', 2, 'b'), c = newLessonPath(P1, C1, 'audio/webm', 3, 'c'), v = newLessonPath(P1, C1, 'video/webm', 4, 'v')
+  await saveLessonRecord(f.client, COACH, C1, a, { mime: 'audio/webm', timeline: TL, durationMs: 5123.6 })
+  await saveLessonRecord(f.client, COACH, C1, b, { mime: 'audio/webm', timeline: TL, durationMs: null })
+  await saveLessonRecord(f.client, COACH, C1, c, { mime: 'audio/webm', timeline: TL, durationMs: Infinity })
+  await saveLessonRecord(f.client, COACH, C1, v, { mime: 'video/webm', durationMs: 7000 })
+  const rows = f.tables.lessons as Record<string, unknown>[]
+  assert.deepEqual(rows.map(r => r.duration_ms), [5124, 5000, 5000, 7000])
+  // QA-003 on the timeline branch too: all four kept for the one clip.
+  assert.equal((await loadLessons(f.client, { clipId: C1 })).lessons.length, 4)
+})
