@@ -3,7 +3,8 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
-import { deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
+import { clipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
+import { loadLessonReplay } from '@/lib/lessons'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -329,12 +330,27 @@ export async function deleteTimestampNote(noteId: string) {
 
 // A new lesson recording: adds a lessons row (never deletes older lessons) and
 // points clips.lesson_path at it. Coach-only; see src/lib/lessons-write.ts.
-export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null } = {}) {
+export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null; timeline?: unknown } = {}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const result = await saveLessonRecord(supabaseAdmin, user?.id, clipId, lessonPath, meta)
   if ('success' in result) revalidatePath(`/clips/${clipId}`)
   return result
+}
+
+// Playback for one lesson: signed URLs for the lesson file and, for timeline
+// lessons, the original clip video (both through the storage ownership check).
+export async function getLessonReplay(lessonId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const src = await loadLessonReplay(supabaseAdmin, user?.id, lessonId)
+  if ('error' in src) return { error: src.error }
+  const { data: media } = await supabaseAdmin.storage.from('lessons').createSignedUrl(src.mediaPath, 3600)
+  if (!media?.signedUrl) return { error: 'Could not load this lesson.' }
+  if (src.format === 1) return { format: 1 as const, mediaUrl: media.signedUrl }
+  const { data: clip } = await supabaseAdmin.storage.from('clips').createSignedUrl(src.clipPath, 3600)
+  if (!clip?.signedUrl) return { error: 'Could not load the clip video for this lesson.' }
+  return { format: 2 as const, mediaUrl: media.signedUrl, videoUrl: clip.signedUrl, timeline: src.timeline, durationMs: src.durationMs }
 }
 
 export async function deleteLesson(lessonId: string) {
@@ -418,6 +434,9 @@ export async function deleteClip(clipId: string) {
     return { error: 'Not authorized' }
   }
 
+  // Every lesson file of this clip (lessons bucket), collected before the rows cascade away.
+  const lessonFiles = await clipLessonFiles(supabaseAdmin, clipId, clip.player_id as string)
+
   await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
@@ -431,6 +450,11 @@ export async function deleteClip(clipId: string) {
 
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
+
+  if (lessonFiles.length) {
+    const { error: lessonRemoveError } = await supabaseAdmin.storage.from('lessons').remove(lessonFiles)
+    if (lessonRemoveError) console.error('[deleteClip] lesson file cleanup failed', clipId, lessonRemoveError.message)
+  }
 
   revalidatePath('/dashboard')
   return { success: true }
