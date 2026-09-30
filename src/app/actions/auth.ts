@@ -74,7 +74,8 @@ export async function signIn(_prevState: { error?: string } | undefined, formDat
 
 export async function signOut() {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  // Sign out this device only; other devices stay signed in (QA-012).
+  await supabase.auth.signOut({ scope: 'local' })
   redirect('/auth/login')
 }
 
@@ -157,7 +158,8 @@ export async function deleteAccount(): Promise<{ error: string } | undefined> {
     skipped: result.log,
   })
 
-  const { error: signOutError } = await supabase.auth.signOut()
+  // Account deleted: end every session of this account, on all devices.
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
   if (signOutError) console.warn('[deleteAccount] signOut after delete', { userId: user.id, error: signOutError.message })
   redirect('/auth/login')
 }
