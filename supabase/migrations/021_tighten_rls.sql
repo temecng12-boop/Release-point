@@ -12,6 +12,7 @@
 --
 -- Idempotent where practical: policies use DROP POLICY IF EXISTS, functions use
 -- CREATE OR REPLACE, and triggers use DROP TRIGGER IF EXISTS.
+-- Runs as one transaction: if any statement fails, nothing is changed.
 --
 -- Most app server code uses the service-role key, which BYPASSES RLS and
 -- triggers that check for end-user roles. These rules mainly protect against
@@ -22,6 +23,8 @@
 -- postgres, and SECURITY DEFINER functions owned by postgres are not
 -- restricted by the triggers.
 -- ============================================================================
+
+BEGIN;
 
 -- ── Helper: is this an end-user (JWT) request? ───────────────────────────────
 CREATE OR REPLACE FUNCTION public.is_end_user_request()
@@ -180,8 +183,9 @@ CREATE POLICY "profiles_update_own" ON profiles
   WITH CHECK (id = auth.uid());
 
 -- No DELETE policy on purpose. Deleting your own profile and re-inserting it
--- would otherwise be a way around the role lock. Account deletion goes
--- through the delete_current_user() RPC (not in the repo; see notes).
+-- would otherwise be a way around the role lock. Account deletion runs on
+-- the server with the service role (deleteAccount in src/app/actions/auth.ts,
+-- src/lib/account-deletion.ts), which bypasses RLS.
 
 -- Reject role changes made through an end-user request. The service role
 -- (e.g. the coach signUp action, recordConsent) can still set roles.
@@ -394,5 +398,7 @@ CREATE POLICY "players_claim_by_email" ON players
   FOR UPDATE TO authenticated
   USING  (email = auth.email() AND user_id IS NULL)
   WITH CHECK (email = auth.email() AND user_id = auth.uid());
+
+COMMIT;
 
 NOTIFY pgrst, 'reload schema';
