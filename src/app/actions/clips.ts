@@ -4,13 +4,14 @@ import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
+import { isVoicePathFor } from '@/lib/voice-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
-import { canDeleteClip, canDeleteClipItem } from '@/lib/auth/roster-access'
+import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
 
 // Loads the coach and account ids of the player a clip belongs to.
@@ -442,9 +443,10 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
 
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
-  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
-  if (playerIdFromStoragePath(voicePath) !== clip.player_id) return { error: 'Invalid storage path' }
+  // Voice notes are coach commentary: only the player's own (direct) coach.
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: 'Not authorized' }
+  if (!isVoicePathFor(voicePath, clip.player_id, clipId)) return { error: 'Invalid storage path' }
 
   const { error } = await supabaseAdmin
     .from('clips')
