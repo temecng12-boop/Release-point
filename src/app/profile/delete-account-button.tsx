@@ -9,6 +9,22 @@ export default function DeleteAccountButton() {
   const [confirming, setConfirming] = useState(false)
   const [input, setInput] = useState('')
   const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function onConfirm() {
+    setError(null)
+    startTransition(async () => {
+      try {
+        // On success the server action redirects to /auth/login; it only returns on failure.
+        const result = await deleteAccount()
+        if (result?.error) setError(result.error)
+      } catch (e) {
+        // redirect() is delivered as a thrown control-flow signal; let Next handle it.
+        if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT')) throw e
+        setError('We couldn\'t reach the server to delete your account. Check your connection and try again.')
+      }
+    })
+  }
 
   if (!confirming) {
     return (
@@ -33,9 +49,12 @@ export default function DeleteAccountButton() {
         placeholder="Type DELETE"
         className="w-full max-w-xs bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8102E]/50 font-mono"
       />
+      {error && (
+        <p role="alert" className="text-xs text-[#C8102E] max-w-md">{error}</p>
+      )}
       <div className="flex gap-2">
         <button
-          onClick={() => startTransition(() => deleteAccount())}
+          onClick={onConfirm}
           disabled={input !== 'DELETE' || pending}
           className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           style={oswald}
@@ -43,7 +62,7 @@ export default function DeleteAccountButton() {
           {pending ? 'Deleting…' : 'Confirm Delete'}
         </button>
         <button
-          onClick={() => { setConfirming(false); setInput('') }}
+          onClick={() => { setConfirming(false); setInput(''); setError(null) }}
           disabled={pending}
           className="text-xs text-[#3D5166] hover:text-[#456080] px-4 py-2 rounded-lg transition-colors"
           style={oswald}
