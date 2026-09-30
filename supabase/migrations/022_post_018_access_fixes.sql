@@ -159,7 +159,7 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE public.%I ALTER COLUMN %I DROP NOT NULL', spec.tbl, spec.col);
 
-    SELECT count(*) FILTER (WHERE c.confdeltype = 'n'), count(*)
+    SELECT count(*) FILTER (WHERE c.confdeltype = 'n' AND c.convalidated), count(*)
       INTO n_ok, n_all
       FROM pg_constraint c
       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
@@ -170,7 +170,7 @@ BEGIN
        AND a.attname = spec.col;
 
     IF n_all = 1 AND n_ok = 1 THEN
-      CONTINUE;  -- already ON DELETE SET NULL
+      CONTINUE;  -- already ON DELETE SET NULL and validated
     END IF;
 
     FOR fk IN
@@ -193,9 +193,12 @@ BEGIN
         spec.new_name, spec.tbl, spec.tbl, spec.col;
     END IF;
 
+    -- NOT VALID skips the full-table check while the lock is held; VALIDATE
+    -- then checks existing rows under a lighter lock.
     EXECUTE format(
-      'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (%I) REFERENCES auth.users(id) ON DELETE SET NULL',
+      'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (%I) REFERENCES auth.users(id) ON DELETE SET NULL NOT VALID',
       spec.tbl, spec.new_name, spec.col);
+    EXECUTE format('ALTER TABLE public.%I VALIDATE CONSTRAINT %I', spec.tbl, spec.new_name);
   END LOOP;
 END
 $$;
