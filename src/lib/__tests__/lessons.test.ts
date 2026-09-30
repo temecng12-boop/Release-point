@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { canManageLessons, formatLessonDuration, groupLessonsByClip, isMissingTableError, loadLessonFeedback, loadLessons, LESSONS_MISSING_MESSAGE, type LessonRow } from '../lessons'
-import { deleteLessonRecord, saveLessonRecord, LESSON_DENIED } from '../lessons-write'
+import { clipLessonFiles, deleteLessonRecord, saveLessonRecord, LESSON_DENIED } from '../lessons-write'
 import { newLessonPath } from '../lesson-path'
 import { fakeSupabase, type FakeTables } from './helpers/fake-supabase'
 
@@ -179,4 +179,39 @@ test('degrades without the lessons table: save works, feedback falls back to cli
   await assert.rejects(loadLessons(broken.client, { clipId: C1 }))   // clip page wraps this in try/catch
   // Viewers without access get nothing.
   assert.equal(await loadLessonFeedback(fakeSupabase(world()).client, OFF, P1), null)
+})
+
+test('delete legacy:<clipId> after 025: removes the file AND the backfilled lessons row; lesson_path moves to the newest remaining', async () => {
+  const w = world()
+  const old = `${P1}/${C1}/lesson.webm`, newer = newLessonPath(P1, C1, 'video/webm', 5, 'n')
+  ;(w.clips as Record<string, unknown>[])[0].lesson_path = old
+  w.lessons = [{ ...L('bf', C1, '2026-09-01T00:00:00Z', null), media_path: old }]
+  const f = fakeSupabase(w)
+  assert.deepEqual(await deleteLessonRecord(f.client, COACH, `legacy:${C1}`), { success: true, clipId: C1 })
+  assert.deepEqual(f.removed, [`lessons:${old}`])
+  assert.deepEqual(f.tables.lessons, [])
+  assert.equal((f.tables.clips as Record<string, unknown>[])[0].lesson_path, null)
+  // With another lesson left, lesson_path points at it.
+  const w2 = world(); (w2.clips as Record<string, unknown>[])[0].lesson_path = old
+  w2.lessons = [{ ...L('bf', C1, '2026-09-01T00:00:00Z', null), media_path: old }, { ...L('n', C1, '2026-09-02T00:00:00Z'), media_path: newer }]
+  const f2 = fakeSupabase(w2)
+  assert.deepEqual(await deleteLessonRecord(f2.client, COACH, `legacy:${C1}`), { success: true, clipId: C1 })
+  assert.deepEqual((f2.tables.lessons as Record<string, unknown>[]).map(r => r.media_path), [newer])
+  assert.equal((f2.tables.clips as Record<string, unknown>[])[0].lesson_path, newer)
+  // Before 025 (no table) a legacy delete still works.
+  const w3 = world(); w3.lessons = 'missing'; (w3.clips as Record<string, unknown>[])[0].lesson_path = old
+  const f3 = fakeSupabase(w3)
+  assert.deepEqual(await deleteLessonRecord(f3.client, COACH, `legacy:${C1}`), { success: true, clipId: C1 })
+  assert.equal((f3.tables.clips as Record<string, unknown>[])[0].lesson_path, null)
+})
+
+test('clip delete: collects ALL lesson files of the clip (rows + lesson_path), only inside that clip folder', async () => {
+  const f = fakeSupabase(world())
+  const a = newLessonPath(P1, C1, 'video/webm', 1, 'a'), b = newLessonPath(P1, C1, 'video/webm', 2, 'b'), other = newLessonPath(P1, C2, 'video/webm', 3, 'c')
+  for (const [clip, p] of [[C1, a], [C1, b], [C2, other]]) await saveLessonRecord(f.client, COACH, clip, p)
+  ;(f.tables.lessons as Record<string, unknown>[]).push({ id: 'evil', clip_id: C1, player_id: P1, media_path: `${P2}/${C1}/lesson.webm` })
+  ;(f.tables.clips as Record<string, unknown>[])[0].lesson_path = `${P1}/${C1}/lesson.webm`   // older, not in lessons
+  assert.deepEqual((await clipLessonFiles(f.client, C1, P1)).sort(), [a, b, `${P1}/${C1}/lesson.webm`].sort())
+  const w = world(); w.lessons = 'missing'; (w.clips as Record<string, unknown>[])[0].lesson_path = a
+  assert.deepEqual(await clipLessonFiles(fakeSupabase(w).client, C1, P1), [a])
 })

@@ -3,7 +3,7 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
-import { deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
+import { clipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -418,6 +418,9 @@ export async function deleteClip(clipId: string) {
     return { error: 'Not authorized' }
   }
 
+  // Every lesson file of this clip (lessons bucket), collected before the rows cascade away.
+  const lessonFiles = await clipLessonFiles(supabaseAdmin, clipId, clip.player_id as string)
+
   await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
@@ -431,6 +434,11 @@ export async function deleteClip(clipId: string) {
 
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
+
+  if (lessonFiles.length) {
+    const { error: lessonRemoveError } = await supabaseAdmin.storage.from('lessons').remove(lessonFiles)
+    if (lessonRemoveError) console.error('[deleteClip] lesson file cleanup failed', clipId, lessonRemoveError.message)
+  }
 
   revalidatePath('/dashboard')
   return { success: true }

@@ -113,19 +113,35 @@ export async function deleteLessonRecord(client: unknown, userId: string | null 
     console.error('[deleteLesson] storage remove failed', { lessonId, message: removeError.message })
     return { error: 'Could not delete this lesson. Please try again.' }
   }
-  if (!legacy) {
-    const { error } = await db.from('lessons').delete().eq('id', lessonId)
-    if (error) return { error: 'Could not delete this lesson. Please try again.' }
-  }
+  // The lessons row: by id, or for a legacy id (clips.lesson_path) the row 025
+  // backfilled for that same file. Before 025 there is no table and nothing to remove.
+  const { error: rowError } = legacy
+    ? await db.from('lessons').delete().eq('media_path', mediaPath)
+    : await db.from('lessons').delete().eq('id', lessonId)
+  if (rowError && !(legacy && isMissingTableError(rowError))) return { error: 'Could not delete this lesson. Please try again.' }
   // Keep clips.lesson_path pointing at the newest remaining lesson (or none).
   const { data: clipRow } = await db.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
   if ((clipRow as { lesson_path?: string | null } | null)?.lesson_path === mediaPath) {
-    let next: string | null = null
-    if (!legacy) {
-      const { data: newest } = await db.from('lessons').select('media_path').eq('clip_id', clipId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      next = (newest as { media_path?: string } | null)?.media_path ?? null
-    }
+    const { data: newest, error } = await db.from('lessons').select('media_path').eq('clip_id', clipId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    const next = error ? null : (newest as { media_path?: string } | null)?.media_path ?? null
     await db.from('clips').update({ lesson_path: next }).eq('id', clipId)
   }
   return { success: true, clipId }
+}
+
+/**
+ * Every lesson file of a clip (all lessons rows plus clips.lesson_path), for
+ * removal when the clip is deleted. Tolerates a missing lessons table; only
+ * paths inside this player's/clip's folder are returned.
+ */
+export async function clipLessonFiles(client: unknown, clipId: string, playerId: string): Promise<string[]> {
+  const db = client as Client
+  const paths = new Set<string>()
+  const { data: rows, error } = await db.from('lessons').select('media_path').eq('clip_id', clipId)
+  if (error && !isMissingTableError(error)) console.error('[clipLessonFiles] lessons read failed', { clipId, message: error.message })
+  for (const r of (rows ?? []) as { media_path: string }[]) paths.add(r.media_path)
+  const { data: clip } = await db.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
+  const lp = (clip as { lesson_path?: string | null } | null)?.lesson_path
+  if (lp) paths.add(lp)
+  return [...paths].filter(p => isLessonPathFor(p, playerId, clipId))
 }
