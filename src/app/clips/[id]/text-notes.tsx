@@ -107,7 +107,6 @@ export default function TextNotes({
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           onBlur={onNotesBlur}
-          data-unsaved={saveStatus === 'saved' ? undefined : 'true'}
           placeholder="Type coaching notes here…"
           rows={5}
           className="w-full text-sm bg-white border border-[#DDE4ED] rounded-md p-3 text-[#0F1F33] placeholder:text-[#3D5166] resize-none focus:outline-none focus:border-[#456080]"
