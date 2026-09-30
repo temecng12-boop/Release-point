@@ -106,6 +106,16 @@ test('team (assistant) coach gets read links only', async () => {
   const r = await decideStorageAccess(db, ASST, 'clips', clipUpload, 'write')
   assert.deepEqual(r, { allowed: false, reason: 'read-only access', teamCheck: 'ok' })
   assert.equal(await allowed(db, ASST, 'lessons', lesson, 'write'), false)
+  assert.deepEqual(await decideStorageAccess(db, ASST, 'lessons', lesson, 'write'), { allowed: false, reason: 'lessons: direct coach only', teamCheck: 'ok' })
+})
+
+test('lessons upload links: direct coach only, even for the team organizer who is not the direct coach', async () => {
+  const t = base()
+  ;(t.players as Record<string, unknown>[])[0].coach_id = null     // P1 now has no direct coach
+  const db = fakeDb(t)
+  assert.equal(await allowed(db, OWNER, 'lessons', lesson, 'write'), false)   // organizer via team only
+  assert.equal(await allowed(db, OWNER, 'lessons', lesson, 'read'), true)
+  assert.equal(await allowed(fakeDb(base()), OWNER, 'lessons', lesson, 'write'), true)
 })
 
 test('guardian is read-only', async () => {
