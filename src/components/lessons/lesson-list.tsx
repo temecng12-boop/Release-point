@@ -2,7 +2,9 @@
 
 import { useState, useTransition, type SyntheticEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { getLessonSignedUrl, deleteLesson } from '@/app/actions/clips'
+import { getLessonReplay, deleteLesson } from '@/app/actions/clips'
+import { validateTimeline, type Timeline } from '@/lib/lesson-timeline/schema'
+import LessonReplay from './lesson-replay'
 import { formatLessonDuration, type LessonItem } from '@/lib/lessons'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -25,7 +27,8 @@ function fixInfiniteDuration(e: SyntheticEvent<HTMLVideoElement>) {
 /** One lesson: date, coach, duration; opens and replays in place. */
 function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: boolean }) {
   const router = useRouter()
-  const [url, setUrl] = useState<string | null>(null)
+  // Format 1: a video file. Format 2: audio + timeline replayed over the original clip.
+  const [media, setMedia] = useState<{ format: 1; url: string } | { format: 2; audioUrl: string; videoUrl: string; timeline: Timeline; durationMs: number | null } | null>(null)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -35,12 +38,15 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
     setError(null)
     if (open) { setOpen(false); return }
     setOpen(true)
-    if (url) return
+    if (media) return
     startTransition(async () => {
       // Signed playback URLs go through the storage ownership check.
-      const r = await getLessonSignedUrl(lesson.media_path)
-      if ('signedUrl' in r && r.signedUrl) setUrl(r.signedUrl)
-      else { setError('error' in r && r.error ? r.error : 'Could not load this lesson.'); setOpen(false) }
+      const r = await getLessonReplay(lesson.id)
+      if ('error' in r) { setError(r.error ?? 'Could not load this lesson.'); setOpen(false); return }
+      if (r.format === 1) { setMedia({ format: 1, url: r.mediaUrl }); return }
+      const checked = validateTimeline(r.timeline)
+      if (!checked.ok) { setError('This lesson replay is damaged and cannot be played.'); setOpen(false); return }
+      setMedia({ format: 2, audioUrl: r.mediaUrl, videoUrl: r.videoUrl, timeline: checked.timeline, durationMs: r.durationMs })
     })
   }
 
@@ -70,8 +76,11 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
         )}
       </div>
       {error && <p role="alert" className="text-xs text-[#C8102E] mt-1">{error}</p>}
-      {open && url && (
-        <video src={url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
+      {open && media?.format === 1 && (
+        <video src={media.url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
+      )}
+      {open && media?.format === 2 && (
+        <LessonReplay timeline={media.timeline} audioUrl={media.audioUrl} videoUrl={media.videoUrl} durationMs={media.durationMs} />
       )}
     </li>
   )
