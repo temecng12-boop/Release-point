@@ -25,13 +25,16 @@
 --     uploads to a signed URL are authorized by the token, not by these
 --     policies. The server checks (canUploadForPlayer, checkUploadConsent,
 --     storage path checks) are what protect that path.
---   * createSignedUrl on the server, and every service-role remove(), also
---     skip these policies.
+--   * createSignedUrl on the server, and every storage remove() in the app
+--     (deleteClip, voice/lesson replacement, account deletion) run with the
+--     service role and skip these policies. Since #14, deleteClip checks
+--     uploader-or-coach itself and then removes the files with the service
+--     role.
 -- These policies govern requests made with a user JWT (the browser client or
 -- the user-scoped server client). In the current code that is:
 --   * browser createSignedUrl for voice and lesson playback (SELECT),
---   * deleteClip's storage remove() calls (DELETE),
---   * any direct PostgREST / storage API call someone makes with their own JWT.
+--   * any direct PostgREST / storage API call someone makes with their own JWT
+--     (including a DELETE, which the delete rule below covers).
 --
 -- Rules, mirroring the clips table policies in 002 as left by 018 and 021:
 --   read:   the player's own coach, a coach on one of the player's teams
@@ -41,7 +44,7 @@
 --           when the player has an 18+ confirmation or guardian consent (023).
 --   update: the player's own coach
 --   delete: the player's own coach; the player, only for a clip video they
---           uploaded themself (matches deleteClip: uploader or coach)
+--           uploaded themself (the same rule deleteClip checks in the app)
 -- Paths that don't start with a player id (e.g. avatars/) get no end-user
 -- access here; they stay service-role only.
 --

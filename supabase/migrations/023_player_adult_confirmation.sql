@@ -12,9 +12,16 @@
 -- the database-side backstop. It fires for every role, including the service
 -- role the app server uses, so it matches the server-side check.
 --
--- Existing players get adult_confirmed_at = NULL. No data is backfilled: no
--- migration or app code stores a date of birth or age for players or
--- profiles (age_group, graduation_year and signup choices are not used as
+-- Backfill (one time, safe to re-run): a player who signed up on their own
+-- (coach_id IS NULL, see 003) and ticked the 18+ box at signup is marked
+-- confirmed, by themself. The signup code (src/app/actions/auth.ts) stores
+-- that as auth.users.raw_user_meta_data.adult_confirmed = JSON boolean true,
+-- and the app only accepts exactly that (=== true); the backfill matches the
+-- same. Coach-added players are not backfilled from the invitee's signup box:
+-- as in the app, the coach's age choice stands. Only rows with
+-- adult_confirmed_at IS NULL are touched.
+-- Everyone else keeps adult_confirmed_at = NULL: no migration or app code
+-- stores a date of birth or age (age_group and graduation_year are not used as
 -- evidence). A coach has to mark adult players 18+ (Edit Player, or "Mark as
 -- 18+" on the profile). The read-only queries after COMMIT list who that is.
 -- Existing clips are not touched; the trigger only checks new clips and clips
@@ -33,6 +40,16 @@ COMMENT ON COLUMN players.adult_confirmed_at IS
   'When the player was confirmed to be 18 or older. NULL = not confirmed (guardian consent needed before video).';
 COMMENT ON COLUMN players.adult_confirmed_by IS
   'User who confirmed the player is 18+ (the player at self-signup, or their coach).';
+
+-- One-time backfill: self-signups who confirmed 18+ at signup.
+UPDATE public.players p
+   SET adult_confirmed_at = now(),
+       adult_confirmed_by = p.user_id
+  FROM auth.users u
+ WHERE u.id = p.user_id
+   AND p.coach_id IS NULL
+   AND p.adult_confirmed_at IS NULL
+   AND u.raw_user_meta_data -> 'adult_confirmed' = 'true'::jsonb;
 
 -- True if video may be added for this player.
 CREATE OR REPLACE FUNCTION public.player_has_video_consent(p_player_id uuid)
