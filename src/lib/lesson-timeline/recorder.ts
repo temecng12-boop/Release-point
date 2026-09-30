@@ -88,7 +88,12 @@ export class TimelineRecorder {
 
   play(videoSec: number)  { const t = this.t(); this.lastPos = t; this.push({ t, k: 'play', v: this.v(videoSec) }) }
   pause(videoSec: number) { this.push({ t: this.t(), k: 'pause', v: this.v(videoSec) }) }
-  seek(videoSec: number, step = false) { this.push({ t: this.t(), k: step ? 'step' : 'seek', v: this.v(videoSec) }) }
+  /** Scrubbing fires many seeks: at most one seek event per 40 ms, carrying the latest position. */
+  seek(videoSec: number, step = false) {
+    const t = this.t(), last = this.events[this.events.length - 1]
+    if (!step && last?.k === 'seek' && t - last.t < 40) { last.v = this.v(videoSec); return }
+    this.push({ t, k: step ? 'step' : 'seek', v: this.v(videoSec) })
+  }
   rate(r: number) { if (r >= 0.0625 && r <= 16) this.push({ t: this.t(), k: 'rate', r }) }
   /** Call often while the clip plays; stored about once a second (covers buffering stalls). */
   pos(videoSec: number) {

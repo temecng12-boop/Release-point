@@ -92,6 +92,20 @@ test('recorder: size limit thins samples; simplify keeps corners; audio mime pre
   assert.equal(pickAudioMime(() => false), null)
 })
 
+test('recorder: scrubbing is thinned to one seek per 40 ms ending at the final spot; frame steps are all kept', () => {
+  let now = 0
+  const rec = new TimelineRecorder(() => now, 100, 100)
+  rec.begin({ videoSec: 0, playing: false, rate: 1, crop: FULL_CROP, shapes: [] }); rec.setOrigin(0)
+  for (let i = 0; i < 10; i++) { now += 16; rec.seek(i / 10) }
+  now += 500; rec.seek(1, true); now += 10; rec.seek(1.033, true)
+  const tl = (rec.finish(1000) as { timeline: Timeline }).timeline
+  const seeks = tl.events.filter(e => e.k === 'seek') as { t: number; v: number }[]
+  assert.ok(seeks.length <= 4, `seeks ${seeks.length}`)                     // 10 raw seeks thinned
+  for (let i = 1; i < seeks.length; i++) assert.ok(seeks[i].t - seeks[i - 1].t >= 40)
+  assert.equal(seeks[seeks.length - 1].v, 900)                               // lands where the scrub ended
+  assert.deepEqual(tl.events.slice(-2).map(e => e.k), ['step', 'step'])
+})
+
 // ── state at time t ───────────────────────────────────────────────────────
 const lesson = base([
   { t: 1000, k: 'play', v: 0 },
