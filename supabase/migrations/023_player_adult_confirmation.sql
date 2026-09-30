@@ -12,8 +12,11 @@
 -- the database-side backstop. It fires for every role, including the service
 -- role the app server uses, so it matches the server-side check.
 --
--- Existing players get adult_confirmed_at = NULL. No data is backfilled: a coach
--- has to mark adult players 18+ (Edit Player, or "Mark as 18+" on the profile).
+-- Existing players get adult_confirmed_at = NULL. No data is backfilled: no
+-- migration or app code stores a date of birth or age for players or
+-- profiles (age_group, graduation_year and signup choices are not used as
+-- evidence). A coach has to mark adult players 18+ (Edit Player, or "Mark as
+-- 18+" on the profile). The read-only queries after COMMIT list who that is.
 -- Existing clips are not touched; the trigger only checks new clips and clips
 -- moved to another player.
 --
@@ -71,3 +74,17 @@ CREATE TRIGGER clips_require_video_consent
 COMMIT;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ── Read-only report (changes nothing; safe to run any time) ─────────────────
+-- Players who still need an 18+ confirmation or guardian consent before video
+-- can be added for them.
+SELECT count(*) AS players_needing_confirmation
+  FROM public.players
+ WHERE adult_confirmed_at IS NULL
+   AND consent_given_at IS NULL;
+
+SELECT id, full_name
+  FROM public.players
+ WHERE adult_confirmed_at IS NULL
+   AND consent_given_at IS NULL
+ ORDER BY full_name, id;
