@@ -18,7 +18,10 @@
 -- moved to another player.
 --
 -- Idempotent: ADD COLUMN IF NOT EXISTS, CREATE OR REPLACE, DROP ... IF EXISTS.
+-- Runs as one transaction: if any statement fails, nothing is changed.
 -- ============================================================================
+
+BEGIN;
 
 ALTER TABLE players ADD COLUMN IF NOT EXISTS adult_confirmed_at timestamptz;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS adult_confirmed_by uuid REFERENCES auth.users ON DELETE SET NULL;
@@ -64,5 +67,7 @@ DROP TRIGGER IF EXISTS clips_require_video_consent ON clips;
 CREATE TRIGGER clips_require_video_consent
   BEFORE INSERT OR UPDATE OF player_id ON clips
   FOR EACH ROW EXECUTE FUNCTION public.clips_require_video_consent();
+
+COMMIT;
 
 NOTIFY pgrst, 'reload schema';

@@ -45,8 +45,21 @@
 -- Paths that don't start with a player id (e.g. avatars/) get no end-user
 -- access here; they stay service-role only.
 --
--- Idempotent: CREATE OR REPLACE, DROP POLICY IF EXISTS.
+-- Idempotent: CREATE OR REPLACE, DROP POLICY IF EXISTS. Runs as one
+-- transaction: if 023 hasn't been applied, or any statement fails, nothing is
+-- changed.
 -- ============================================================================
+
+BEGIN;
+
+DO $$
+BEGIN
+  IF to_regprocedure('public.player_has_video_consent(uuid)') IS NULL THEN
+    RAISE EXCEPTION 'Migration 024 needs migration 023 (player_has_video_consent) first. Nothing was changed.'
+      USING ERRCODE = 'P0001';
+  END IF;
+END
+$$;
 
 -- The bucket must be private. Creates it only if it doesn't exist; an existing
 -- bucket's settings are left unchanged (check `public` is false on live).
@@ -217,3 +230,7 @@ CREATE POLICY "clips_bucket_delete" ON storage.objects
       )
     )
   );
+
+COMMIT;
+
+NOTIFY pgrst, 'reload schema';
