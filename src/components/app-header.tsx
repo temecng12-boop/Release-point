@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import { signOut } from '@/app/actions/auth'
+import SignOutForm from '@/components/sign-out-form'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -53,7 +53,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
       <div className="flex items-center gap-3 shrink-0">
         {right}
         {showSignOut && (
-          <form action={signOut}>
+          <SignOutForm>
             <button
               type="submit"
               className="text-xs text-slate-400 hover:text-slate-700 transition-colors px-2 py-1"
@@ -61,7 +61,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
             >
               Sign Out
             </button>
-          </form>
+          </SignOutForm>
         )}
       </div>
     </header>

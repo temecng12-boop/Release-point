@@ -35,7 +35,8 @@ export default async function DashboardPage() {
 
   if (profile?.role === 'guardian') redirect('/guardian')
 
-  const isCoach = (profile?.role ?? user.user_metadata?.role) === 'coach'
+  // Role comes from profiles only; user_metadata is set by the client at signup.
+  const isCoach = profile?.role === 'coach'
 
   // ── Coach data ──────────────────────────────────────────────────────────────
   // Fetch all teams where this user is a coach (organizer OR assistant)
@@ -173,12 +174,14 @@ export default async function DashboardPage() {
         <span className="text-xs text-slate-500 hidden sm:block truncate max-w-[140px]">
           {profile?.full_name ?? user.email}
         </span>
-        <span
-          className="text-xs px-2 py-0.5 rounded"
-          style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
-        >
-          {profile?.role ?? user.user_metadata?.role ?? 'coach'}
-        </span>
+        {profile?.role && (
+          <span
+            className="text-xs px-2 py-0.5 rounded"
+            style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
+          >
+            {profile.role}
+          </span>
+        )}
       </div>
       <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block" style={os}>
         About RP

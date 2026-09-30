@@ -20,13 +20,23 @@ export default function TextNotes({
   const [saveError, setSaveError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const notesRef = useRef(notes)
+  // Notes as last loaded or saved; sent with each save so the server can
+  // refuse a stale overwrite (QA-002). Saves run one at a time.
+  const baselineRef = useRef<string | null>(initialNotes ?? null)
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
 
-  async function persistNotes(text: string) {
+  function persistNotes(text: string) {
+    saveChainRef.current = saveChainRef.current.then(() => persistNotesNow(text))
+    return saveChainRef.current
+  }
+
+  async function persistNotesNow(text: string) {
     setSaveStatus('saving')
     let error: string | null = null
     try {
-      const result = await saveClipNotes(clipId, text)
+      const result = await saveClipNotes(clipId, text, baselineRef.current)
       if (result?.error) error = result.error
+      else if (result && 'notes' in result) baselineRef.current = result.notes ?? null
     } catch (err) {
       console.error('[TextNotes] save request failed', err)
       error = 'Could not save notes. Check your connection and try again.'
