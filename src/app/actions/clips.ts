@@ -652,10 +652,15 @@ export async function saveClipNotes(clipId: string, notes: string | null, expect
     || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
   if (!allowed) return { error: 'Only the player\'s coaches can edit these notes.' }
 
-  // Stale-write guard (QA-002), atomic: the update only applies if the note
-  // is still what this client last saw; a save whose response was lost is
-  // recognised on retry. See src/lib/clip-notes-write.ts.
-  const result = await writeClipNotesAtomic(supabaseAdmin, clipId, (clip.notes as string | null) ?? null, normalized.notes, expectedNotes)
+  // Stale-write guard (QA-002), atomic in Postgres (save_clip_notes, 027):
+  // the update only applies if the note is still what this client last saw;
+  // a save whose response was lost is recognised on retry.
+  // See src/lib/clip-notes-write.ts.
+  // The RPC runs with the caller's session, so RLS on clips also decides.
+  const result = await writeClipNotesAtomic(
+    { rpc: (fn, args) => supabase.rpc(fn, args), legacy: supabaseAdmin },
+    clipId, (clip.notes as string | null) ?? null, normalized.notes, expectedNotes,
+  )
   if (result.ok) return { success: true, notes: result.notes }
   if (result.conflict) return { error: result.error, conflict: true }
   if (result.dbError === 'missing') return { error: 'Clip not found' }
