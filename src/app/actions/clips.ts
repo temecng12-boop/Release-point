@@ -3,7 +3,7 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
-import { isLessonPathFor } from '@/lib/lesson-path'
+import { deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -327,42 +327,22 @@ export async function deleteTimestampNote(noteId: string) {
   return { success: true }
 }
 
-export async function saveLessonPath(clipId: string, lessonPath: string) {
+// A new lesson recording: adds a lessons row (never deletes older lessons) and
+// points clips.lesson_path at it. Coach-only; see src/lib/lessons-write.ts.
+export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null } = {}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-  if (!isLessonPathFor(lessonPath, clip.player_id, clipId)) {
-    console.warn('[saveLessonPath] rejected path', { clipId, lessonPath })
-    return { error: 'Invalid lesson file' }
-  }
-  const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
-  if (error) return { error: error.message }
-  // Re-record: remove the previous recording once the new one is attached.
-  const previous = clip.lesson_path as string | null
-  if (previous && previous !== lessonPath && isLessonPathFor(previous, clip.player_id, clipId)) {
-    const { error: removeError } = await supabaseAdmin.storage.from('lessons').remove([previous])
-    if (removeError) console.warn('[saveLessonPath] could not remove previous lesson file', { previous, error: removeError.message })
-  }
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
+  const result = await saveLessonRecord(supabaseAdmin, user?.id, clipId, lessonPath, meta)
+  if ('success' in result) revalidatePath(`/clips/${clipId}`)
+  return result
 }
 
-export async function deleteLessonPath(clipId: string) {
+export async function deleteLesson(lessonId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-  if (clip.lesson_path) {
-    await supabaseAdmin.storage.from('lessons').remove([clip.lesson_path])
-  }
-  await supabaseAdmin.from('clips').update({ lesson_path: null }).eq('id', clipId)
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
+  const result = await deleteLessonRecord(supabaseAdmin, user?.id, lessonId)
+  if ('success' in result && result.clipId) revalidatePath(`/clips/${result.clipId}`)
+  return 'error' in result ? { error: result.error } : { success: true as const }
 }
 
 // The player, their direct coach, or a coach on one of their teams. Team

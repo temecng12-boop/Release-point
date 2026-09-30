@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
-import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
+import { useRouter } from 'next/navigation'
+import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -269,7 +270,6 @@ export default function VideoPlayer({
   playerId,
   role,
   initialAnnotations = [],
-  initialLessonUrl = null,
   initialReframe = null,
 }: {
   src: string
@@ -277,7 +277,6 @@ export default function VideoPlayer({
   playerId: string
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
-  initialLessonUrl?: string | null
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
 }) {
   const isCoach = role === 'coach'
@@ -336,7 +335,10 @@ export default function VideoPlayer({
   const cropDragRef     = useRef<{ handle: HandleId; startX: number; startY: number; startCrop: Crop } | null>(null)
 
   // lesson recording
-  const [lessonUrl,      setLessonUrl]        = useState<string | null>(initialLessonUrl)
+  // Saved lessons are listed below the player (LessonList); this only records.
+  const router = useRouter()
+  const [lessonNotice,   setLessonNotice]     = useState<string | null>(null)
+  const lessonStartRef   = useRef<number>(0)
   const [lessonPhase,    setLessonPhase]      = useState<'idle' | 'recording' | 'saving'>('idle')
   const [lessonSecs,     setLessonSecs]       = useState(0)
   const [lessonError,    setLessonError]      = useState<string | null>(null)
@@ -786,10 +788,13 @@ export default function VideoPlayer({
       micStream.getTracks().forEach(t => t.stop())
       canvasStream.getTracks().forEach(t => t.stop())
     }
-    recorder.onstop = () => {
+    // Event timestamps share one clock, so stop - start is the recording length.
+    recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp }
+    recorder.onstop = (ev) => {
       releaseStreams()
       lessonRecRef.current = null
-      uploadLesson(mimeType)
+      const durationMs = lessonStartRef.current ? Math.max(0, ev.timeStamp - lessonStartRef.current) : null
+      uploadLesson(mimeType, durationMs)
     }
     recorder.onerror = (ev) => {
       console.error('[lesson] recorder error', ev)
@@ -802,6 +807,7 @@ export default function VideoPlayer({
     recorder.start(250)
     lessonRecRef.current = recorder
     setLessonSecs(0)
+    setLessonNotice(null)
     setLessonPhase('recording')
     lessonTimerRef.current = setInterval(() => setLessonSecs(s => s + 1), 1000)
   }
@@ -812,7 +818,7 @@ export default function VideoPlayer({
     setLessonPhase('saving')
   }
 
-  async function uploadLesson(mimeType: string) {
+  async function uploadLesson(mimeType: string, durationMs: number | null) {
     // A fresh object per recording: re-recording used to reuse lesson.<ext>,
     // which already existed, so the non-upsert signed upload was rejected.
     const path = newLessonPath(playerId, clipId, mimeType)
@@ -837,17 +843,14 @@ export default function VideoPlayer({
       setLessonError(`Upload failed (${res.status}). Try again.`); setLessonPhase('idle'); return
     }
 
-    const saveResult = await saveLessonPath(clipId, path)
-    if (saveResult && 'error' in saveResult) { setLessonError('Saved video but failed to attach to clip. Try again.'); setLessonPhase('idle'); return }
-
-    const signedResult = await getLessonSignedUrl(path)
-    if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl ?? null)
+    const saveResult = await saveLessonPath(clipId, path, { mime: baseMime, durationMs })
+    if ('error' in saveResult) {
+      console.error('[lesson] save failed', { path, error: saveResult.error })
+      setLessonError(`Uploaded, but the lesson wasn't saved: ${saveResult.error}`); setLessonPhase('idle'); return
+    }
+    setLessonNotice(saveResult.warning ?? 'Lesson saved')
     setLessonPhase('idle')
-  }
-
-  async function deleteLesson() {
-    await deleteLessonPath(clipId)
-    setLessonUrl(null)
+    router.refresh()   // reload the lesson list for this clip
   }
 
   // ── reframe helpers ──────────────────────────────────────────────────────
@@ -1196,25 +1199,9 @@ export default function VideoPlayer({
             ● Record Lesson
           </button>
           {lessonError && <span className="text-xs text-[#C8102E]">{lessonError}</span>}
-          {lessonUrl && !lessonError && <span className="text-xs text-slate-400" style={oswald}>Lesson saved</span>}
-        </div>
-      )}
-
-      {/* Lesson playback */}
-      {lessonUrl && lessonPhase === 'idle' && (
-        <div className="mt-3 pt-3" style={divider}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[0.68rem] text-[#8096AE] tracking-widest" style={oswald}>
-              {isCoach ? 'Coach Lesson Recording' : 'Lesson from your coach'}
-            </p>
-            {isCoach && (
-              <div className="flex gap-3">
-                <button onClick={startLessonRecording} className="text-[10px] text-[#456080] hover:text-[#0F1F33] transition-colors" style={oswald}>Re-record</button>
-                <button onClick={deleteLesson} className="text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors" style={oswald}>Delete</button>
-              </div>
-            )}
-          </div>
-          <video src={lessonUrl} controls playsInline className="w-full rounded-lg" style={{ maxHeight: 300, background: '#000' }} />
+          {lessonNotice && !lessonError && (lessonNotice === 'Lesson saved'
+            ? <span className="text-xs text-slate-400" style={oswald}>{lessonNotice}</span>
+            : <span role="status" className="text-xs text-[#B45309]">{lessonNotice}</span>)}
         </div>
       )}
 

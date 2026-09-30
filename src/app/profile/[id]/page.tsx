@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
 import AppHeader from '@/components/app-header'
+import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -206,6 +207,8 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
             career_stats: athleteData.career_stats as Record<string, string> | null ?? null,
           }}
         />
+
+        <LessonFeedbackSection playerId={player.id} viewerId={user.id} />
       </main>
     </div>
   )
