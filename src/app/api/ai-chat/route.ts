@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { formatPhilosophiesForPrompt } from '@/lib/philosophies'
+import { loadAiChatContext, sanitizeChatMessages } from '@/lib/ai-chat-context'
 import { loadClipContext } from '@/lib/ai-coach/clip-context'
 import {
   VIDEO_ACCESS_NOTE, cleanCoachNotes, formatChecklist, formatClipDetails, formatHittingMetrics, formatMetrics,
@@ -84,33 +86,34 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
 
-  const body = await req.json().catch(() => null) as { messages?: unknown; agent?: unknown; context?: Record<string, unknown> } | null
-  const messages = Array.isArray(body?.messages)
-    ? (body.messages as { role?: unknown; content?: unknown }[])
-        .filter(m => (m?.role === 'user' || m?.role === 'assistant') && typeof m.content === 'string' && m.content.trim() !== '')
-        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
-    : []
+  const body = await req.json().catch(() => null) as { messages?: unknown; agent?: unknown; context?: { clipId?: unknown; playerId?: unknown } } | null
+  if (!body) return new Response('Bad request', { status: 400 })
+  const messages = sanitizeChatMessages(body.messages).filter(m => m.content.trim() !== '')
   if (messages.length === 0) return new Response('No message to answer.', { status: 400 })
-  const agent = body?.agent === 'barry' ? 'barry' : 'randy'
-  const context = body?.context && typeof body.context === 'object' ? body.context : {}
+  const agent = body.agent === 'barry' ? 'barry' : 'randy'
 
-  let playerName = typeof context.playerName === 'string' ? context.playerName : null
-  let ageGroup = typeof context.ageGroup === 'string' ? context.ageGroup : null
-  let position = typeof context.position === 'string' ? context.position : null
-  let metrics: CoachMetric[] = Array.isArray(context.metrics) ? context.metrics as CoachMetric[] : []
+  // The client says only which clip or player this is about. Everything the
+  // prompt says about the player is loaded here after an access check (their
+  // coaches or the player; not guardians); anything else in the body is ignored.
+  let playerName: string | null
+  let ageGroup: string | null
+  let position: string | null
+  let metrics: CoachMetric[]
   let hittingMetrics: CoachHittingMetrics | null = null
-  let checklist: CoachPhaseRow[] | null = Array.isArray(context.checklist) ? context.checklist as CoachPhaseRow[] : null
-  let coachNotes = cleanCoachNotes(context.coachNotes)
+  let checklist: CoachPhaseRow[] | null
+  let coachNotes: string | null
   let clipDetails: CoachClipDetails | null = null
   let timestampNotes: CoachTimestampNote[] = []
 
-  // On a clip page, load the clip's context on the server (fresh, and only if
-  // this user may see the clip) instead of trusting what the page sent.
-  if (typeof context.clipId === 'string' && context.clipId) {
+  const context = {
+    clipId: typeof body.context?.clipId === 'string' && body.context.clipId ? body.context.clipId : null,
+    playerId: body.context?.playerId,
+  }
+  if (context.clipId) {
     const loaded = await loadClipContext(user.id, context.clipId)
     if (!loaded.ok) return new Response(loaded.message, { status: loaded.status })
     const c = loaded.context
-    playerName = c.playerName ?? playerName
+    playerName = c.playerName
     ageGroup = c.ageGroup
     position = c.position
     metrics = c.metrics
@@ -119,6 +122,17 @@ export async function POST(req: NextRequest) {
     coachNotes = cleanCoachNotes(c.coachNotes)
     clipDetails = c.clip
     timestampNotes = c.timestampNotes
+  } else {
+    // Player-profile chat: summary across the player's clips.
+    const loaded = await loadAiChatContext(supabaseAdmin, user.id, { playerId: context.playerId })
+    if (!loaded.ok) return new Response(loaded.status === 400 ? 'Bad request' : 'Not found', { status: loaded.status })
+    const c = loaded.context
+    playerName = c.playerName || null
+    ageGroup = c.ageGroup
+    position = c.position
+    metrics = c.metrics as CoachMetric[]
+    checklist = c.checklist as CoachPhaseRow[] | null
+    coachNotes = cleanCoachNotes(c.coachNotes)
   }
 
   const benchmarks    = ageGroup ? AGE_BENCHMARKS[ageGroup as keyof typeof AGE_BENCHMARKS] : null

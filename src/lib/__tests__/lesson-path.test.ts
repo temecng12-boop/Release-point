@@ -56,3 +56,14 @@ test('audio lesson types: base type, extension and path match', () => {
   assert.equal(lessonMimeMatchesPath('audio/webm', 'p/c/lesson-1-a.mp4'), false)
   assert.equal(lessonMimeMatchesPath('video/mp4', 'p/c/lesson.mp4'), true)
 })
+
+test('deleteClip removes the lesson recording from the lessons bucket, not clips', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../app/actions/clips.ts', import.meta.url), 'utf8')
+  const fn = src.slice(src.indexOf('export async function deleteClip'), src.indexOf('export async function savePhaseChecklist'))
+  // Every lesson file of the clip (checked to be in this player's folder by
+  // clipLessonFiles), removed from the lessons bucket; never from clips.
+  assert.match(fn, /clipLessonFiles\(supabaseAdmin, clipId, clip\.player_id as string\)/)
+  assert.match(fn, /storage\.from\('lessons'\)\.remove\(lessonFiles\)/)
+  assert.doesNotMatch(fn, /clipFilesToRemove\([^)]*lesson/)
+})

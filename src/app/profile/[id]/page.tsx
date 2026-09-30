@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
 import AppHeader from '@/components/app-header'
@@ -37,9 +38,11 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
     .eq('id', id)
     .single()
 
-  // Allow access if this player was invited by the coach OR is a self-signup player linked by email
-  if (!player) notFound()
-  if (player.coach_id !== null && player.coach_id !== user.id) notFound()
+  // Only the player's own coach may view this page. Other coaches, including
+  // for a player with no coach, get a 404 so the player's existence isn't revealed.
+  const access = profilePageAccess(user.id, profile?.role, player)
+  if (access === 'redirect-dashboard') redirect('/dashboard')
+  if (access !== 'view' || !player) notFound()
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}

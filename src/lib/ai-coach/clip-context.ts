@@ -41,10 +41,12 @@ export async function loadClipContext(userId: string, clipId: string): Promise<C
     .select('full_name, age_group, position')
     .eq('id', clip.player_id)
     .maybeSingle()
-  // Same people who can open the clip page (src/lib/clip-access.ts): the
-  // player, their direct coach, a coach on one of their teams, or a linked
-  // guardian. Unauthorized callers get the same 404 so clip existence isn't revealed.
-  if (!player || !(await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)).allowed) {
+  // The player, their direct coach, or a coach on one of their teams
+  // (src/lib/clip-access.ts). Guardians can open the clip page but not the AI
+  // Coach (the clip page shows them a notice). Unauthorized callers get the
+  // same 404 so clip existence isn't revealed.
+  const access = await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)
+  if (!player || !access.allowed || access.via === 'guardian') {
     return { ok: false, status: 404, message: 'Clip not found' }
   }
 
