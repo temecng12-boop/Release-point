@@ -215,3 +215,17 @@ test('clip delete: collects ALL lesson files of the clip (rows + lesson_path), o
   const w = world(); w.lessons = 'missing'; (w.clips as Record<string, unknown>[])[0].lesson_path = a
   assert.deepEqual(await clipLessonFiles(fakeSupabase(w).client, C1, P1), [a])
 })
+
+test('QA-003: every recording is kept: several lessons on one clip, none overwritten or removed', async () => {
+  const f = fakeSupabase(world())
+  const paths = [1, 2, 3].map(i => newLessonPath(P1, C1, 'video/webm', i, `r${i}`))
+  for (const p of paths) assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, p, { durationMs: 10_000 }), { success: true })
+  await saveLessonRecord(f.client, COACH, C2, newLessonPath(P1, C2, 'video/webm', 4, 'x'))
+  assert.equal(new Set(paths).size, 3)                                        // unique file per recording
+  const byClip = await loadLessons(f.client, { clipId: C1 })
+  assert.deepEqual(byClip.lessons.map(l => l.media_path).sort(), [...paths].sort())
+  assert.equal((await loadLessons(f.client, { playerId: P1 })).lessons.length, 4)
+  assert.deepEqual(f.removed, [])                                             // no file deleted
+  assert.ok(!f.log.some(l => l.startsWith('delete')))                          // no row deleted
+  assert.ok((f.tables.lessons as Record<string, unknown>[]).every(r => r.duration_ms === 10_000 || r.clip_id === C2))
+})

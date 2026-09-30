@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type SyntheticEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { getLessonSignedUrl, deleteLesson } from '@/app/actions/clips'
 import { formatLessonDuration, type LessonItem } from '@/lib/lessons'
@@ -9,6 +9,17 @@ const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTrans
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+// MediaRecorder webm files have no duration (Infinity), so the bar can't be
+// dragged (QA-005). Seeking far past the end makes the browser work out the
+// real length; then jump back to the start.
+function fixInfiniteDuration(e: SyntheticEvent<HTMLVideoElement>) {
+  const v = e.currentTarget
+  if (Number.isFinite(v.duration)) return
+  const back = () => { if (Number.isFinite(v.duration)) { v.removeEventListener('durationchange', back); v.currentTime = 0 } }
+  v.addEventListener('durationchange', back)
+  v.currentTime = 1e101
 }
 
 /** One lesson: date, coach, duration; opens and replays in place. */
@@ -60,7 +71,7 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
       </div>
       {error && <p role="alert" className="text-xs text-[#C8102E] mt-1">{error}</p>}
       {open && url && (
-        <video src={url} controls autoPlay playsInline className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
+        <video src={url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
       )}
     </li>
   )

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
+import { browserRecordingEnv, micErrorMessage, recordedDurationMs, recordingSupportError } from '@/lib/lesson-recording'
 import { useRouter } from 'next/navigation'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 
@@ -351,6 +352,7 @@ export default function VideoPlayer({
   const lessonChunksRef  = useRef<Blob[]>([])
   const lessonRafRef     = useRef<number | null>(null)
   const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lessonTicksRef   = useRef(0)   // whole seconds recorded (duration fallback)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -606,6 +608,7 @@ export default function VideoPlayer({
     if (!video || !scrub) return
 
     function onLoadedMetadata() {
+      if (!Number.isFinite(video!.duration) || video!.duration <= 0) return
       setDuration(video!.duration)
       scrub!.max = String(Math.floor(video!.duration * 1000) || 1000)
       if (video!.videoWidth && video!.videoHeight) {
@@ -623,6 +626,9 @@ export default function VideoPlayer({
     function onEnded() { setPlaying(false) }
 
     video.addEventListener('loadedmetadata', onLoadedMetadata)
+    video.addEventListener('durationchange', onLoadedMetadata)
+    // Metadata may have loaded before this effect ran (QA-007: "0.00s" total).
+    const lateMeta = video.readyState >= 1 ? setTimeout(onLoadedMetadata, 0) : null
     video.addEventListener('timeupdate',     onTimeUpdate)
     video.addEventListener('play',           onPlay)
     video.addEventListener('pause',          onPause)
@@ -632,6 +638,8 @@ export default function VideoPlayer({
     return () => {
       prevFrameRef.current = null
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeEventListener('durationchange', onLoadedMetadata)
+      if (lateMeta) clearTimeout(lateMeta)
       video.removeEventListener('timeupdate',     onTimeUpdate)
       video.removeEventListener('play',           onPlay)
       video.removeEventListener('pause',          onPause)
@@ -746,6 +754,20 @@ export default function VideoPlayer({
 
   async function startLessonRecording() {
     setLessonError(null)
+    setLessonNotice(null)
+    // QA-004: say why instead of failing silently (no MediaRecorder, no mic API, http).
+    const unsupported = recordingSupportError(browserRecordingEnv())
+    if (unsupported) { setLessonError(unsupported); return }
+    try {
+      await startVideoLessonRecording()
+    } catch (err) {
+      console.error('[lesson] could not start recording', err)
+      setLessonError('Couldn\'t start recording in this browser. Try again, or use the latest Safari or Chrome.')
+      setLessonPhase('idle')
+    }
+  }
+
+  async function startVideoLessonRecording() {
     const video = videoRef.current
     const overlay = overlayRef.current
     if (!video || !overlay) return
@@ -760,8 +782,8 @@ export default function VideoPlayer({
     let micStream: MediaStream
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch {
-      setLessonError('Microphone access denied. Check browser permissions.')
+    } catch (err) {
+      setLessonError(micErrorMessage(err))
       return
     }
 
@@ -793,11 +815,12 @@ export default function VideoPlayer({
       canvasStream.getTracks().forEach(t => t.stop())
     }
     // Event timestamps share one clock, so stop - start is the recording length.
+    lessonStartRef.current = 0
     recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp }
     recorder.onstop = (ev) => {
       releaseStreams()
       lessonRecRef.current = null
-      const durationMs = lessonStartRef.current ? Math.max(0, ev.timeStamp - lessonStartRef.current) : null
+      const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
       uploadLesson(mimeType, durationMs)
     }
     recorder.onerror = (ev) => {
@@ -813,7 +836,8 @@ export default function VideoPlayer({
     setLessonSecs(0)
     setLessonNotice(null)
     setLessonPhase('recording')
-    lessonTimerRef.current = setInterval(() => setLessonSecs(s => s + 1), 1000)
+    lessonTicksRef.current = 0
+    lessonTimerRef.current = setInterval(() => { lessonTicksRef.current++; setLessonSecs(s => s + 1) }, 1000)
   }
 
   function stopLessonRecording() {
