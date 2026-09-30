@@ -496,10 +496,15 @@ export async function deleteClip(clipId: string) {
   // Files are removed only after the check above passed and the clip row is
   // gone, with the service client (the caller's session may not be allowed to
   // delete another uploader's files), and only inside this player's folder.
-  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path, lessonPath])
+  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path])
   if (files.length > 0) {
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
     if (storageError) console.error('[deleteClip] storage cleanup failed', clipId, storageError.message)
+  }
+  // Lesson recordings live in the lessons bucket.
+  if (lessonPath && isLessonPathFor(lessonPath, clip.player_id as string, clipId)) {
+    const { error: lessonError } = await supabaseAdmin.storage.from('lessons').remove([lessonPath])
+    if (lessonError) console.error('[deleteClip] lesson cleanup failed', clipId, lessonError.message)
   }
 
   revalidatePath('/dashboard')

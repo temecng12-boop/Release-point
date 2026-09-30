@@ -17,8 +17,8 @@ const Q = 'bbbbbbbb-0000-4000-8000-000000000002'
 
 console.log('\n── clipFilesToRemove ───────────────────────────────────────────')
 {
-  const out = clipFilesToRemove(P, [`${P}/video.mp4`, `${P}/voice.webm`, `${P}/lesson.webm`])
-  assert(JSON.stringify(out) === JSON.stringify([`${P}/video.mp4`, `${P}/voice.webm`, `${P}/lesson.webm`]), 'video, voice note and lesson are all removed')
+  const out = clipFilesToRemove(P, [`${P}/video.mp4`, `${P}/voice.webm`])
+  assert(JSON.stringify(out) === JSON.stringify([`${P}/video.mp4`, `${P}/voice.webm`]), 'video and voice note are removed')
 }
 assert(clipFilesToRemove(P, [null, undefined, '']).length === 0, 'missing paths: nothing to remove')
 assert(JSON.stringify(clipFilesToRemove(P, [`${P}/a.mp4`, `${P}/a.mp4`])) === JSON.stringify([`${P}/a.mp4`]), 'duplicates collapse')

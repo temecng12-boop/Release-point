@@ -1,7 +1,7 @@
 // Which storage objects to remove when a clip is deleted (RP-041). Pure.
 
 /**
- * Returns the clip's stored file paths (video, voice note, lesson recording)
+ * Returns the clip's stored file paths (video, voice note)
  * that sit in this player's folder of the clips bucket (`<playerId>/...`),
  * without duplicates. Anything else is skipped, so a bad path on the row can
  * never delete another player's files.
