@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { isMissingConsentColumn, writeWithAdultFields } from '@/lib/consent-server'
 import { sendPlayerInviteEmail } from '@/lib/email'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
@@ -53,11 +54,16 @@ export async function invitePlayer(
   }
 
   // Create player row
-  const { data: player, error: playerError } = await supabaseAdmin
-    .from('players')
-    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail, ...adultFields })
-    .select('id')
-    .single()
+  // Before migration 023 the adult columns don't exist; the player is then
+  // added without them (see writeWithAdultFields).
+  const { data: player, error: playerError } = await writeWithAdultFields(
+    adultFields,
+    (fields) => supabaseAdmin
+      .from('players')
+      .insert({ coach_id: user.id, full_name: playerName, email: playerEmail, ...fields })
+      .select('id')
+      .single(),
+  )
 
   if (playerError && playerError.code !== '23505') return { error: playerError.message }
 
@@ -86,13 +92,17 @@ export async function invitePlayer(
 
   // Existing player now on this coach's roster: record the 18+ confirmation if
   // it isn't already on file. (A 'minor' choice never clears an existing one.)
+  // Skipped quietly before migration 023 (no adult columns yet).
   if (playerError?.code === '23505' && playerId && ageStatus === 'adult') {
-    await supabaseAdmin
+    const { error: adultError } = await supabaseAdmin
       .from('players')
       .update(adultFields)
       .eq('id', playerId)
       .eq('coach_id', user.id)
       .is('adult_confirmed_at', null)
+    if (adultError && !isMissingConsentColumn(adultError)) {
+      console.error('[invitePlayer] could not record 18+ confirmation', playerId, adultError.message)
+    }
   }
 
   // Assign teams via junction table (new assignments only, ignore duplicates)

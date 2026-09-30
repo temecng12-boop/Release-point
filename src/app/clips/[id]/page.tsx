@@ -3,8 +3,9 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import { canViewPlayerContent } from '@/lib/clip-access'
-import { canUploadVideo } from '@/lib/consent'
+import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -90,11 +91,12 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
   // Role comes from profiles only; user_metadata is set by the client at signup.
   const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
-  const { data: playerRow } = await supabaseAdmin
-    .from('players')
-    .select('full_name, age_group, position, consent_given_at, adult_confirmed_at')
-    .eq('id', clip.player_id)
-    .single()
+  const { data: playerRow } = await selectPlayersWithConsent<
+    { full_name: string | null; age_group: string | null; position: string | null } & PlayerConsentFields
+  >(
+    'full_name, age_group, position',
+    (cols) => supabaseAdmin.from('players').select(cols).eq('id', clip.player_id).single(),
+  )
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')

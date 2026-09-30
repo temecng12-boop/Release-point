@@ -16,12 +16,22 @@
 export type PlayerConsentFields = {
   adult_confirmed_at?: string | null
   consent_given_at?: string | null
+  /**
+   * Set by the server when the database doesn't have migration 023's columns
+   * yet (see consent-server.ts). The consent rule then isn't enforced, so
+   * uploads work as they did before this feature; the player counts as not
+   * confirmed 18+.
+   */
+  consent_rules_pending_migration?: boolean
 }
 
-export type UploadConsentStatus = 'adult_confirmed' | 'guardian_consent' | 'pending'
+export type UploadConsentStatus = 'adult_confirmed' | 'guardian_consent' | 'pending' | 'rules_not_active'
 
 /** Columns to select from `players` when checking upload consent. */
 export const PLAYER_CONSENT_COLUMNS = 'adult_confirmed_at, consent_given_at'
+
+/** Columns added by migration 023. Before 023 runs, queries naming them fail. */
+export const CONSENT_MIGRATION_COLUMNS = ['adult_confirmed_at', 'adult_confirmed_by'] as const
 
 function isSet(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Date.parse(value))
@@ -29,6 +39,7 @@ function isSet(value: string | null | undefined): boolean {
 
 export function uploadConsentStatus(player: PlayerConsentFields | null | undefined): UploadConsentStatus {
   if (!player) return 'pending'
+  if (player.consent_rules_pending_migration === true) return 'rules_not_active'
   if (isSet(player.adult_confirmed_at)) return 'adult_confirmed'
   if (isSet(player.consent_given_at)) return 'guardian_consent'
   return 'pending'

@@ -6,7 +6,7 @@ import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
 import MarkAdultButton from '@/app/dashboard/mark-adult-button'
 import { canUploadVideo } from '@/lib/consent'
-import { canManagePlayerAge } from '@/lib/consent-server'
+import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -17,6 +17,19 @@ function initials(name: string) {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+type ProfilePlayer = {
+  id: string
+  full_name: string
+  email: string | null
+  accepted_at: string | null
+  age_group: string | null
+  position: string | null
+  coach_id: string | null
+  consent_given_at: string | null
+  adult_confirmed_at: string | null
+  consent_rules_pending_migration?: boolean
 }
 
 export default async function PlayerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,11 +47,10 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   if (profile?.role !== 'coach') redirect('/dashboard')
 
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('id, full_name, email, accepted_at, age_group, position, coach_id, consent_given_at, adult_confirmed_at')
-    .eq('id', id)
-    .single()
+  const { data: player } = await selectPlayersWithConsent<ProfilePlayer>(
+    'id, full_name, email, accepted_at, age_group, position, coach_id',
+    (cols) => supabaseAdmin.from('players').select(cols).eq('id', id).single(),
+  )
 
   // Only the player's own coach may view this page. Other coaches, including
   // for a player with no coach, get a 404 so the player's existence isn't revealed.

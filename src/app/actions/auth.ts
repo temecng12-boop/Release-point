@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { writeWithAdultFields } from '@/lib/consent-server'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
@@ -119,14 +120,19 @@ export async function linkPlayerRow() {
     if (!existing) {
       // 18+ confirmation from the self-signup form (RP-041). No guardian
       // consent is recorded here.
+      // Before migration 023 the adult columns don't exist; the row is then
+      // created without them (see writeWithAdultFields).
       const adultConfirmed = user.user_metadata?.adult_confirmed === true
-      await supabaseAdmin.from('players').insert({
-        user_id:     user.id,
-        full_name:   fullName,
-        email:       user.email,
-        accepted_at: now,
-        ...(adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {}),
-      })
+      await writeWithAdultFields(
+        adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {},
+        (adultFields) => supabaseAdmin.from('players').insert({
+          user_id:     user.id,
+          full_name:   fullName,
+          email:       user.email,
+          accepted_at: now,
+          ...adultFields,
+        }),
+      )
     }
   }
 }

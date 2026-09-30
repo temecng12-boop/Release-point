@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
@@ -11,6 +12,19 @@ import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+type TeamRosterPlayer = {
+  id: string
+  full_name: string
+  email: string
+  accepted_at: string | null
+  age_group: string | null
+  position: string | null
+  coach_id: string | null
+  consent_given_at: string | null
+  adult_confirmed_at: string | null
+  consent_rules_pending_migration?: boolean
+}
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -63,12 +77,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const otherPlayerIds = roster.others.map((r) => r.id)
 
   const { data: players } = ownPlayerIds.length > 0
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, full_name, email, accepted_at, age_group, position, consent_given_at, adult_confirmed_at, coach_id')
-        .in('id', ownPlayerIds)
-        .order('full_name', { ascending: true })
-    : { data: [] }
+    ? await selectPlayersWithConsent<TeamRosterPlayer[]>(
+        'id, full_name, email, accepted_at, age_group, position, coach_id',
+        (cols) => supabaseAdmin.from('players').select(cols).in('id', ownPlayerIds).order('full_name', { ascending: true }),
+      )
+    : { data: [] as TeamRosterPlayer[] }
 
   const { data: otherPlayers } = otherPlayerIds.length > 0
     ? await supabaseAdmin

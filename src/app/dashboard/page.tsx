@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo } from '@/lib/consent'
+import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -125,11 +126,10 @@ export default async function DashboardPage() {
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, full_name, position, consent_given_at, adult_confirmed_at')
-        .eq('user_id', user.id)
-        .single()
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null } & PlayerConsentFields>(
+        'id, full_name, position',
+        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).single(),
+      )
     : { data: null }
 
   if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')

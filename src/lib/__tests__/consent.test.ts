@@ -12,7 +12,10 @@ import {
   UPLOAD_BLOCKED_MESSAGE,
   type PlayerConsentFields,
 } from '../consent'
-import { checkUploadConsent, canManagePlayerAge, setAdultConfirmation } from '../consent-server'
+import {
+  checkUploadConsent, canManagePlayerAge, setAdultConfirmation,
+  isMissingConsentColumn, selectPlayersWithConsent, writeWithAdultFields,
+} from '../consent-server'
 import { canUploadForPlayerWith } from '../auth/upload-access'
 
 // ─── Minimal test harness (same style as ai-coach.test.ts) ─────────────────────
@@ -247,6 +250,114 @@ async function main() {
     const missing = withRow(null)
     assert(!(await canUploadForPlayer(COACH, PLAYER, missing.db)), 'unknown player: refused')
     assert(!(await canUploadForPlayer('', PLAYER, own.db)), 'empty user id: refused')
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  section('Before migration 023 (adult columns missing)')
+  {
+    // What PostgREST returns when a select names a column that doesn't exist
+    // (42703), and when a write does (PGRST204).
+    const missingSelect = { code: '42703', message: 'column players.adult_confirmed_at does not exist' }
+    const missingWrite = { code: 'PGRST204', message: "Could not find the 'adult_confirmed_at' column of 'players' in the schema cache" }
+    const missingBy = { code: 'PGRST204', message: "Could not find the 'adult_confirmed_by' column of 'players' in the schema cache" }
+    const otherMissing = { code: '42703', message: 'column players.height does not exist' }
+
+    assert(isMissingConsentColumn(missingSelect), 'detects 42703 for adult_confirmed_at')
+    assert(isMissingConsentColumn(missingWrite) && isMissingConsentColumn(missingBy), 'detects PGRST204 for adult_confirmed_at / _by')
+    assert(!isMissingConsentColumn(otherMissing), 'a different missing column is not treated as 023 missing')
+    assert(!isMissingConsentColumn({ code: '42501', message: 'permission denied' }) && !isMissingConsentColumn(null), 'other errors / no error: not missing')
+
+    // A players table without 023's columns: any select naming them fails.
+    const pre023 = (row: Record<string, unknown> | null) => mockDb({
+      players: (q) => {
+        const sel = String(opArgs(q, 'select')?.[0] ?? '')
+        if (sel.includes('adult_confirmed')) return { data: null, error: missingSelect }
+        return { data: row, error: null }
+      },
+    })
+
+    // Uploads behave as before the consent rule.
+    {
+      const { db, queries } = pre023({ id: PLAYER })
+      const r = await checkUploadConsent(db, PLAYER)
+      assert(r.ok, 'checkUploadConsent: allowed before 023 (not blocked)', JSON.stringify(r))
+      assert(queries.length === 2, 'checkUploadConsent: retried without the consent columns')
+    }
+    {
+      const { db } = pre023(null)
+      const r = await checkUploadConsent(db, PLAYER)
+      assert(!r.ok && r.error === 'Player not found', 'checkUploadConsent before 023: unknown player still refused')
+    }
+    {
+      const { db } = mockDb({ players: () => ({ data: null, error: otherMissing }) })
+      const r = await checkUploadConsent(db, PLAYER)
+      assert(!r.ok, 'checkUploadConsent: any other schema error still fails closed')
+    }
+
+    // Reads: retried without the columns; rows marked; player not confirmed.
+    {
+      const { db, queries } = pre023({ id: PLAYER, full_name: 'P', consent_given_at: null })
+      const r = await selectPlayersWithConsent<Record<string, unknown> & PlayerConsentFields>(
+        'id, full_name',
+        (cols) => db.from('players').select(cols).eq('id', PLAYER).single(),
+      )
+      assert(r.error === null && !!r.data, 'single-row read succeeds before 023', JSON.stringify(r))
+      assert(JSON.stringify(opArgs(queries[1], 'select')) === JSON.stringify(['id, full_name, consent_given_at']), 'retry selects the base columns plus consent_given_at')
+      assert(r.data?.adult_confirmed_at === null, 'player is treated as not confirmed 18+')
+      assert(r.data?.consent_rules_pending_migration === true, 'row is marked: consent rules pending migration')
+      assert(uploadConsentStatus(r.data) === 'rules_not_active' && canUploadVideo(r.data), 'upload buttons stay available (as on main)')
+    }
+    {
+      const { db } = mockDb({
+        players: (q) => String(opArgs(q, 'select')?.[0]).includes('adult_confirmed')
+          ? { data: null, error: missingSelect }
+          : { data: [{ id: 'a' }, { id: 'b' }], error: null },
+      })
+      const r = await selectPlayersWithConsent<(Record<string, unknown> & PlayerConsentFields)[]>(
+        'id', (cols) => db.from('players').select(cols).in('id', ['a', 'b']),
+      )
+      assert(Array.isArray(r.data) && r.data.length === 2, 'list read keeps every player (no empty roster)')
+      assert(!!r.data?.every((p) => p.consent_rules_pending_migration === true && p.adult_confirmed_at === null), 'every listed player marked')
+    }
+    {
+      const { db, queries } = mockDb({ players: () => ({ data: { id: PLAYER, adult_confirmed_at: null, consent_given_at: null }, error: null }) })
+      const r = await selectPlayersWithConsent<PlayerConsentFields>('id', (cols) => db.from('players').select(cols).single())
+      assert(queries.length === 1 && JSON.stringify(opArgs(queries[0], 'select')) === JSON.stringify(['id, adult_confirmed_at, consent_given_at']), 'after 023: one query with the consent columns')
+      assert(!r.data?.consent_rules_pending_migration && !canUploadVideo(r.data), 'after 023: the consent rule applies (pending player blocked)')
+    }
+    {
+      const { db, queries } = mockDb({ players: () => ({ data: null, error: { code: '42501', message: 'permission denied' } }) })
+      const r = await selectPlayersWithConsent('id', (cols) => db.from('players').select(cols).single())
+      assert(queries.length === 1 && r.error?.code === '42501', 'other read errors are returned, not retried')
+    }
+
+    // Writes: signup / invite retried without the adult fields.
+    {
+      const calls: Record<string, unknown>[] = []
+      const r = await writeWithAdultFields({ adult_confirmed_at: T, adult_confirmed_by: COACH }, async (fields) => {
+        calls.push(fields)
+        return 'adult_confirmed_at' in fields ? { data: null, error: missingWrite } : { data: { id: PLAYER }, error: null }
+      })
+      assert(calls.length === 2 && Object.keys(calls[1]).length === 0, 'write retried without the adult fields')
+      assert(r.error === null && (r.data as { id: string }).id === PLAYER, 'player row still created (signup / invite work)')
+    }
+    {
+      const calls: Record<string, unknown>[] = []
+      await writeWithAdultFields({}, async (fields) => { calls.push(fields); return { data: null, error: missingWrite } })
+      assert(calls.length === 1, 'no adult fields: no retry')
+      const calls2: Record<string, unknown>[] = []
+      const r = await writeWithAdultFields({ adult_confirmed_at: T }, async (fields) => { calls2.push(fields); return { data: null, error: { code: '23505', message: 'duplicate' } } })
+      assert(calls2.length === 1 && r.error?.code === '23505', 'other write errors (e.g. duplicate) are returned as-is')
+    }
+
+    // Marking 18+ reports that the update is pending instead of a raw error.
+    {
+      const { db } = mockDb({
+        players: (q) => hasOp(q, 'update') ? { data: null, error: missingWrite } : { data: { coach_id: COACH }, error: null },
+      })
+      const r = await setAdultConfirmation(db, COACH, PLAYER, true)
+      assert('error' in r && /isn't available yet/.test(r.error), 'setAdultConfirmation before 023: clear message', JSON.stringify(r))
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
