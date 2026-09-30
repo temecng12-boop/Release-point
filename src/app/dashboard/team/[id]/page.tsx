@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
@@ -48,15 +49,58 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const teamPlayerIds = teamPlayerLinks?.map((r) => r.player_id) ?? []
 
-  const { data: players } = teamPlayerIds.length > 0
+  // Split the roster into this coach's own players and other coaches' (or
+  // coach-less) players. Only own players get details, clips, sessions,
+  // metrics, a profile link and edit controls; others are listed by name only.
+  const { data: rosterRows } = teamPlayerIds.length > 0
+    ? await supabaseAdmin
+        .from('players')
+        .select('id, coach_id')
+        .in('id', teamPlayerIds)
+    : { data: [] }
+  const roster = splitRosterByCoach(user.id, (rosterRows ?? []) as { id: string; coach_id: string | null }[])
+  const ownPlayerIds = roster.own.map((r) => r.id)
+  const otherPlayerIds = roster.others.map((r) => r.id)
+
+  const { data: players } = ownPlayerIds.length > 0
     ? await supabaseAdmin
         .from('players')
         .select('id, full_name, email, accepted_at, age_group, position, consent_given_at')
-        .in('id', teamPlayerIds)
+        .in('id', ownPlayerIds)
         .order('full_name', { ascending: true })
     : { data: [] }
 
+  const { data: otherPlayers } = otherPlayerIds.length > 0
+    ? await supabaseAdmin
+        .from('players')
+        .select('id, full_name, age_group, position')
+        .in('id', otherPlayerIds)
+        .order('full_name', { ascending: true })
+    : { data: [] }
+  const rosterCount = (players?.length ?? 0) + (otherPlayers?.length ?? 0)
+
   const playerIds = players?.map((p) => p.id) ?? []
+
+  // The edit form saves the player's full set of this coach's teams, so give
+  // it all of the coach's teams and every one of them the player is on.
+  // Otherwise saving here would drop the player from the coach's other teams.
+  const { data: coachTeams } = await supabaseAdmin
+    .from('teams')
+    .select('id, name')
+    .eq('coach_id', user.id)
+    .order('created_at')
+  const coachTeamIds = (coachTeams ?? []).map((t) => t.id as string)
+  const { data: ownPlayerLinks } = playerIds.length > 0 && coachTeamIds.length > 0
+    ? await supabaseAdmin
+        .from('player_teams')
+        .select('player_id, team_id')
+        .in('player_id', playerIds)
+        .in('team_id', coachTeamIds)
+    : { data: [] }
+  const teamIdsByPlayer = ownTeamIdsByPlayer(
+    (ownPlayerLinks ?? []) as { player_id: string; team_id: string }[],
+    coachTeamIds,
+  )
   const { data: clips } = playerIds.length > 0
     ? await supabaseAdmin
         .from('clips')
@@ -143,23 +187,44 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
         <div>
           <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-3" style={oswald}>
-            Roster ({players?.length ?? 0})
+            Roster ({rosterCount})
           </p>
 
-          {!players || players.length === 0 ? (
+          {rosterCount === 0 ? (
             <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm px-6 py-10 text-center">
               <p className="text-sm text-[#3D5166]">No players on this team yet. Invite someone above.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {players.map((p) => (
+              {(players ?? []).map((p) => (
                 <PlayerRow
                   key={p.id}
-                  player={{ ...p, teamIds: [id] }}
+                  player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
-                  teams={[team]}
+                  teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}
                   sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}
                 />
+              ))}
+              {(otherPlayers ?? []).map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-white rounded-xl border border-[#DDE4ED] shadow-sm px-4 py-2.5"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-[#0F1F33]">{p.full_name}</span>
+                    {p.age_group && (
+                      <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full">
+                        {p.age_group}
+                      </span>
+                    )}
+                    {p.position && (
+                      <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full capitalize">
+                        {p.position}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#3D5166] mt-0.5">Coached by another coach.</p>
+                </div>
               ))}
             </div>
           )}

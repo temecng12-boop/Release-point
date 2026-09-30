@@ -4,11 +4,27 @@ import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
+import { isVoicePathFor } from '@/lib/voice-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
+import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
+import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
+import { clipFilesToRemove } from '@/lib/clip-storage'
+
+// Loads the coach and account ids of the player a clip belongs to.
+async function playerForClip(clipId: string) {
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+  if (!clip?.player_id) return null
+  const { data: player } = await supabaseAdmin
+    .from('players')
+    .select('coach_id, user_id')
+    .eq('id', clip.player_id)
+    .maybeSingle()
+  return (player as { coach_id: string | null; user_id: string | null } | null) ?? null
+}
 
 // Signed storage URLs: only for paths belonging to a player the caller may
 // see (read) or write. See src/lib/storage-access.ts.
@@ -71,6 +87,12 @@ export async function createClip(data: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // The caller must be allowed to upload for this player, and the storage path
+  // must live under that player's folder (prevents pointing a clip at another
+  // player's video).
+  if (!(await canUploadForPlayer(user.id, data.player_id))) return { error: 'Not authorized' }
+  if (playerIdFromStoragePath(data.storage_path) !== data.player_id) return { error: 'Invalid storage path' }
 
   const { data: newClip, error } = await supabaseAdmin.from('clips').insert({
     player_id:    data.player_id,
@@ -232,12 +254,16 @@ export async function deleteAnnotation(annotationId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // The author may delete it only while they are still the player's current
+  // coach, or are the player themself.
   const { data: ann } = await supabaseAdmin
     .from('annotations')
-    .select('created_by')
+    .select('created_by, clip_id')
     .eq('id', annotationId)
-    .single()
-  if (!ann || ann.created_by !== user.id) return { error: 'Not authorized' }
+    .maybeSingle()
+  if (!ann) return { error: 'Not authorized' }
+  const player = await playerForClip(ann.clip_id as string)
+  if (!canDeleteClipItem(user.id, ann.created_by as string | null, player)) return { error: 'Not authorized' }
 
   const { error } = await supabaseAdmin.from('annotations').delete().eq('id', annotationId)
   if (error) return { error: error.message }
@@ -317,6 +343,17 @@ export async function deleteTimestampNote(noteId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // The author may delete it only while they are still the player's current
+  // coach, or are the player themself.
+  const { data: note } = await supabaseAdmin
+    .from('timestamp_notes')
+    .select('created_by, clip_id')
+    .eq('id', noteId)
+    .maybeSingle()
+  if (!note) return { error: 'Not authorized' }
+  const player = await playerForClip(note.clip_id as string)
+  if (!canDeleteClipItem(user.id, note.created_by as string | null, player)) return { error: 'Not authorized' }
+
   const { error } = await supabaseAdmin
     .from('timestamp_notes')
     .delete()
@@ -333,11 +370,14 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   if (!user) return { error: 'Not authenticated' }
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
   if (!isLessonPathFor(lessonPath, clip.player_id, clipId)) {
     console.warn('[saveLessonPath] rejected path', { clipId, lessonPath })
     return { error: 'Invalid lesson file' }
   }
+  // Same rule as lesson upload links (src/lib/storage-access.ts): only the
+  // player's own coach may write lesson files.
+  const decision = await decideStorageAccess(supabaseAdmin, user.id, 'lessons', lessonPath, 'write')
+  if (!decision.allowed || decision.playerId !== clip.player_id.toLowerCase()) return { error: 'Not authorized' }
   const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
   if (error) return { error: error.message }
   // Re-record: remove the previous recording once the new one is attached.
@@ -403,7 +443,10 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
 
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
+  // Voice notes are coach commentary: only the player's own (direct) coach.
+  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
+  if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: 'Not authorized' }
+  if (!isVoicePathFor(voicePath, clip.player_id, clipId)) return { error: 'Invalid storage path' }
 
   const { error } = await supabaseAdmin
     .from('clips')
@@ -428,29 +471,41 @@ export async function deleteClip(clipId: string) {
 
   if (!clip) return { error: 'Clip not found' }
 
+  // The player's current coach, or the player deleting a clip they uploaded.
   const { data: player } = await supabaseAdmin
     .from('players')
-    .select('coach_id')
+    .select('coach_id, user_id')
     .eq('id', clip.player_id)
-    .single()
+    .maybeSingle()
 
-  if (clip.uploaded_by !== user.id && player?.coach_id !== user.id) {
+  if (!canDeleteClip(user.id, clip.uploaded_by as string | null, player)) {
     return { error: 'Not authorized' }
   }
+
+  // lesson_path is read separately in case that column isn't migrated yet.
+  const { data: lessonRow } = await supabaseAdmin.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
+  const lessonPath = (lessonRow as { lesson_path?: string | null } | null)?.lesson_path ?? null
 
   await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
   await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
 
-  if (clip.storage_path) {
-    await supabase.storage.from('clips').remove([clip.storage_path])
-  }
-  if (clip.voice_path) {
-    await supabase.storage.from('clips').remove([clip.voice_path])
-  }
-
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
+
+  // Files are removed only after the check above passed and the clip row is
+  // gone, with the service client (the caller's session may not be allowed to
+  // delete another uploader's files), and only inside this player's folder.
+  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path])
+  if (files.length > 0) {
+    const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
+    if (storageError) console.error('[deleteClip] storage cleanup failed', clipId, storageError.message)
+  }
+  // Lesson recordings live in the lessons bucket.
+  if (lessonPath && isLessonPathFor(lessonPath, clip.player_id as string, clipId)) {
+    const { error: lessonError } = await supabaseAdmin.storage.from('lessons').remove([lessonPath])
+    if (lessonError) console.error('[deleteClip] lesson cleanup failed', clipId, lessonError.message)
+  }
 
   revalidatePath('/dashboard')
   return { success: true }

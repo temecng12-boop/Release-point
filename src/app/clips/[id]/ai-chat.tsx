@@ -46,17 +46,16 @@ const AGENTS = {
   },
 }
 
+// The chat sends only the clip id; the server loads the player's details,
+// pitch data, checklist and notes itself after an access check. The other
+// props are kept for the existing callers but are no longer sent.
 export default function AIChat({
   clipId,
-  role,
-  playerName,
-  playerAgeGroup,
-  playerPosition,
-  metrics = [],
-  checklist = null,
-  coachNotes = null,
+  available = true,
 }: {
   clipId: string
+  /** False for viewers the server won't serve (guardians): show a notice instead of the chat. */
+  available?: boolean
   role: 'coach' | 'player'
   playerName: string
   playerAgeGroup: string | null
@@ -102,16 +101,7 @@ export default function AIChat({
         body: JSON.stringify({
           messages: nextMessages,
           agent,
-          context: {
-            playerName,
-            ageGroup: playerAgeGroup,
-            position: playerPosition,
-            clipId,
-            viewerRole: role,
-            metrics,
-            checklist,
-            coachNotes,
-          },
+          context: { clipId },
         }),
       })
 
@@ -140,6 +130,24 @@ export default function AIChat({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (!available) {
+    return (
+      <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md">
+        <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
+          <p
+            className="text-xs text-[#3D5166] tracking-widest"
+            style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
+          >
+            AI Coach Chat
+          </p>
+        </div>
+        <p className="p-4 text-sm text-[#456080]">
+          The AI Coach isn&apos;t available for guardians. It&apos;s for the player and their coaches.
+        </p>
+      </div>
+    )
   }
 
   // ── Agent picker ────────────────────────────────────────────────────────────

@@ -82,7 +82,10 @@ function fmtTime(s: number) {
 // ── AI Chat (player-level) ────────────────────────────────────────────────────
 type Message = { role: 'user' | 'assistant'; content: string }
 
-function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
+// Sends only the player id; the server loads the player's details and pitch
+// data itself after checking the caller is their coach or the player.
+function PlayerAIChat({ playerId, playerName, metrics }: {
+  playerId: string
   playerName: string
   ageGroup: string | null
   position: string | null
@@ -114,7 +117,7 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: next,
-          context: { playerName, ageGroup, position, clipId: null, viewerRole: 'coach', metrics: metrics.map(m => ({ pitch_type: m.pitch_type, velocity: m.velocity, spin_rate: m.spin_rate, spin_axis: m.spin_axis, horizontal_break: m.horizontal_break, vertical_break: m.vertical_break })) },
+          context: { playerId },
         }),
       })
       if (!res.ok || !res.body) throw new Error(`${res.status}`)
@@ -153,21 +156,7 @@ function PlayerAIChat({ playerName, ageGroup, position, metrics }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: next,
-          context: {
-            playerName,
-            ageGroup,
-            position,
-            clipId: null,
-            viewerRole: 'coach',
-            metrics: metrics.map(m => ({
-              pitch_type: m.pitch_type,
-              velocity: m.velocity,
-              spin_rate: m.spin_rate,
-              spin_axis: m.spin_axis,
-              horizontal_break: m.horizontal_break,
-              vertical_break: m.vertical_break,
-            })),
-          },
+          context: { playerId },
         }),
       })
       if (!res.ok || !res.body) throw new Error(`${res.status}`)
@@ -690,6 +679,7 @@ export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition
 
       {active === 'AI Coach' && (
         <PlayerAIChat
+          playerId={playerId}
           playerName={playerName}
           ageGroup={playerAgeGroup}
           position={playerPosition}

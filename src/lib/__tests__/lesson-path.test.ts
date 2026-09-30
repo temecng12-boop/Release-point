@@ -41,3 +41,12 @@ test('isLessonPathFor accepts old and new names for this clip only', () => {
     `${P}/${C}/../lesson.webm`, `${P}/${C}/x/lesson.webm`, `${P}/lesson.webm`, '', null, 42,
   ]) assert.equal(isLessonPathFor(bad, P, C), false, String(bad))
 })
+
+test('deleteClip removes the lesson recording from the lessons bucket, not clips', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../app/actions/clips.ts', import.meta.url), 'utf8')
+  const fn = src.slice(src.indexOf('export async function deleteClip'), src.indexOf('export async function savePhaseChecklist'))
+  assert.match(fn, /isLessonPathFor\(lessonPath, clip\.player_id as string, clipId\)/)
+  assert.match(fn, /storage\.from\('lessons'\)\.remove\(\[lessonPath\]\)/)
+  assert.doesNotMatch(fn, /clipFilesToRemove\([^)]*lessonPath/)
+})

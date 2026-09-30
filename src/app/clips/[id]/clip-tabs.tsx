@@ -65,6 +65,7 @@ export default function ClipTabs({
   playerName,
   playerAgeGroup,
   playerPosition,
+  aiCoachAvailable = true,
 }: {
   clipId: string
   playerId: string
@@ -78,6 +79,8 @@ export default function ClipTabs({
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
+  /** Whether this viewer may use the AI Coach (own coach or the player). */
+  aiCoachAvailable?: boolean
 }) {
   const [active, setActive] = useState<Tab>('Timestamps')
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
@@ -158,6 +161,7 @@ export default function ClipTabs({
             {active === 'AI Coach' && (
               <AiChat
                 clipId={clipId}
+                available={aiCoachAvailable}
                 role={role}
                 playerName={playerName}
                 playerAgeGroup={playerAgeGroup}
