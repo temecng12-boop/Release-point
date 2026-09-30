@@ -13,6 +13,7 @@ import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
+import { removeClipMediaAsOwnCoach } from '@/lib/clip-media-delete'
 
 // Loads the coach and account ids of the player a clip belongs to.
 async function playerForClip(clipId: string) {
@@ -394,29 +395,10 @@ export async function deleteLessonPath(clipId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-  if (clip.lesson_path) {
-    await supabaseAdmin.storage.from('lessons').remove([clip.lesson_path])
-  }
-  await supabaseAdmin.from('clips').update({ lesson_path: null }).eq('id', clipId)
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
-}
-
-// The player, their direct coach, or a coach on one of their teams. Team
-// membership uses the shared rule in src/lib/clip-access.ts (players.team_id
-// plus player_teams), instead of a separate team_id-only lookup.
-async function isCoachForPlayer(userId: string, playerId: string): Promise<boolean> {
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('coach_id, team_id, user_id')
-    .eq('id', playerId)
-    .maybeSingle()
-  if (!player) return false
-  if (player.coach_id === userId || player.user_id === userId) return true
-  return isCoachOnPlayersTeam(userId, playerId, player.team_id as string | null)
+  // Only the player's own coach (see src/lib/clip-media-delete.ts).
+  const result = await removeClipMediaAsOwnCoach(supabaseAdmin, user.id, clipId, 'lesson')
+  if ('success' in result) revalidatePath(`/clips/${clipId}`)
+  return result
 }
 
 export async function deleteVoicePath(clipId: string) {
@@ -424,16 +406,10 @@ export async function deleteVoicePath(clipId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, voice_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-
-  if (clip.voice_path) {
-    await supabaseAdmin.storage.from('clips').remove([clip.voice_path])
-  }
-  await supabaseAdmin.from('clips').update({ voice_path: null }).eq('id', clipId)
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
+  // Only the player's own coach, as for saving (see src/lib/clip-media-delete.ts).
+  const result = await removeClipMediaAsOwnCoach(supabaseAdmin, user.id, clipId, 'voice')
+  if ('success' in result) revalidatePath(`/clips/${clipId}`)
+  return result
 }
 
 export async function saveVoicePath(clipId: string, voicePath: string) {

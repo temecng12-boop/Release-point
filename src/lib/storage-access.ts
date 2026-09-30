@@ -76,7 +76,13 @@ export async function decideStorageAccess(
   if (mode === 'read') return { allowed: true, playerId: parsed.playerId, via: access.via, teamCheck: access.teamCheck }
 
   // write: direct coach, or the player in their own clips folder. Team
-  // coaches and guardians are read-only.
+  // coaches and guardians are read-only. Lesson files: the direct coach only,
+  // so nobody else can get an upload link (and leave an orphan file).
+  if (bucket === 'lessons') {
+    return access.via === 'coach'
+      ? { allowed: true, playerId: parsed.playerId, via: 'coach', teamCheck: access.teamCheck }
+      : { allowed: false, reason: 'lessons: direct coach only', teamCheck: access.teamCheck }
+  }
   if (access.via === 'coach') {
     return { allowed: true, playerId: parsed.playerId, via: 'coach', teamCheck: access.teamCheck }
   }
