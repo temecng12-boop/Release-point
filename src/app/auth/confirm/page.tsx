@@ -23,7 +23,8 @@ function ConfirmInner() {
       const refreshToken = hashParams.get('refresh_token')
 
       if (accessToken && refreshToken) {
-        await supabase.auth.signOut()
+        // Local only: drop this browser's old session, not the account's other devices (QA-012).
+        await supabase.auth.signOut({ scope: 'local' })
 
         const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         if (error) {
@@ -50,7 +51,7 @@ function ConfirmInner() {
         return
       }
 
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       window.location.href = '/auth/login'
     }
 
