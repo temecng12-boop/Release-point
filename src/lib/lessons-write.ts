@@ -7,6 +7,7 @@
 import { decideStorageAccess } from './storage-access'
 import { isLessonPathFor } from './lesson-path'
 import { isMissingTableError, LESSONS_MISSING_MESSAGE } from './lessons'
+import { MAX_TIMELINE_BYTES, TIMELINE_VERSION, validateTimeline, timelineBytes } from './lesson-timeline/schema'
 
 type DbError = { code?: string; message: string } | null
 type Q = PromiseLike<{ data: unknown; error: DbError }> & {
@@ -24,6 +25,9 @@ type Client = {
   }
   storage: { from(b: string): { remove(paths: string[]): PromiseLike<{ error: DbError }> } }
 }
+
+export const LESSONS_MISSING_TIMELINE_MESSAGE =
+  'Lesson audio saved, but the drawing replay needs a database update (migration 025) and was not kept.'
 
 export type LessonWriteResult = { success: true; warning?: string } | { error: string }
 
@@ -44,7 +48,7 @@ export async function saveLessonRecord(
   userId: string | null | undefined,
   clipId: string,
   lessonPath: string,
-  meta: { mime?: string | null; durationMs?: number | null } = {},
+  meta: { mime?: string | null; durationMs?: number | null; timeline?: unknown } = {},
 ): Promise<LessonWriteResult> {
   if (!userId) return { error: 'Not authenticated' }
   const db = client as Client
@@ -61,12 +65,25 @@ export async function saveLessonRecord(
     return { error: LESSON_DENIED }
   }
 
+  // Timeline lessons (format 2): audio file + validated event timeline.
+  let timeline = null
+  if (meta.timeline != null) {
+    const checked = validateTimeline(meta.timeline)
+    if (!checked.ok) {
+      console.warn('[saveLesson] rejected timeline', { clipId, error: checked.error })
+      return { error: checked.error }
+    }
+    if (timelineBytes(checked.timeline) > MAX_TIMELINE_BYTES) return { error: 'Invalid lesson timeline: too large' }
+    timeline = checked.timeline
+  }
+
   const duration = meta.durationMs != null && Number.isFinite(meta.durationMs) && meta.durationMs >= 0
     ? Math.min(Math.round(meta.durationMs), 2_147_483_647) : null
   const { error: insertError } = await db.from('lessons').insert({
     clip_id: clipId, player_id: playerId, coach_id: userId, media_path: lessonPath,
     mime: meta.mime ? String(meta.mime).split(';')[0].trim().slice(0, 100) : null,
     duration_ms: duration,
+    ...(timeline ? { timeline, format_version: TIMELINE_VERSION } : {}),
   })
   let warning: string | undefined
   if (insertError) {
@@ -75,7 +92,7 @@ export async function saveLessonRecord(
       return { error: 'Could not save this lesson. Please try again.' }
     }
     console.error('[saveLesson] public.lessons missing; apply supabase/migrations/025_lessons.sql')
-    warning = LESSONS_MISSING_MESSAGE
+    warning = timeline ? LESSONS_MISSING_TIMELINE_MESSAGE : LESSONS_MISSING_MESSAGE
   }
   // Newest lesson on the clip, for older app code that reads clips.lesson_path.
   const { error: updateError } = await db.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)

@@ -5,7 +5,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { canManageLessons, formatLessonDuration, groupLessonsByClip, isMissingTableError, loadLessonFeedback, loadLessons, LESSONS_MISSING_MESSAGE, type LessonRow } from '../lessons'
-import { clipLessonFiles, deleteLessonRecord, saveLessonRecord, LESSON_DENIED } from '../lessons-write'
+import { clipLessonFiles, deleteLessonRecord, saveLessonRecord, LESSON_DENIED, LESSONS_MISSING_TIMELINE_MESSAGE } from '../lessons-write'
+import { loadLessonReplay } from '../lessons'
+import { FULL_CROP } from '../lesson-timeline/schema'
 import { newLessonPath } from '../lesson-path'
 import { fakeSupabase, type FakeTables } from './helpers/fake-supabase'
 
@@ -25,7 +27,7 @@ function world(): FakeTables {
     player_teams: [{ player_id: P1, team_id: 'T' }],
     team_coaches: [{ team_id: 'T', coach_id: COACH, role: 'organizer' }, { team_id: 'T', coach_id: ASST, role: 'assistant' }],
     clips: [
-      { id: C1, player_id: P1, title: 'Bullpen', session_date: '2026-09-20', created_at: '2026-09-20T10:00:00Z', lesson_path: null },
+      { id: C1, player_id: P1, storage_path: `${P1}/1700000000000.mp4`, title: 'Bullpen', session_date: '2026-09-20', created_at: '2026-09-20T10:00:00Z', lesson_path: null },
       { id: C2, player_id: P1, title: 'Game', session_date: null, created_at: '2026-09-25T10:00:00Z', lesson_path: null },
     ],
     lessons: [],
@@ -203,6 +205,41 @@ test('delete legacy:<clipId> after 025: removes the file AND the backfilled less
   const f3 = fakeSupabase(w3)
   assert.deepEqual(await deleteLessonRecord(f3.client, COACH, `legacy:${C1}`), { success: true, clipId: C1 })
   assert.equal((f3.tables.clips as Record<string, unknown>[])[0].lesson_path, null)
+})
+
+const TL = { v: 2, durationMs: 5000, clip: { w: 1280, h: 720, durMs: 8000 }, start: { v: 0, playing: false, rate: 1, crop: FULL_CROP, shapes: [], o: {} },
+  events: [{ t: 100, k: 'play', v: 0 }, { t: 900, k: 'stroke', d: 200, s: { id: 's1', kind: 'line', color: '#E9412F', pts: [[0.1, 0.1], [0.5, 0.5]] } }] }
+
+test('save: timeline lesson stores the validated timeline with format_version 2; invalid timelines are rejected', async () => {
+  const f = fakeSupabase(world())
+  const path = newLessonPath(P1, C1, 'audio/mp4', 5, 'tl')
+  assert.deepEqual(await saveLessonRecord(f.client, COACH, C1, path, { mime: 'audio/mp4;codecs=mp4a.40.2', durationMs: 5000, timeline: { ...TL, junk: 1 } }), { success: true })
+  const row = (f.tables.lessons as Record<string, unknown>[])[0]
+  assert.equal(row.format_version, 2); assert.equal(row.mime, 'audio/mp4')
+  assert.equal('junk' in (row.timeline as object), false)
+  const bad = fakeSupabase(world())
+  const r = await saveLessonRecord(bad.client, COACH, C1, path, { timeline: { ...TL, v: 3 } })
+  assert.ok('error' in r && /Invalid lesson timeline/.test(r.error))
+  assert.equal((bad.tables.lessons as unknown[]).length, 0)
+  const w = world(); w.lessons = 'missing'
+  assert.deepEqual(await saveLessonRecord(fakeSupabase(w).client, COACH, C1, path, { timeline: TL }), { success: true, warning: LESSONS_MISSING_TIMELINE_MESSAGE })
+})
+
+test('replay source: v2 signs lesson audio + original clip video after read checks; v1 and legacy play the file', async () => {
+  const f = fakeSupabase(world())
+  const v1 = newLessonPath(P1, C1, 'video/webm', 1, 'v1'), v2 = newLessonPath(P1, C1, 'audio/mp4', 2, 'v2')
+  await saveLessonRecord(f.client, COACH, C1, v1)
+  await saveLessonRecord(f.client, COACH, C1, v2, { timeline: TL, durationMs: 5000 })
+  const [r1, r2] = (f.tables.lessons as Record<string, unknown>[]).map(r => r.id as string)
+  assert.deepEqual(await loadLessonReplay(f.client, PLAYER, r1), { format: 1, mediaPath: v1 })
+  const src = await loadLessonReplay(f.client, ASST, r2)
+  assert.ok('format' in src && src.format === 2)
+  assert.equal((src as { clipPath: string }).clipPath, `${P1}/1700000000000.mp4`)
+  assert.equal((src as { durationMs: number }).durationMs, 5000)
+  for (const who of [OFF, null]) assert.ok('error' in await loadLessonReplay(f.client, who, r2), String(who))
+  assert.deepEqual(await loadLessonReplay(f.client, GUARD, 'nope'), { error: 'Lesson not found' })
+  const w = world(); w.lessons = 'missing'; (w.clips as Record<string, unknown>[])[0].lesson_path = v1
+  assert.deepEqual(await loadLessonReplay(fakeSupabase(w).client, PLAYER, `legacy:${C1}`), { format: 1, mediaPath: v1 })
 })
 
 test('clip delete: collects ALL lesson files of the clip (rows + lesson_path), only inside that clip folder', async () => {

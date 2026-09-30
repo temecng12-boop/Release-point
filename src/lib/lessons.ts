@@ -2,6 +2,7 @@
 // client after the caller's access has been checked; the pure helpers are
 // shared by the clip page, the player page and tests.
 import { canViewPlayerContent } from './clip-access'
+import { decideStorageAccess } from './storage-access'
 
 export type LessonRow = {
   id: string
@@ -12,6 +13,8 @@ export type LessonRow = {
   mime: string | null
   duration_ms: number | null
   created_at: string
+  /** 1 = video recording (older); 2 = audio + timeline replay. */
+  format_version?: number
 }
 export type LessonClip = { id: string; title: string | null; session_date: string | null; created_at: string }
 export type LessonItem = LessonRow & { coach_name: string | null }
@@ -71,7 +74,7 @@ type Q = PromiseLike<{ data: unknown; error: DbError }> & {
 }
 type Client = { from(t: string): { select(c: string): Q } }
 
-const LESSON_COLS = 'id, clip_id, player_id, coach_id, media_path, mime, duration_ms, created_at'
+const LESSON_COLS = 'id, clip_id, player_id, coach_id, media_path, mime, duration_ms, format_version, created_at'
 
 /**
  * All lessons for a player or a clip, newest first, with coach names. If the
@@ -91,7 +94,7 @@ export async function loadLessons(client: unknown, filter: { playerId: string } 
     const lr = await db.from('clips').select('id, player_id, lesson_path, created_at').eq(clipCol, val).not('lesson_path', 'is', null)
     rows = ((lr.data ?? []) as { id: string; player_id: string; lesson_path: string; created_at: string }[]).map(c => ({
       id: `legacy:${c.id}`, clip_id: c.id, player_id: c.player_id, coach_id: null, media_path: c.lesson_path,
-      mime: null, duration_ms: null, created_at: c.created_at,
+      mime: null, duration_ms: null, format_version: 1, created_at: c.created_at,
     }))
   } else {
     rows = (res.data ?? []) as LessonRow[]
@@ -125,4 +128,37 @@ export async function loadLessonFeedback(client: unknown, viewerId: string, play
     console.error('[lessons] feedback load failed', e)
     return null
   }
+}
+
+export type LessonReplaySource =
+  | { format: 1; mediaPath: string }
+  | { format: 2; mediaPath: string; clipPath: string; timeline: unknown; durationMs: number | null }
+
+/**
+ * What the replay player needs for one lesson, after the storage read check on
+ * the lesson file AND the clip video (both must belong to a player the viewer
+ * may see). Legacy ids ("legacy:<clipId>") are format 1.
+ */
+export async function loadLessonReplay(client: unknown, userId: string | null | undefined, lessonId: string): Promise<LessonReplaySource | { error: string }> {
+  if (!userId) return { error: 'Not authenticated' }
+  const db = client as { from(t: string): { select(c: string): { eq(c: string, v: string): { maybeSingle(): PromiseLike<{ data: unknown; error: DbError }> } } } }
+  let row: { clip_id: string; media_path: string; format_version: number | null; timeline: unknown; duration_ms: number | null } | null = null
+  if (lessonId.startsWith('legacy:')) {
+    const { data } = await db.from('clips').select('id, lesson_path').eq('id', lessonId.slice(7)).maybeSingle()
+    const c = data as { id: string; lesson_path: string | null } | null
+    if (c?.lesson_path) row = { clip_id: c.id, media_path: c.lesson_path, format_version: 1, timeline: null, duration_ms: null }
+  } else {
+    const { data } = await db.from('lessons').select('clip_id, media_path, format_version, timeline, duration_ms').eq('id', lessonId).maybeSingle()
+    row = data as typeof row
+  }
+  if (!row) return { error: 'Lesson not found' }
+  const lessonRead = await decideStorageAccess(client, userId, 'lessons', row.media_path, 'read')
+  if (!lessonRead.allowed) return { error: 'You don\'t have access to this lesson.' }
+  if (row.format_version !== 2 || row.timeline == null) return { format: 1, mediaPath: row.media_path }
+  const { data: clip } = await db.from('clips').select('storage_path').eq('id', row.clip_id).maybeSingle()
+  const clipPath = (clip as { storage_path?: string | null } | null)?.storage_path
+  if (!clipPath) return { error: 'The clip video for this lesson is missing.' }
+  const clipRead = await decideStorageAccess(client, userId, 'clips', clipPath, 'read')
+  if (!clipRead.allowed || clipRead.playerId !== lessonRead.playerId) return { error: 'You don\'t have access to this lesson.' }
+  return { format: 2, mediaPath: row.media_path, clipPath, timeline: row.timeline, durationMs: row.duration_ms }
 }
