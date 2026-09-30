@@ -1,6 +1,6 @@
 'use server'
 import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
-import { normalizeClipNotes } from '@/lib/clip-notes'
+import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
@@ -648,7 +648,7 @@ export async function saveReframe(clipId: string, reframe: { left: number; top: 
 // rule as the corrected 018 RLS policies. "Player's teams" means players.team_id
 // plus player_teams rows, because the app links players through player_teams.
 // Blank text clears the notes (stored as null); see src/lib/clip-notes.ts.
-export async function saveClipNotes(clipId: string, notes: string | null) {
+export async function saveClipNotes(clipId: string, notes: string | null, expectedNotes?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Your session has expired. Please sign in again.' }
@@ -658,7 +658,7 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
 
   const { data: clip, error: clipError } = await supabaseAdmin
     .from('clips')
-    .select('player_id')
+    .select('player_id, notes')
     .eq('id', clipId)
     .maybeSingle()
   if (clipError) return { error: describeDbError('saveClipNotes:clip', clipError, 'Could not save notes.') }
@@ -675,6 +675,13 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
     || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
   if (!allowed) return { error: 'Only the player\'s coaches can edit these notes.' }
 
+  // Stale-write guard (QA-002): refuse to overwrite notes that changed since
+  // this client loaded or last saved them. No version column exists, so the
+  // notes text itself is the version (check-then-write; no migration).
+  if (isStaleClipNotesWrite(clip.notes as string | null, expectedNotes)) {
+    return { error: CLIP_NOTES_CONFLICT_ERROR, conflict: true }
+  }
+
   const { data: updated, error } = await supabaseAdmin
     .from('clips')
     .update({ notes: normalized.notes })
@@ -685,5 +692,5 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
     console.error('[saveClipNotes] update matched no rows', { clipId })
     return { error: 'Could not save notes. Please refresh and try again.' }
   }
-  return { success: true }
+  return { success: true, notes: normalized.notes }
 }
