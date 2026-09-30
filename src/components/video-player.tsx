@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { newLessonPath } from '@/lib/lesson-path'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
 
 // ── playback ───────────────────────────────────────────────────────────────
@@ -778,10 +779,25 @@ export default function VideoPlayer({
     const recorder = new MediaRecorder(mixedStream, { mimeType })
     lessonChunksRef.current = []
     recorder.ondataavailable = (e) => { if (e.data.size > 0) lessonChunksRef.current.push(e.data) }
-    recorder.onstop = () => {
+    // Release everything this recording opened, so the next one starts clean.
+    const releaseStreams = () => {
       if (lessonRafRef.current) cancelAnimationFrame(lessonRafRef.current)
+      lessonRafRef.current = null
       micStream.getTracks().forEach(t => t.stop())
+      canvasStream.getTracks().forEach(t => t.stop())
+    }
+    recorder.onstop = () => {
+      releaseStreams()
+      lessonRecRef.current = null
       uploadLesson(mimeType)
+    }
+    recorder.onerror = (ev) => {
+      console.error('[lesson] recorder error', ev)
+      if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+      releaseStreams()
+      lessonRecRef.current = null
+      setLessonError('Recording stopped unexpectedly. Try again.')
+      setLessonPhase('idle')
     }
     recorder.start(250)
     lessonRecRef.current = recorder
@@ -797,19 +813,29 @@ export default function VideoPlayer({
   }
 
   async function uploadLesson(mimeType: string) {
-    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
-    const path = `${playerId}/${clipId}/lesson.${ext}`
+    // A fresh object per recording: re-recording used to reuse lesson.<ext>,
+    // which already existed, so the non-upsert signed upload was rejected.
+    const path = newLessonPath(playerId, clipId, mimeType)
     // Strip codec parameters — Supabase MIME check only matches the base type
     const baseMime = mimeType.split(';')[0].trim()
     const blob = new Blob(lessonChunksRef.current, { type: baseMime })
+    lessonChunksRef.current = []
+    if (blob.size === 0) { setLessonError('Nothing was recorded. Try again.'); setLessonPhase('idle'); return }
 
     const urlResult = await getSignedUploadUrl(path, 'lessons')
-    if ('error' in urlResult) { setLessonError('Upload failed'); setLessonPhase('idle'); return }
+    if ('error' in urlResult) {
+      console.error('[lesson] signed upload URL failed', { path, error: urlResult.error })
+      setLessonError(`Upload failed: ${urlResult.error}`); setLessonPhase('idle'); return
+    }
 
     const res = await fetch(urlResult.signedUrl, {
       method: 'PUT', body: blob, headers: { 'Content-Type': baseMime },
     })
-    if (!res.ok) { setLessonError('Upload failed. Try again.'); setLessonPhase('idle'); return }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      console.error('[lesson] upload failed', { path, status: res.status, size: blob.size, detail })
+      setLessonError(`Upload failed (${res.status}). Try again.`); setLessonPhase('idle'); return
+    }
 
     const saveResult = await saveLessonPath(clipId, path)
     if (saveResult && 'error' in saveResult) { setLessonError('Saved video but failed to attach to clip. Try again.'); setLessonPhase('idle'); return }

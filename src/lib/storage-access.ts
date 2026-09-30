@@ -4,7 +4,7 @@
 //   clips:   <playerId>/<timestamp>[-<rand>].<ext>          (clip uploads)
 //            <playerId>/<clipId>/voice.<ext>                  (clip voice note)
 //            <playerId>/<clipId>/ts_voice/<uid>.<ext>         (timestamp voice notes)
-//   lessons: <playerId>/<clipId>/lesson.<ext>                 (lesson recordings)
+//   lessons: <playerId>/<clipId>/lesson-<stamp>-<rand>.<ext>  (lesson recordings; older: lesson.<ext>)
 // so the first folder maps the path to its player. Access then follows
 // canViewPlayerContent (src/lib/clip-access.ts):
 //   read:  the player, direct coach, linked guardian, or team coach
