@@ -3,6 +3,7 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
+import { isLessonPathFor } from '@/lib/lesson-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -330,11 +331,21 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
+  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
   if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
+  if (!isLessonPathFor(lessonPath, clip.player_id, clipId)) {
+    console.warn('[saveLessonPath] rejected path', { clipId, lessonPath })
+    return { error: 'Invalid lesson file' }
+  }
   const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
   if (error) return { error: error.message }
+  // Re-record: remove the previous recording once the new one is attached.
+  const previous = clip.lesson_path as string | null
+  if (previous && previous !== lessonPath && isLessonPathFor(previous, clip.player_id, clipId)) {
+    const { error: removeError } = await supabaseAdmin.storage.from('lessons').remove([previous])
+    if (removeError) console.warn('[saveLessonPath] could not remove previous lesson file', { previous, error: removeError.message })
+  }
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
 }
