@@ -16,3 +16,17 @@ export function normalizeClipNotes(value: unknown): { ok: true; notes: string | 
   }
   return { ok: true, notes: value.trim() === '' ? null : value }
 }
+
+export const CLIP_NOTES_CONFLICT_ERROR = 'This note changed elsewhere. Reload to see the latest.'
+
+/**
+ * Stale-write guard for coach notes (QA-002). The client sends the notes it
+ * last loaded or saved (`expected`); if the stored notes (`current`) differ,
+ * the write is stale and must be refused. Blank and null compare equal.
+ * `expected === undefined` means the client sent no baseline (not checked).
+ */
+export function isStaleClipNotesWrite(current: string | null | undefined, expected: string | null | undefined): boolean {
+  if (expected === undefined) return false
+  const norm = (v: string | null | undefined) => (typeof v === 'string' && v.trim() !== '' ? v : null)
+  return norm(current) !== norm(expected)
+}
