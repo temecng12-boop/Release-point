@@ -271,6 +271,92 @@ export async function deleteAnnotation(annotationId: string) {
   return { success: true }
 }
 
+// Pitch rows (QA-017). Deletes run with the signed-in user's own Supabase
+// client, so RLS decides: pitch_metrics_coach_all (002) only matches clips of
+// players whose players.coach_id is the caller, i.e. the player's direct
+// coach. Team coaches and players have no delete policy on pitch_metrics, and
+// RLS then deletes 0 rows without an error, so the row count is checked and 0
+// is reported as an error. The screen only drops what the database removed.
+const PITCH_DELETE_DENIED = 'Pitch not deleted. Only the player\'s own coach can delete pitches. Refresh the page and try again.'
+
+export async function deletePitchMetric(metricId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof metricId !== 'string' || !metricId) return { error: 'Pitch not found' }
+
+  const { data: removed, error } = await supabase.from('pitch_metrics').delete().eq('id', metricId).select('id, clip_id')
+  if (error) return { error: describeDbError('deletePitchMetric', error, 'Could not delete this pitch.') }
+  const rows = (removed ?? []) as { id: string; clip_id: string }[]
+  if (rows.length !== 1) return { error: PITCH_DELETE_DENIED }
+  revalidatePath(`/clips/${rows[0].clip_id}`)
+  return { success: true }
+}
+
+export async function deleteAllPitchMetrics(clipId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+
+  const { data: removed, error } = await supabase.from('pitch_metrics').delete().eq('clip_id', clipId).select('id')
+  if (error) return { error: describeDbError('deleteAllPitchMetrics', error, 'Could not delete these pitches.') }
+  const removedIds = ((removed ?? []) as { id: string }[]).map(r => r.id)
+  if (removedIds.length === 0) return { error: PITCH_DELETE_DENIED }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true, removedIds }
+}
+
+// Hitting data (clips.hitting_metrics, 017): one saved summary per clip, so
+// "a row" is one saved metric and "delete all" clears the summary. Same rule
+// as pitch rows: only the player's direct coach. clips_coach_all (018) also
+// lets team coaches update clips, so the direct-coach check is done here
+// first; players have no update policy on clips. The update runs with the
+// user's own client and must report the one clip row it changed.
+const HITTING_DELETE_DENIED = 'Hitting data not deleted. Only the player\'s own coach can delete it. Refresh the page and try again.'
+const HITTING_KEYS = ['ev_avg', 'ev_max', 'launch_angle_avg', 'barrel_rate', 'hard_hit_rate', 'sweet_spot_rate', 'attack_angle', 'bat_speed'] as const
+type HittingKey = (typeof HITTING_KEYS)[number]
+
+async function hittingDeleteContext(clipId: unknown) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' as const }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' as const }
+  const { data: clip, error: clipError } = await supabase.from('clips').select('player_id, hitting_metrics').eq('id', clipId).maybeSingle()
+  if (clipError) return { error: describeDbError('deleteHittingMetric:clip', clipError, 'Could not delete hitting data.') }
+  if (!clip) return { error: HITTING_DELETE_DENIED }
+  const { data: player, error: playerError } = await supabase.from('players').select('coach_id').eq('id', (clip as { player_id: string }).player_id).maybeSingle()
+  if (playerError) return { error: describeDbError('deleteHittingMetric:player', playerError, 'Could not delete hitting data.') }
+  if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: HITTING_DELETE_DENIED }
+  const current = ((clip as { hitting_metrics?: Record<string, number | null> | null }).hitting_metrics ?? null)
+  return { supabase, current }
+}
+
+async function writeHittingMetrics(supabase: Awaited<ReturnType<typeof createClient>>, clipId: string, next: Record<string, number | null> | null, action: string) {
+  const { data: changed, error } = await supabase.from('clips').update({ hitting_metrics: next }).eq('id', clipId).select('id')
+  if (error) return { error: describeDbError(action, error, 'Could not delete hitting data.') }
+  if (((changed ?? []) as unknown[]).length !== 1) return { error: HITTING_DELETE_DENIED }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true }
+}
+
+export async function deleteHittingMetric(clipId: string, key: HittingKey) {
+  if (!(HITTING_KEYS as readonly string[]).includes(key)) return { error: 'Unknown hitting metric' }
+  const ctx = await hittingDeleteContext(clipId)
+  if ('error' in ctx) return { error: ctx.error }
+  if (ctx.current?.[key] == null) return { error: 'This value was already removed. Refresh the page.' }
+  const next = { ...ctx.current, [key]: null }
+  const empty = HITTING_KEYS.every(k => next[k] == null)
+  return writeHittingMetrics(ctx.supabase, clipId, empty ? null : next, 'deleteHittingMetric')
+}
+
+export async function deleteAllHittingMetrics(clipId: string) {
+  const ctx = await hittingDeleteContext(clipId)
+  if ('error' in ctx) return { error: ctx.error }
+  if (!ctx.current || HITTING_KEYS.every(k => ctx.current?.[k] == null)) return { error: 'There is no saved hitting data to delete. Refresh the page.' }
+  return writeHittingMetrics(ctx.supabase, clipId, null, 'deleteAllHittingMetrics')
+}
+
 export async function clearAnnotations(clipId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
