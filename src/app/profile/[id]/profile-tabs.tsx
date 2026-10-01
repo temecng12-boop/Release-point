@@ -627,7 +627,7 @@ export default function ProfileTabs({ playerName, playerAgeGroup, playerPosition
           <button
             key={tab}
             onClick={() => setActive(tab)}
-            className={`px-4 py-2.5 text-xs tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap ${
+            className={`px-4 py-2.5 text-xs tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap max-sm:min-h-11 ${
               active === tab
                 ? 'border-[#C8102E] text-[#0F1F33]'
                 : 'border-transparent text-[#3D5166] hover:text-[#456080]'
