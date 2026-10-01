@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBullpenSession, updateBullpenSession, deleteBullpenSession } from '@/app/actions/bullpen'
 import type { PitchBlock } from '@/app/actions/bullpen'
+import { runAction } from '@/lib/action-result'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -42,15 +43,20 @@ function SessionList({
   sessions: BullpenSession[]
   onNew: () => void
   onRun: (s: BullpenSession) => void
-  onDelete: (id: string) => void
+  /** Resolves to an error message if the delete failed, otherwise null. */
+  onDelete: (id: string) => Promise<string | null>
 }) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   async function handleDelete(id: string) {
     setDeleting(id)
-    await onDelete(id)
+    setDeleteError(null)
+    const error = await onDelete(id)
     setDeleting(null)
+    // On failure keep the confirm row open with the error, so it can be retried.
+    if (error) { setDeleteError(`Not deleted: ${error}`); return }
     setConfirmDel(null)
   }
 
@@ -92,7 +98,7 @@ function SessionList({
               >
                 {confirmDel === s.id ? (
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#456080]">Delete this session?</span>
+                    <span role={deleteError ? 'alert' : undefined} className={`text-xs ${deleteError ? 'text-[#C8102E]' : 'text-[#456080]'}`}>{deleteError ?? 'Delete this session?'}</span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDelete(s.id)}
@@ -101,7 +107,7 @@ function SessionList({
                       >
                         {deleting === s.id ? '…' : 'Delete'}
                       </button>
-                      <button onClick={() => setConfirmDel(null)} className="text-xs text-[#456080]">Cancel</button>
+                      <button onClick={() => { setConfirmDel(null); setDeleteError(null) }} className="text-xs text-[#456080]">Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -136,7 +142,7 @@ function SessionList({
                         </button>
                       )}
                       <button
-                        onClick={() => setConfirmDel(s.id)}
+                        onClick={() => { setConfirmDel(s.id); setDeleteError(null) }}
                         className="text-[#3D5166] hover:text-[#C8102E] transition-colors"
                         title="Delete"
                       >
@@ -313,7 +319,8 @@ function RunSession({
   onComplete,
 }: {
   session: BullpenSession
-  onBack: () => void
+  /** Called once the progress is saved, with the saved session. */
+  onBack: (saved: BullpenSession) => void
   onComplete: (updated: BullpenSession) => void
 }) {
   const [pitches, setPitches] = useState<PitchBlock[]>(session.pitches.map(p => ({ ...p, thrown: p.thrown ?? 0 })))
@@ -339,14 +346,21 @@ function RunSession({
     onComplete({ ...session, pitches, status: 'complete' })
   }
 
+  // Back saves the counts first. If the save fails, stay here with the
+  // counts on screen and show the error, so no pitches are lost.
   async function handleSaveProgress() {
-    await updateBullpenSession(session.id, { pitches })
+    setSaving(true)
+    setError(null)
+    const result = await runAction(() => updateBullpenSession(session.id, { pitches }))
+    setSaving(false)
+    if (!result.ok) { setError(`Progress not saved: ${result.error}`); return }
+    onBack({ ...session, pitches })
   }
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => { handleSaveProgress(); onBack() }} className="text-[#3D5166] hover:text-[#0F1F33] transition-colors">
+        <button onClick={handleSaveProgress} disabled={saving} aria-label="Save progress and go back" className="text-[#3D5166] hover:text-[#0F1F33] transition-colors disabled:opacity-40">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -466,10 +480,20 @@ export default function BullpenModal({
     router.refresh()
   }
 
-  async function handleDelete(id: string) {
-    await deleteBullpenSession(id)
+  function handleBackFromRun(saved: BullpenSession) {
+    setSessions(prev => prev.map(s => s.id === saved.id ? saved : s))
+    setView('list')
+    setRunSession(null)
+    router.refresh()
+  }
+
+  // Removed from the list only once the server deleted it.
+  async function handleDelete(id: string): Promise<string | null> {
+    const result = await runAction(() => deleteBullpenSession(id))
+    if (!result.ok) return result.error
     setSessions(prev => prev.filter(s => s.id !== id))
     router.refresh()
+    return null
   }
 
   return (
@@ -509,7 +533,7 @@ export default function BullpenModal({
           {view === 'run' && runSession && (
             <RunSession
               session={runSession}
-              onBack={() => { setView('list'); setRunSession(null) }}
+              onBack={handleBackFromRun}
               onComplete={handleComplete}
             />
           )}
