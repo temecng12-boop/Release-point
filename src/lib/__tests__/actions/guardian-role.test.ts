@@ -3,8 +3,9 @@
  * except that an unused 'player' profile (no players row, clips or other data)
  * becomes 'guardian'. Consent is recorded in every case, and a failed write
  * is an error, never a redirect.
- * The rule itself runs in Postgres (migration 029, checked in PGlite); the fake
- * rpc mirrors it.
+ * The rule itself runs in Postgres (migration 029); the fake rpc mirrors it.
+ * The SQL is tested in PGlite by supabase/tests/guardian-role-029.test.ts
+ * (npx tsx --test supabase/tests/guardian-role-029.test.ts).
  * Run with: npx tsx --tsconfig src/lib/__tests__/actions/tsconfig.json --test src/lib/__tests__/actions/guardian-role.test.ts
  */
 import { test, beforeEach } from 'node:test'
