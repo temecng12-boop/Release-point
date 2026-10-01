@@ -196,7 +196,7 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  {/* Metrics — Nolan's real Trackman numbers */}
+                  {/* Metrics — example numbers */}
                   <div className="flex flex-col">
                     <div className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
                       <p className="text-[9px] tracking-[0.2em] text-[#E8102A]" style={os}>Pitch Metrics</p>
@@ -245,7 +245,7 @@ export default async function HomePage() {
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-slate-100">
           {[
             { n: 'All Levels', sub: 'Youth → Pro',          color: '#E8102A' },
-            { n: 'Any Device', sub: 'CSV & PDF import',       color: '#3B82F6' },
+            { n: 'Mechanics',  sub: 'Pitching & hitting',    color: '#3B82F6' },
             { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#10B981' },
           ].map((s) => (
             <div key={s.n} className="py-8 text-center px-4 group cursor-default">
@@ -336,7 +336,7 @@ export default async function HomePage() {
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
-              <p className="text-[10px] text-slate-400 mb-5">TrackMan · CSV · PDF</p>
+              <p className="text-[10px] text-slate-400 mb-5">Pitching &amp; hitting metrics</p>
               <PitchMetrics />
               <p className="text-[10px] text-slate-400 mt-4" style={os}>Example data</p>
             </div>
@@ -395,7 +395,7 @@ export default async function HomePage() {
           <div className="grid md:grid-cols-3 gap-10">
             {[
               { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They set up their account and join the roster.' },
-              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, import pitch data files. Everything linked to the player.' },
+              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, and record pitching and hitting metrics. Everything linked to the player.' },
               { n: '03', t: 'Players Get It All',   d: 'Every annotation, metric, and AI insight is shared with the player instantly.' },
             ].map((s, i) => (
               <div key={s.n} className="group">
