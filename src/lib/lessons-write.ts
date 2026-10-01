@@ -131,17 +131,25 @@ export async function deleteLessonRecord(client: unknown, userId: string | null 
 
 /**
  * Every lesson file of a clip (all lessons rows plus clips.lesson_path), for
- * removal when the clip is deleted. Tolerates a missing lessons table; only
- * paths inside this player's/clip's folder are returned.
+ * removal when the clip is deleted. Tolerates a missing lessons table; any
+ * other read error is returned so the caller can stop. Only paths inside
+ * this player's/clip's folder are returned.
  */
-export async function clipLessonFiles(client: unknown, clipId: string, playerId: string): Promise<string[]> {
+export async function readClipLessonFiles(client: unknown, clipId: string, playerId: string): Promise<{ files: string[]; error: DbError }> {
   const db = client as Client
   const paths = new Set<string>()
   const { data: rows, error } = await db.from('lessons').select('media_path').eq('clip_id', clipId)
-  if (error && !isMissingTableError(error)) console.error('[clipLessonFiles] lessons read failed', { clipId, message: error.message })
+  if (error && !isMissingTableError(error)) return { files: [], error }
   for (const r of (rows ?? []) as { media_path: string }[]) paths.add(r.media_path)
   const { data: clip } = await db.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
   const lp = (clip as { lesson_path?: string | null } | null)?.lesson_path
   if (lp) paths.add(lp)
-  return [...paths].filter(p => isLessonPathFor(p, playerId, clipId))
+  return { files: [...paths].filter(p => isLessonPathFor(p, playerId, clipId)), error: null }
+}
+
+/** Like readClipLessonFiles, but logs a read error and returns what it found. */
+export async function clipLessonFiles(client: unknown, clipId: string, playerId: string): Promise<string[]> {
+  const { files, error } = await readClipLessonFiles(client, clipId, playerId)
+  if (error) console.error('[clipLessonFiles] lessons read failed', { clipId, message: error.message })
+  return files
 }
