@@ -25,7 +25,7 @@ const HAS_CREDS      = !!(COACH_EMAIL && COACH_PASSWORD)
 
 async function signInAsCoach(page: Page) {
   await page.goto('/auth/login')
-  await page.getByRole('button', { name: /password/i }).click()
+  await page.getByRole('group', { name: 'Sign-in method' }).getByRole('button', { name: 'Password', exact: true }).click()
   await page.getByLabel(/email/i).fill(COACH_EMAIL)
   await page.getByLabel(/password/i).fill(COACH_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
@@ -37,8 +37,12 @@ async function signInAsCoach(page: Page) {
 test('login page loads and shows both auth modes', async ({ page }) => {
   await page.goto('/auth/login')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /password/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /email link/i })).toBeVisible()
+  // The mode tabs. "Email Link" is also an inline button under the password
+  // form, and "Forgot password?" contains "password", so look inside the tab group.
+  const modes = page.getByRole('group', { name: 'Sign-in method' })
+  await expect(modes.getByRole('button', { name: 'Password', exact: true })).toBeVisible()
+  await expect(modes.getByRole('button', { name: 'Email Link', exact: true })).toBeVisible()
+  await expect(modes.getByRole('button', { name: 'Password', exact: true })).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('login page has Apple and Google sign-in buttons', async ({ page }) => {

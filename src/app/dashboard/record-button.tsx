@@ -151,12 +151,12 @@ export default function RecordButton({
               if (e.key === 'Escape') { chunksRef.current = []; setPhase('idle') }
             }}
             placeholder="e.g. game changeup strikeout 9/27"
-            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080] max-sm:min-h-11"
           />
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => { chunksRef.current = []; setPhase('idle') }}
-              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors"
+              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors max-sm:min-h-11"
               style={oswald}
             >
               Discard
@@ -164,7 +164,7 @@ export default function RecordButton({
             <button
               onClick={() => { if (title.trim()) { setPhase('uploading'); uploadRecording(pendingMime.current, title.trim()) } }}
               disabled={!title.trim()}
-              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40"
+              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 max-sm:min-h-11"
               style={oswald}
             >
               Upload
@@ -254,7 +254,7 @@ export default function RecordButton({
       {error && <p className="text-xs text-[#C8102E]">{error}</p>}
       <button
         onClick={openCamera}
-        className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5"
+        className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 max-sm:min-h-11"
       >
         <span className="w-2 h-2 rounded-full bg-[#C8102E] shrink-0" />
         Record
