@@ -35,6 +35,15 @@ export type ClipAccess =
   | { allowed: true; via: 'player' | 'coach' | 'guardian' | 'team_coach'; teamCheck: 'ok' | 'unavailable' | 'skipped' }
   | { allowed: false; teamCheck: 'ok' | 'unavailable' | 'skipped' }
 
+/**
+ * Delete buttons for saved pitch rows and hitting data: only the player's
+ * direct coach (players.coach_id), the same rule pitch_metrics RLS enforces.
+ * Team coaches, the player and guardians can view but not delete.
+ */
+export function canDeleteSavedMetrics(access: ClipAccess): boolean {
+  return access.allowed && access.via === 'coach'
+}
+
 /** Pure decision for the direct relationships (no team lookup). */
 export function directAccess(userId: string, player: AccessPlayer, guardianUserId: string | null): 'player' | 'coach' | 'guardian' | null {
   if (!userId) return null

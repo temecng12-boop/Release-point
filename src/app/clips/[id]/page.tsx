@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { canViewPlayerContent } from '@/lib/clip-access'
+import { canViewPlayerContent, canDeleteSavedMetrics } from '@/lib/clip-access'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -38,7 +38,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   // the skeleton.
   return (
     <Suspense fallback={<ClipSkeleton />}>
-      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} />
+      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} />
     </Suspense>
   )
 }
@@ -54,12 +54,14 @@ type ClipRow = {
   voice_path: string | null
 }
 
-async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
+async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics }: {
   id: string
   clip: ClipRow
   userId: string
   /** False for guardians: they see a notice instead of the AI Coach. */
   aiCoachAvailable: boolean
+  /** Only the player's direct coach may delete saved pitch rows / hitting data (same rule as RLS). */
+  canDeleteMetrics: boolean
 }) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
@@ -298,6 +300,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable }: {
             initialVoiceUrl={voiceUrl}
             initialTsNotes={tsNotes ?? []}
             initialMetrics={(rawMetrics ?? []) as Metric[]}
+            canDeleteMetrics={canDeleteMetrics}
             initialChecklist={phaseChecklist}
             initialHittingMetrics={hittingMetrics}
             playerName={playerRow?.full_name ?? 'Player'}
