@@ -53,13 +53,15 @@ export async function invitePlayer(
 
   // Resolve player id — either newly inserted or existing (on duplicate key)
   let playerId = player?.id ?? null
+  let alreadyOnRoster = false
   if (playerError?.code === '23505') {
     // Player with this email already exists — could be unlinked or another coach's player
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('players')
       .select('id, coach_id')
       .eq('email', playerEmail)
       .maybeSingle()
+    if (existingError || !existing) return { error: 'Could not check this player. Please try again.' }
 
     if (existing) {
       if (!existing.coach_id) {
@@ -68,6 +70,7 @@ export async function invitePlayer(
         return { error: SELF_SIGNED_UP_PLAYER_MESSAGE }
       } else if (existing.coach_id === user.id) {
         playerId = existing.id
+        alreadyOnRoster = true
       } else {
         return { error: 'This player is already linked to another coach.' }
       }
@@ -75,11 +78,13 @@ export async function invitePlayer(
   }
 
   // Assign teams via junction table (new assignments only, ignore duplicates)
-  if (playerId && teamIds.length > 0) {
-    await supabaseAdmin.from('player_teams').upsert(
+  if (!playerId) return { error: 'Could not add this player. Please try again.' }
+  if (teamIds.length > 0) {
+    const { error: teamsAssignError } = await supabaseAdmin.from('player_teams').upsert(
       teamIds.map((tid) => ({ player_id: playerId, team_id: tid })),
       { onConflict: 'player_id,team_id', ignoreDuplicates: true }
     )
+    if (teamsAssignError) return { error: 'Player added, but they could not be added to the team. Please try again.' }
   }
 
   // Generate invite link via Supabase, send email via Resend
@@ -93,23 +98,48 @@ export async function invitePlayer(
     },
   })
 
-  if (linkErr && !linkErr.message.toLowerCase().includes('already')) {
+  // QA-016: Supabase refuses an invite link for an email that already has an
+  // account. No setup email is sent then, so the message must not promise one.
+  const hasAccount = !!linkErr && (linkErr.code === 'email_exists' || linkErr.message.toLowerCase().includes('already'))
+  if (linkErr && !hasAccount) {
     return { error: `Player added but invite link failed: ${linkErr.message}` }
   }
 
-  if (linkData?.properties?.action_link) {
-    const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
-    const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'
-    await sendPlayerInviteEmail({
+  if (hasAccount) {
+    revalidatePath('/', 'layout')
+    return { success: existingAccountMessage(playerEmail, alreadyOnRoster, teamIds.length) }
+  }
+
+  const inviteUrl = linkData?.properties?.action_link
+  if (!inviteUrl) return { error: 'Player added, but the invite email could not be created. Please try again.' }
+  const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
+  const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'
+  let sent: { error?: string }
+  try {
+    sent = await sendPlayerInviteEmail({
       toEmail: playerEmail,
       playerName: playerName || undefined,
       coachName,
-      inviteUrl: linkData.properties.action_link,
+      inviteUrl,
     })
+  } catch (err) {
+    sent = { error: err instanceof Error ? err.message : 'unknown error' }
+  }
+  revalidatePath('/', 'layout')
+  if (sent.error) {
+    console.error('[invite] invite email not sent', sent.error)
+    return { error: `Player added, but the invite email could not be sent (${sent.error}). Please try again.` }
   }
 
-  revalidatePath('/', 'layout')
   return {
     success: `Invite sent to ${playerEmail}! ${playerName ? `${playerName} will` : 'They will'} receive an email to set up their account.`,
   }
+}
+
+/** Success text when the email already has an account (no email is sent). */
+function existingAccountMessage(email: string, alreadyOnRoster: boolean, teamCount: number): string {
+  const teams = teamCount > 0 ? ` and to the selected team${teamCount === 1 ? '' : 's'}` : ''
+  return alreadyOnRoster
+    ? `${email} already has an account and is already on your roster${teamCount > 0 ? `. They've been added to the selected team${teamCount === 1 ? '' : 's'}` : ''}. No email was sent.`
+    : `${email} already has an account and has been added to your roster${teams}. No email was sent.`
 }
