@@ -157,7 +157,8 @@ export default function MetricsTab({
 
   // ── Handle file selection ──────────────────────────────────────────────
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const input = e.target
+    const file = input.files?.[0]
     if (!file) return
     setSaveError(null)
     setCsvSkipped(null)
@@ -174,6 +175,9 @@ export default function MetricsTab({
       console.error('[csv import] could not read file', reader.error)
       setSaveError('Couldn\'t read this file. Try exporting the CSV again.')
     }
+    // Clear the picker once the file is read, so picking the same file again
+    // (e.g. after fixing it) fires onChange and imports it again.
+    reader.onloadend = () => { input.value = '' }
     reader.readAsText(file)
   }
 

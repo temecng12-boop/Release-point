@@ -106,3 +106,12 @@ test('works the same in WebKit: plain string code, FileReader text, .csv and tex
   assert.match(tab, /reader\.onerror = /)
   assert.doesNotMatch(tab, /split\(','\)/)
 })
+
+test('re-picking the same CSV imports it again: the picker is cleared once the file is read', () => {
+  const tab = readFileSync(new URL('../../app/clips/[id]/metrics-tab.tsx', import.meta.url), 'utf8')
+  const handler = tab.slice(tab.indexOf('function handleFile('), tab.indexOf('// ── Save parsed rows'))
+  assert.match(handler, /const input = e\.target/)
+  assert.match(handler, /reader\.onloadend = \(\) => \{ input\.value = '' \}/)
+  // Cleared after the read starts being handled, for success and error alike.
+  assert.ok(handler.indexOf('reader.onloadend') < handler.indexOf('reader.readAsText(file)'))
+})
