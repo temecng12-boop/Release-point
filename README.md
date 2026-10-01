@@ -39,8 +39,9 @@ from it.
 Email links come back to `/auth/confirm` and `/auth/callback`, including the
 password reset link (`/auth/confirm?next=%2Fauth%2Freset`). Allow
 `https://releasepointai.com/auth/confirm**` and `https://releasepointai.com/auth/callback**`.
-`NEXT_PUBLIC_SITE_URL` must be set to the site's origin, because reset links are
-built from it.
+Reset links are built from `NEXT_PUBLIC_SITE_URL`, falling back to
+`https://releasepointai.com` when it is unset. For local dev, set
+`NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local`.
 
 ## Learn More
 

@@ -18,13 +18,17 @@ export const RESET_LINK_INVALID =
 export const RESET_NO_SESSION =
   'This page only works from a password reset link. Request a new one.'
 
+/** Used when NEXT_PUBLIC_SITE_URL is unset, the same fallback as invite emails (invite.ts, email.ts). */
+export const PRODUCTION_SITE_URL = 'https://releasepointai.com'
+
 /**
  * The redirectTo sent with the reset email. Fixed: built only from the site
- * URL (the same NEXT_PUBLIC_SITE_URL the app uses for emailRedirectTo), never
- * from user input or the current page. Only the site URL's origin is used.
+ * URL (NEXT_PUBLIC_SITE_URL, else production), never from user input or the
+ * current page. Only the site URL's origin is used. Local dev sets
+ * NEXT_PUBLIC_SITE_URL=http://localhost:3000.
  */
 export function passwordResetRedirectUrl(siteUrl: string | undefined = process.env.NEXT_PUBLIC_SITE_URL): string {
-  const origin = new URL(siteUrl || 'http://localhost:3000').origin
+  const origin = new URL(siteUrl || PRODUCTION_SITE_URL).origin
   return `${origin}/auth/confirm?next=${encodeURIComponent(RESET_PATH)}`
 }
 

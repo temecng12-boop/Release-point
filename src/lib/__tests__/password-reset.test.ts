@@ -18,7 +18,11 @@ test('redirectTo is fixed and same-origin with the site URL', () => {
   // Only the origin of the site URL is used (trailing slash, path, query ignored).
   assert.equal(passwordResetRedirectUrl('https://releasepointai.com/'), 'https://releasepointai.com/auth/confirm?next=%2Fauth%2Freset')
   assert.equal(passwordResetRedirectUrl('https://releasepointai.com/x?next=//evil.example'), 'https://releasepointai.com/auth/confirm?next=%2Fauth%2Freset')
-  assert.equal(passwordResetRedirectUrl(undefined), 'http://localhost:3000/auth/confirm?next=%2Fauth%2Freset')
+  // Unset (or empty) falls back to production, like invite emails; never localhost.
+  assert.equal(passwordResetRedirectUrl(undefined), 'https://releasepointai.com/auth/confirm?next=%2Fauth%2Freset')
+  assert.equal(passwordResetRedirectUrl(''), 'https://releasepointai.com/auth/confirm?next=%2Fauth%2Freset')
+  // Local dev works through the variable.
+  assert.equal(passwordResetRedirectUrl('http://localhost:3000'), 'http://localhost:3000/auth/confirm?next=%2Fauth%2Freset')
   for (const site of ['https://releasepointai.com', 'http://localhost:3000', 'https://preview-abc.vercel.app']) {
     const u = new URL(passwordResetRedirectUrl(site))
     assert.equal(u.origin, new URL(site).origin)
