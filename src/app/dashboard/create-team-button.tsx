@@ -20,7 +20,7 @@ export default function CreateTeamButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+        className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors whitespace-nowrap max-sm:min-h-11"
       >
         + New Team
       </button>

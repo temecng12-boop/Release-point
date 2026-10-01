@@ -47,7 +47,7 @@ export default function ClipTitle({ clipId, initialTitle }: { clipId: string; in
           if (e.key === 'Escape') { setValue(saved); setEditing(false) }
         }}
         disabled={saving}
-        className="text-base text-[#0F1F33] bg-transparent border-b border-[#456080] focus:outline-none w-full max-w-md disabled:opacity-50"
+        className="text-base text-[#0F1F33] bg-transparent border-b border-[#456080] focus:outline-none w-full max-w-md disabled:opacity-50 max-sm:min-h-11"
         style={os}
       />
     )
@@ -57,7 +57,7 @@ export default function ClipTitle({ clipId, initialTitle }: { clipId: string; in
     <div>
       <button
         onClick={() => { setError(null); setEditing(true) }}
-        className="group flex items-center gap-1.5 text-left hover:text-[#1C3A5C] transition-colors"
+        className="group flex items-center gap-1.5 text-left hover:text-[#1C3A5C] transition-colors max-sm:min-h-11"
         title="Click to rename"
       >
         <span className="text-base text-[#0F1F33] group-hover:text-[#1C3A5C]" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'capitalize' }}>{value}</span>

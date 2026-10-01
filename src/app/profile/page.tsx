@@ -231,7 +231,7 @@ export default async function ProfilePage() {
               <p className="text-sm text-[#0F1F33]" style={oswald}>Manage Roster</p>
               <p className="text-xs text-[#3D5166] mt-0.5">View teams, players, and clips</p>
             </div>
-            <Link href="/dashboard" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors" style={oswald}>
+            <Link href="/dashboard" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors max-sm:flex max-sm:items-center max-sm:min-h-11" style={oswald}>
               Go to Dashboard →
             </Link>
           </div>
