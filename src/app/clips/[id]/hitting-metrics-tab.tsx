@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { saveHittingMetrics } from '@/app/actions/clips'
+import { saveHittingMetrics, deleteHittingMetric, deleteAllHittingMetrics } from '@/app/actions/clips'
+import { runAction } from '@/lib/action-result'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -37,15 +38,26 @@ export default function HittingMetricsTab({
   clipId,
   role,
   initial,
+  canDelete = false,
 }: {
   clipId: string
   role: 'coach' | 'player'
   initial: HittingMetrics | null
+  /** Only the player's direct coach may delete saved hitting data. */
+  canDelete?: boolean
 }) {
   const [metrics,   setMetrics]   = useState<HittingMetrics>(initial ?? empty())
   const [saveState, setSaveState] = useState<SaveState>(initial ? 'saved' : 'idle')
   const [error,     setError]     = useState<string | null>(null)
   const isCoach = role === 'coach'
+  // Deleting saved values: they leave the screen only after the server
+  // confirmed the delete; on failure they stay and the error shows.
+  const [saved,       setSaved]       = useState<HittingMetrics>(initial ?? empty())
+  const [deletingKey, setDeletingKey] = useState<keyof HittingMetrics | null>(null)
+  const [confirmAll,  setConfirmAll]  = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const hasSaved = Object.values(saved).some(v => v !== null)
 
   function setValue(key: keyof HittingMetrics, raw: string) {
     const val = raw === '' ? null : parseFloat(raw)
@@ -62,8 +74,31 @@ export default function HittingMetricsTab({
       setError(result.error)
       setSaveState('error')
     } else {
+      setSaved(metrics)
       setSaveState('saved')
     }
+  }
+
+  async function handleDeleteMetric(key: keyof HittingMetrics) {
+    setDeletingKey(key)
+    setDeleteError(null)
+    const result = await runAction(() => deleteHittingMetric(clipId, key))
+    setDeletingKey(null)
+    if (!result.ok) { setDeleteError(`Not deleted: ${result.error}`); return }
+    setSaved(prev => ({ ...prev, [key]: null }))
+    setMetrics(prev => ({ ...prev, [key]: null }))
+  }
+
+  async function handleDeleteAllMetrics() {
+    setDeletingAll(true)
+    setDeleteError(null)
+    const result = await runAction(() => deleteAllHittingMetrics(clipId))
+    setDeletingAll(false)
+    if (!result.ok) { setDeleteError(`Not deleted: ${result.error}`); return }
+    setConfirmAll(false)
+    setSaved(empty())
+    setMetrics(empty())
+    setSaveState('idle')
   }
 
   const hasAny = Object.values(metrics).some(v => v !== null)
@@ -76,6 +111,13 @@ export default function HittingMetricsTab({
           <p className="text-xs text-[#3D5166]" style={os}>Hitting Data</p>
           <p className="text-[11px] text-[#8096AE] mt-0.5">Trackman session stats</p>
         </div>
+        <div className="flex items-center gap-2">
+        {canDelete && hasSaved && !confirmAll && (
+          <button type="button" onClick={() => { setConfirmAll(true); setDeleteError(null) }}
+            className="!min-h-11 px-2 text-[10px] tracking-widest text-[#3D5166] hover:text-[#C8102E] transition-colors" style={os}>
+            Delete all
+          </button>
+        )}
         {isCoach && hasAny && (
           <button
             onClick={handleSave}
@@ -90,7 +132,25 @@ export default function HittingMetricsTab({
             {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : 'Save'}
           </button>
         )}
+        </div>
       </div>
+
+      {canDelete && confirmAll && (
+        <div role="alertdialog" aria-label="Delete all hitting data" className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-lg border border-[#DDE4ED] bg-[#FFF5F5]">
+          <span className="text-xs text-[#456080]">Delete all saved hitting data on this clip? This can&apos;t be undone.</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handleDeleteAllMetrics} disabled={deletingAll}
+              className="!min-h-11 px-3 rounded text-xs text-white bg-[#C8102E] hover:bg-red-700 transition-colors disabled:opacity-50">
+              {deletingAll ? 'Deleting…' : 'Delete all'}
+            </button>
+            <button type="button" onClick={() => setConfirmAll(false)} disabled={deletingAll}
+              className="!min-h-11 px-3 text-xs text-[#3D5166] hover:text-[#456080] transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {deleteError && <p role="alert" className="text-xs text-[#C8102E]">{deleteError}</p>}
 
       {/* Fields */}
       <div className="grid grid-cols-2 gap-3">
@@ -98,7 +158,17 @@ export default function HittingMetricsTab({
           <div key={f.key} className="bg-[#F8FAFC] border border-[#DDE4ED] rounded-lg p-3 space-y-1.5">
             <div className="flex items-center justify-between">
               <p className="text-[10px] text-[#3D5166]" style={os}>{f.label}</p>
-              <span className="text-[9px] text-[#8096AE]" style={os}>{f.unit}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-[#8096AE]" style={os}>{f.unit}</span>
+                {canDelete && saved[f.key] != null && (
+                  <button type="button" onClick={() => handleDeleteMetric(f.key)} disabled={deletingKey !== null || deletingAll}
+                    aria-label={`Delete ${f.label}`}
+                    title={`Delete ${f.label}`}
+                    className="!min-h-11 !min-w-11 -my-3 -mr-2 inline-flex items-center justify-center rounded text-xs text-[#3D5166] hover:text-[#C8102E] hover:bg-[#FFF5F5] transition-colors disabled:opacity-40">
+                    {deletingKey === f.key ? '…' : '✕'}
+                  </button>
+                )}
+              </div>
             </div>
             {isCoach ? (
               <input

@@ -2,9 +2,10 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
-import { readPitchCsv, skippedSummary, type CsvPitchRow } from '@/lib/pitch-csv'
+import { readPitchCsv, skippedSummary, warningsSummary, type CsvPitchRow } from '@/lib/pitch-csv'
 import { createClient } from '@/lib/supabase/client'
-import { addPitchMetric } from '@/app/actions/clips'
+import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics } from '@/app/actions/clips'
+import { runAction } from '@/lib/action-result'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -89,6 +90,7 @@ export default function MetricsTab({
   playerAgeGroup,
   initialMetrics,
   onMetricsChange,
+  canDelete = false,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -97,6 +99,8 @@ export default function MetricsTab({
   playerPosition: string | null
   initialMetrics: MetricRow[]
   onMetricsChange?: (metrics: MetricRow[]) => void
+  /** Only the player's direct coach (the rule RLS enforces on pitch_metrics). */
+  canDelete?: boolean
 }) {
   const isCoach = role === 'coach'
   const fileRef = useRef<HTMLInputElement>(null)
@@ -112,6 +116,12 @@ export default function MetricsTab({
   }
   const [preview, setPreview] = useState<ParsedRow[] | null>(null)
   const [csvSkipped, setCsvSkipped] = useState<string | null>(null)
+  // Deleting saved pitch rows (QA-017): rows leave the table only after the
+  // server confirmed the delete; on failure they stay and the error shows.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmAll, setConfirmAll] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
+  const [metricDeleteError, setMetricDeleteError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [axisWarning, setAxisWarning] = useState<string | null>(null)
@@ -155,6 +165,27 @@ export default function MetricsTab({
     setManualSaving(false)
   }
 
+  async function handleDeleteMetric(id: string) {
+    setDeletingId(id)
+    setMetricDeleteError(null)
+    const result = await runAction(() => deletePitchMetric(id))
+    setDeletingId(null)
+    if (!result.ok) { setMetricDeleteError(`Pitch not deleted: ${result.error}`); return }
+    updateMetrics(prev => prev.filter(m => m.id !== id))
+  }
+
+  async function handleDeleteAllMetrics() {
+    setDeletingAll(true)
+    setMetricDeleteError(null)
+    const result = await runAction(() => deleteAllPitchMetrics(clipId))
+    setDeletingAll(false)
+    if (!result.ok) { setMetricDeleteError(`Pitches not deleted: ${result.error}`); return }
+    const removed = new Set(result.value && 'removedIds' in result.value ? result.value.removedIds ?? [] : [])
+    setConfirmAll(false)
+    updateMetrics(prev => prev.filter(m => !removed.has(m.id)))
+    if (metrics.some(m => !removed.has(m.id))) setMetricDeleteError('Some pitches weren\'t deleted. Refresh the page and try again.')
+  }
+
   // ── Handle file selection ──────────────────────────────────────────────
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const input = e.target
@@ -168,7 +199,8 @@ export default function MetricsTab({
       const result = readPitchCsv(typeof reader.result === 'string' ? reader.result : '')
       if (!result.ok) { setSaveError(result.error); return }
       // Rows that can't be read are listed, never saved quietly (QA-014).
-      setCsvSkipped(skippedSummary(result.skipped))
+      // Stray quotes don't stop the import but are pointed out.
+      setCsvSkipped([skippedSummary(result.skipped), warningsSummary(result.warnings)].filter(Boolean).join(' ') || null)
       setPreview(result.rows)
     }
     reader.onerror = () => {
@@ -208,6 +240,7 @@ export default function MetricsTab({
       setAxisWarning(warning)
       updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPreview(null)
+      setCsvSkipped(null)   // the skipped-rows note was about this import; it's done now
       if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save')
@@ -421,8 +454,32 @@ export default function MetricsTab({
               <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Pitch Analytics</p>
               <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Compatible with TrackMan exports</p>
             </div>
-            <p className="text-[10px] text-[#3D5166]/50">{metrics.length} pitch{metrics.length !== 1 ? 'es' : ''}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-[#3D5166]/50">{metrics.length} pitch{metrics.length !== 1 ? 'es' : ''}</p>
+              {canDelete && !confirmAll && (
+                <button type="button" onClick={() => { setConfirmAll(true); setMetricDeleteError(null) }}
+                  className="!min-h-11 px-2 text-[10px] tracking-widest text-[#3D5166] hover:text-[#C8102E] transition-colors" style={oswald}>
+                  Delete all
+                </button>
+              )}
+            </div>
           </div>
+          {canDelete && confirmAll && (
+            <div role="alertdialog" aria-label="Delete all pitches" className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] bg-[#FFF5F5]">
+              <span className="text-xs text-[#456080]">Delete all {metrics.length} pitch{metrics.length !== 1 ? 'es' : ''} on this clip? This can&apos;t be undone.</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={handleDeleteAllMetrics} disabled={deletingAll}
+                  className="!min-h-11 px-3 rounded text-xs text-white bg-[#C8102E] hover:bg-red-700 transition-colors disabled:opacity-50">
+                  {deletingAll ? 'Deleting…' : 'Delete all'}
+                </button>
+                <button type="button" onClick={() => setConfirmAll(false)} disabled={deletingAll}
+                  className="!min-h-11 px-3 text-xs text-[#3D5166] hover:text-[#456080] transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {metricDeleteError && <p role="alert" className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#C8102E]">{metricDeleteError}</p>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -441,6 +498,7 @@ export default function MetricsTab({
                       {h.label}
                     </th>
                   ))}
+                  {canDelete && <th className="px-1 py-2"><span className="sr-only">Delete</span></th>}
                 </tr>
               </thead>
               <tbody>
@@ -486,6 +544,16 @@ export default function MetricsTab({
                     <td className="px-3 py-2.5 text-[#0F1F33] font-mono">
                       {m.vaa != null ? m.vaa.toFixed(1) : <span className="text-[#3D5166]/40">—</span>}
                     </td>
+                    {canDelete && (
+                      <td className="px-1 py-1 text-right">
+                        <button type="button" onClick={() => handleDeleteMetric(m.id)} disabled={deletingId !== null || deletingAll}
+                          aria-label={`Delete pitch ${m.pitch_type ?? ''}${m.velocity != null ? ` ${m.velocity.toFixed(1)} mph` : ''}`.trim()}
+                          title="Delete this pitch"
+                          className="!min-h-11 !min-w-11 inline-flex items-center justify-center rounded text-xs text-[#3D5166] hover:text-[#C8102E] hover:bg-[#FFF5F5] transition-colors disabled:opacity-40">
+                          {deletingId === m.id ? '…' : '✕'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

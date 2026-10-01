@@ -60,3 +60,28 @@ test('the checker catches the claims it looks for', () => {
     assert.ok(!BANNED.some(([, re]) => re.test(s)), `false positive: ${s}`)
   }
 })
+
+test('about page: no realtime claim, and coach access described with team coaches', () => {
+  const about = read('app/about/page.tsx')
+  assert.doesNotMatch(about, /instantly|real-time data|the moment a coach saves/i)
+  assert.doesNotMatch(about, /coach can only query their own players/i)
+  assert.match(about, /players on teams they coach/)
+})
+
+test('about page: security and access claims match the code', () => {
+  const about = read('app/about/page.tsx')
+  // Server reads use the service-role client with checks in code, so no claim
+  // that every query is enforced by row-level security.
+  assert.doesNotMatch(about, /every database query/i)
+  assert.match(about, /checks who you are and how you are connected to a player/)
+  assert.match(about, /row-level security rules also protect every table/)
+  // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
+  assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
+  assert.match(about, /the player, their coach, coaches of teams the player is on, and their linked parent or guardian/)
+  const access = read('lib/clip-access.ts')
+  for (const via of ["'player'", "'coach'", "'guardian'", "'team_coach'"]) assert.ok(access.includes(via), via)
+  // Signed clip links expire after an hour (3600 s) on the clip page.
+  assert.match(about, /signed links that expire after an hour/)
+  assert.match(read('app/clips/[id]/page.tsx'), /createSignedUrl\(clip\.storage_path, 3600\)/)
+  assert.doesNotMatch(about, /real-time collaboration/i)
+})

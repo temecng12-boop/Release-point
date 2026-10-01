@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
+import { formatClock, formatSeconds, lessonLengthSeconds, watchMediaDuration } from '@/lib/media-duration'
 import { runAction } from '@/lib/action-result'
 import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
@@ -215,7 +216,8 @@ function nccSearch(
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
-function fmtTime(t: number) { return (isFinite(t) ? t : 0).toFixed(2) + 's' }
+// Unknown values show "--", never 0.00s (QA-007).
+function fmtTime(t: number | null) { return formatSeconds(t) }
 
 function dbToShape(a: DbAnnotation): Shape {
   const shape: Shape = {
@@ -301,7 +303,7 @@ export default function VideoPlayer({
   // UI state
   const [playing,         setPlaying]         = useState(false)
   const [currentTime,     setCurrentTime]     = useState(0)
-  const [duration,        setDuration]        = useState(0)
+  const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
   const [tool,            setTool]            = useState('pointer')
   const [inkColor,        setInkColor]        = useState('#E9412F')
@@ -348,6 +350,12 @@ export default function VideoPlayer({
   const lessonChunksRef  = useRef<Blob[]>([])
   const lessonRafRef     = useRef<number | null>(null)
   const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Lesson length (QA-005): measured while recording when known, else the
+  // media duration once the browser has a finite one; "--:--" until then.
+  const lessonVideoRef   = useRef<HTMLVideoElement | null>(null)
+  const lessonStartRef   = useRef(0)
+  const [lessonRecordedSec, setLessonRecordedSec] = useState<number | null>(null)
+  const [lessonMediaSec,    setLessonMediaSec]    = useState<number | null>(null)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -603,8 +611,6 @@ export default function VideoPlayer({
     if (!video || !scrub) return
 
     function onLoadedMetadata() {
-      setDuration(video!.duration)
-      scrub!.max = String(Math.floor(video!.duration * 1000) || 1000)
       if (video!.videoWidth && video!.videoHeight) {
         setVideoAspect(video!.videoWidth / video!.videoHeight)
       }
@@ -625,8 +631,16 @@ export default function VideoPlayer({
     video.addEventListener('pause',          onPause)
     video.addEventListener('ended',          onEnded)
     window.addEventListener('resize',        resizeCanvas)
+    // Duration (QA-007): webm clips can report Infinity until resolved, and it
+    // can change later (durationchange). Shared with the lesson player.
+    const stopDuration = watchMediaDuration(video, (d) => {
+      setDuration(d)
+      scrub!.max = String(d != null ? Math.floor(d * 1000) || 1000 : 1000)
+    })
 
     return () => {
+      stopDuration()
+      setDuration(null)
       prevFrameRef.current = null
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       video.removeEventListener('timeupdate',     onTimeUpdate)
@@ -803,10 +817,13 @@ export default function VideoPlayer({
       micStream.getTracks().forEach(t => t.stop())
       canvasStream.getTracks().forEach(t => t.stop())
     }
-    recorder.onstop = () => {
+    lessonStartRef.current = 0
+    recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp }
+    recorder.onstop = (ev) => {
+      const recordedSec = lessonStartRef.current > 0 ? (ev.timeStamp - lessonStartRef.current) / 1000 : null
       releaseStreams()
       lessonRecRef.current = null
-      uploadLesson(mimeType)
+      uploadLesson(mimeType, recordedSec)
     }
     recorder.onerror = (ev) => {
       console.error('[lesson] recorder error', ev)
@@ -829,7 +846,7 @@ export default function VideoPlayer({
     setLessonPhase('saving')
   }
 
-  async function uploadLesson(mimeType: string) {
+  async function uploadLesson(mimeType: string, recordedSec: number | null) {
     // A fresh object per recording: re-recording used to reuse lesson.<ext>,
     // which already existed, so the non-upsert signed upload was rejected.
     const path = newLessonPath(playerId, clipId, mimeType)
@@ -859,14 +876,22 @@ export default function VideoPlayer({
     setLessonWarning(saveResult && 'warning' in saveResult && saveResult.warning ? saveResult.warning : null)
 
     const signedResult = await getLessonSignedUrl(path)
-    if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl ?? null)
+    if ('signedUrl' in signedResult) { setLessonRecordedSec(recordedSec); setLessonUrl(signedResult.signedUrl ?? null) }
     setLessonPhase('idle')
   }
 
   async function deleteLesson() {
     await deleteLessonPath(clipId)
     setLessonUrl(null)
+    setLessonRecordedSec(null)
   }
+
+  useEffect(() => {
+    const v = lessonVideoRef.current
+    if (!v || !lessonUrl || lessonPhase !== 'idle') return
+    const stop = watchMediaDuration(v, setLessonMediaSec)
+    return () => { stop(); setLessonMediaSec(null) }
+  }, [lessonUrl, lessonPhase])
 
   // ── reframe helpers ──────────────────────────────────────────────────────
   useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
@@ -1225,6 +1250,7 @@ export default function VideoPlayer({
           <div className="flex items-center justify-between mb-2">
             <p className="text-[0.68rem] text-[#8096AE] tracking-widest" style={oswald}>
               {isCoach ? 'Coach Lesson Recording' : 'Lesson from your coach'}
+              <span className="ml-2 tabular-nums" data-testid="lesson-length">{formatClock(lessonLengthSeconds(lessonRecordedSec, lessonMediaSec))}</span>
             </p>
             {isCoach && (
               <div className="flex gap-3">
@@ -1233,7 +1259,7 @@ export default function VideoPlayer({
               </div>
             )}
           </div>
-          <video src={lessonUrl} controls playsInline className="w-full rounded-lg" style={{ maxHeight: 300, background: '#000' }} />
+          <video ref={lessonVideoRef} src={lessonUrl} controls playsInline className="w-full rounded-lg" style={{ maxHeight: 300, background: '#000' }} />
         </div>
       )}
 
