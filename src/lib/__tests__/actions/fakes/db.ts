@@ -10,7 +10,9 @@ export type Op = { table: string; action: Action; values?: unknown; filters: Fil
 type Via = 'admin' | 'session'
 /** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
 export type RlsRule = (row: Row, action: Action, userId: string | null) => boolean
-type Failure = { table?: string; action?: Action; bucket?: string; error: DbError; times?: number }
+// Storage failures: { bucket } fails removes; { bucket, storageOp: 'list' } fails listings.
+// `when` (optional) makes the failure apply only while it returns true.
+type Failure = { table?: string; action?: Action; bucket?: string; storageOp?: 'list' | 'remove'; error: DbError; times?: number; when?: () => boolean }
 
 export const state = {
   tables: {} as Record<string, Row[]>,
@@ -40,7 +42,7 @@ export function resetFake(init: { tables?: Record<string, Row[]>; storage?: Reco
 export function fail(f: Failure) { state.failures.push(f) }
 
 function takeFailure(match: (f: Failure) => boolean): DbError | null {
-  const f = state.failures.find(x => (x.times === undefined || x.times > 0) && match(x))
+  const f = state.failures.find(x => (x.times === undefined || x.times > 0) && (!x.when || x.when()) && match(x))
   if (!f) return null
   if (f.times !== undefined) f.times--
   return f.error
@@ -143,9 +145,21 @@ export const fakeClient = {
       async createSignedUrl(path: string) {
         return { data: { signedUrl: `https://storage.test/${bucket}/${path}?token=t` }, error: null }
       },
+      async list(folder: string, opts: { limit?: number; offset?: number; search?: string } = {}) {
+        const error = takeFailure(f => f.bucket === bucket && f.storageOp === 'list')
+        if (error) return { data: null, error }
+        const files = new Set<string>(), folders = new Set<string>()
+        for (const p of state.storage[bucket] ?? []) {
+          if (!p.startsWith(`${folder}/`)) continue
+          const rest = p.slice(folder.length + 1).split('/')
+          if (rest.length === 1) { if (!opts.search || rest[0].startsWith(opts.search)) files.add(rest[0]) } else folders.add(rest[0])
+        }
+        const data = [...[...folders].map(name => ({ name, id: null })), ...[...files].map(name => ({ name, id: `obj-${name}` }))]
+        return { data: data.slice(opts.offset ?? 0, (opts.offset ?? 0) + (opts.limit ?? 100)), error: null }
+      },
       async remove(paths: string[]) {
         state.storageOps.push({ bucket, paths })
-        const error = takeFailure(f => f.bucket === bucket)
+        const error = takeFailure(f => f.bucket === bucket && f.storageOp !== 'list')
         if (error) return { data: null, error }
         state.storage[bucket] = (state.storage[bucket] ?? []).filter(p => !paths.includes(p))
         return { data: paths.map(name => ({ name })), error: null }
