@@ -1,0 +1,121 @@
+/**
+ * Clip actions: failed writes come back as errors, storage cleanup failures
+ * come back as warnings (the delete itself still stands), and Clear marks
+ * reports which marks the server actually deleted.
+ * Run with: npx tsx --tsconfig src/lib/__tests__/actions/tsconfig.json --test src/lib/__tests__/actions/clip-writes.test.ts
+ */
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { resetFake, fail, state } from './fakes/db'
+import { deleteClip, clearAnnotations, saveLessonPath, renameClip, deleteAnnotation } from '../../../app/actions/clips'
+
+const P = '11111111-1111-4111-8111-111111111111'
+const C = '33333333-3333-4333-8333-333333333333'
+const COACH = { id: 'coach', email: 'coach@example.com' }
+const VIDEO = `${P}/1700000000000.mp4`
+const VOICE = `${P}/${C}/voice.webm`
+const OLD_LESSON = `${P}/${C}/lesson-1-a.webm`
+const NEW_LESSON = `${P}/${C}/lesson-2-b.webm`
+
+function seed() {
+  resetFake({
+    user: COACH,
+    tables: {
+      clips: [{ id: C, player_id: P, title: 'Bullpen 1', storage_path: VIDEO, voice_path: VOICE, uploaded_by: COACH.id, lesson_path: OLD_LESSON }],
+      players: [{ id: P, coach_id: COACH.id, user_id: 'player-user', guardian_id: null, team_id: null }],
+      annotations: [
+        { id: 'a-mine-1', clip_id: C, created_by: COACH.id },
+        { id: 'a-mine-2', clip_id: C, created_by: COACH.id },
+        { id: 'a-player', clip_id: C, created_by: 'player-user' },
+      ],
+      timestamp_notes: [{ id: 'n1', clip_id: C }],
+      pitch_metrics: [{ id: 'm1', clip_id: C }],
+    },
+    storage: { clips: [VIDEO, VOICE], lessons: [OLD_LESSON] },
+  })
+}
+
+test('deleteClip: all good returns plain success and removes the files', async () => {
+  seed()
+  assert.deepEqual(await deleteClip(C), { success: true })
+  assert.equal(state.tables.clips.length, 0)
+  assert.deepEqual(state.storage, { clips: [], lessons: [] })
+})
+
+test('deleteClip: clips-bucket cleanup fails -> clip still deleted, warning returned', async () => {
+  seed()
+  fail({ bucket: 'clips', error: { message: 'storage unavailable' } })
+  const r = await deleteClip(C)
+  assert.equal(r.success, true)
+  assert.match(String((r as { warning?: string }).warning), /Clip deleted, but some of its files couldn't be cleaned up/)
+  assert.equal(state.tables.clips.length, 0)
+})
+
+test('deleteClip: lessons-bucket cleanup fails -> warning returned', async () => {
+  seed()
+  fail({ bucket: 'lessons', error: { message: 'storage unavailable' } })
+  const r = await deleteClip(C) as { success?: true; warning?: string }
+  assert.equal(r.success, true)
+  assert.ok(r.warning)
+})
+
+for (const table of ['annotations', 'timestamp_notes', 'pitch_metrics']) {
+  test(`deleteClip: ${table} delete fails -> error, clip row and files kept`, async () => {
+    seed()
+    fail({ table, action: 'delete', error: { code: '57014', message: 'timeout' } })
+    const r = await deleteClip(C)
+    assert.ok('error' in r && r.error)
+    assert.equal(state.tables.clips.length, 1)
+    assert.deepEqual(state.storageOps, [])
+  })
+}
+
+test('deleteClip: clip row delete fails -> error, no files removed', async () => {
+  seed()
+  fail({ table: 'clips', action: 'delete', error: { message: 'boom' } })
+  assert.ok('error' in await deleteClip(C))
+  assert.deepEqual(state.storageOps, [])
+})
+
+test('clearAnnotations: returns the ids it deleted (own marks only)', async () => {
+  seed()
+  const r = await clearAnnotations(C)
+  assert.ok('removedIds' in r)
+  assert.deepEqual([...(r.removedIds ?? [])].sort(), ['a-mine-1', 'a-mine-2'])
+  assert.deepEqual(state.tables.annotations.map(a => a.id), ['a-player'])
+})
+
+test('clearAnnotations: delete fails -> error, nothing deleted', async () => {
+  seed()
+  fail({ table: 'annotations', action: 'delete', error: { message: 'boom' } })
+  assert.deepEqual(await clearAnnotations(C), { error: 'boom' })
+  assert.equal(state.tables.annotations.length, 3)
+})
+
+test('deleteAnnotation and renameClip return the database error', async () => {
+  seed()
+  fail({ table: 'annotations', action: 'delete', error: { message: 'boom' } })
+  assert.deepEqual(await deleteAnnotation('a-mine-1'), { error: 'boom' })
+  fail({ table: 'clips', action: 'update', error: { message: 'rename failed' } })
+  assert.deepEqual(await renameClip(C, 'New title'), { error: 'rename failed' })
+})
+
+// Lessons phase 1 (#13): a new recording adds a lessons row and never deletes
+// older recordings, so there is no "previous file" cleanup to warn about.
+test('saveLessonPath: adds a lesson, keeps the previous recording, plain success', async () => {
+  seed()
+  state.tables.lessons = []
+  assert.deepEqual(await saveLessonPath(C, NEW_LESSON), { success: true })
+  assert.equal(state.tables.lessons.length, 1)
+  assert.equal(state.tables.clips[0].lesson_path, NEW_LESSON)
+  assert.deepEqual(state.storage.lessons, [OLD_LESSON])
+})
+
+test('saveLessonPath: lessons insert fails -> error, not success', async () => {
+  seed()
+  state.tables.lessons = []
+  fail({ table: 'lessons', action: 'insert', error: { message: 'boom' } })
+  const r = await saveLessonPath(C, NEW_LESSON)
+  assert.ok('error' in r, JSON.stringify(r))
+  assert.equal(state.tables.lessons.length, 0)
+})
