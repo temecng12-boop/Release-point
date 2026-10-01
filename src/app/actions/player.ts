@@ -28,7 +28,8 @@ export async function uploadAvatar(formData: FormData) {
 
   if (!signed?.signedUrl) return { error: 'Could not generate avatar URL' }
 
-  await supabaseAdmin.from('profiles').update({ avatar_url: signed.signedUrl }).eq('id', user.id)
+  const { error: profileError } = await supabaseAdmin.from('profiles').update({ avatar_url: signed.signedUrl }).eq('id', user.id)
+  if (profileError) return { error: 'Photo uploaded, but it couldn\'t be saved to your profile. Please try again.' }
   revalidatePath('/profile')
   return { success: true, avatarUrl: signed.signedUrl }
 }
@@ -86,16 +87,28 @@ export async function updatePlayer(playerId: string, data: {
   }
 
   // Sync team assignments, limited to this coach's own teams.
+  // A failure here is reported, not swallowed (the player's other fields are
+  // already saved by then).
   if (teamIds !== undefined && ownedTeamIds.length > 0) {
-    await supabaseAdmin
+    const { error: unlinkError } = await supabaseAdmin
       .from('player_teams')
       .delete()
       .eq('player_id', playerId)
       .in('team_id', ownedTeamIds)
+    if (unlinkError) {
+      console.error('[updatePlayer] team unlink failed', { code: unlinkError.code, message: unlinkError.message })
+      revalidatePath('/dashboard')
+      return { error: 'Player details saved, but team changes couldn\'t be saved. Please try again.' }
+    }
     if (teamIds.length > 0) {
-      await supabaseAdmin.from('player_teams').insert(
+      const { error: linkError } = await supabaseAdmin.from('player_teams').insert(
         teamIds.map((tid) => ({ player_id: playerId, team_id: tid }))
       )
+      if (linkError) {
+        console.error('[updatePlayer] team link failed', { code: linkError.code, message: linkError.message })
+        revalidatePath('/dashboard')
+        return { error: 'Player details saved, but team changes couldn\'t be saved. Please try again.' }
+      }
     }
   }
 
