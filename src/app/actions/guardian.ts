@@ -50,6 +50,18 @@ export async function recordConsent(playerId: string): Promise<{ error: string }
     return { error: CONSENT_FAILED }
   }
 
+  // Signup gives every account a 'player' profile, so a parent who signed up
+  // from the consent link is 'player'. Migration 029's function turns that into
+  // 'guardian' only if the role is 'player' and the account has no players row,
+  // clips or other data; anything else keeps its role. One conditional UPDATE
+  // in the database, called with the service role only.
+  const { error: roleError } = await supabaseAdmin
+    .rpc('promote_empty_player_to_guardian', { p_user_id: user.id })
+  if (roleError) {
+    console.error('[recordConsent] guardian role check failed', { code: roleError.code, message: roleError.message })
+    return { error: CONSENT_FAILED }
+  }
+
   const { data: consented, error: consentError } = await supabaseAdmin
     .from('players')
     .update({ consent_given_at: new Date().toISOString() })
