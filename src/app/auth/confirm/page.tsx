@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { linkPlayerRow } from '@/app/actions/auth'
 import { runAction } from '@/lib/action-result'
 import { safeRedirectPath } from '@/lib/safe-redirect'
+import { RESET_PATH } from '@/lib/password-reset'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -33,6 +34,12 @@ function ConfirmInner() {
 
       const hash = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
+
+      // Supabase sends an expired or used reset link back with ?error= (or #error=).
+      if (next === RESET_PATH && (searchParams.get('error') || hashParams.get('error'))) {
+        window.location.replace(`${window.location.origin}${RESET_PATH}?error=link`)
+        return
+      }
       const accessToken  = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
 
