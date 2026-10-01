@@ -79,7 +79,7 @@ function CoachForm({ onBack }: { onBack: () => void }) {
         </span>
       </label>
       {state?.error && (
-        <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+        <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
           <p className="text-sm text-[#E8102A]">{state.error}</p>
         </div>
       )}

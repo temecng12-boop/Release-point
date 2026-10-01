@@ -25,7 +25,7 @@ const HAS_CREDS      = !!(COACH_EMAIL && COACH_PASSWORD)
 
 async function signInAsCoach(page: Page) {
   await page.goto('/auth/login')
-  await page.getByRole('button', { name: /password/i }).click()
+  await page.getByRole('button', { name: 'Password', exact: true, pressed: true }).click()
   await page.getByLabel(/email/i).fill(COACH_EMAIL)
   await page.getByLabel(/password/i).fill(COACH_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
@@ -37,8 +37,10 @@ async function signInAsCoach(page: Page) {
 test('login page loads and shows both auth modes', async ({ page }) => {
   await page.goto('/auth/login')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /password/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /email link/i })).toBeVisible()
+  // The mode tabs (aria-pressed). "Email Link" also appears as an inline
+  // button under the password form, and "Forgot password?" contains "password".
+  await expect(page.getByRole('button', { name: 'Password', exact: true, pressed: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Email Link', exact: true, pressed: false })).toBeVisible()
 })
 
 test('login page has Apple and Google sign-in buttons', async ({ page }) => {

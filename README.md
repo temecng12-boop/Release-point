@@ -20,6 +20,28 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Supabase setup notes
+
+**Storage buckets must be Private.** The app serves stored files only through
+signed URLs (`createSignedUrl`) and never uses public URLs. The buckets the code uses:
+
+- `clips`: clip videos, coach voice notes (`<clipId>/voice/...`), and profile photos (`avatars/<userId>.<ext>`)
+- `lessons`: coach lesson recordings (created by migration 016 as private)
+
+In the Supabase dashboard, go to Storage, open each bucket's settings and turn
+"Public bucket" off. No migration is needed. The code doesn't create the `clips`
+bucket, so check it there. There is no separate `avatars` bucket: profile photos
+are stored in `clips`. Migrations 008/012 also create a public `profiles` bucket.
+The app no longer uploads to it; only account deletion still removes old avatars
+from it.
+
+**Auth redirect URLs** (Authentication → URL Configuration → Redirect URLs).
+Email links come back to `/auth/confirm` and `/auth/callback`, including the
+password reset link (`/auth/confirm?next=%2Fauth%2Freset`). Allow
+`https://releasepointai.com/auth/confirm**` and `https://releasepointai.com/auth/callback**`.
+`NEXT_PUBLIC_SITE_URL` must be set to the site's origin, because reset links are
+built from it.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
