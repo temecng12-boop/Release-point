@@ -6,7 +6,10 @@ export type Row = Record<string, unknown>
 export type DbError = { code?: string; message: string }
 type Action = 'select' | 'insert' | 'update' | 'upsert' | 'delete'
 type Filter = { kind: 'eq' | 'is' | 'in'; column: string; value: unknown }
-export type Op = { table: string; action: Action; values?: unknown; filters: Filter[] }
+export type Op = { table: string; action: Action; values?: unknown; filters: Filter[]; via: Via }
+type Via = 'admin' | 'session'
+/** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
+export type RlsRule = (row: Row, action: Action, userId: string | null) => boolean
 type Failure = { table?: string; action?: Action; bucket?: string; error: DbError; times?: number }
 
 export const state = {
@@ -17,6 +20,7 @@ export const state = {
   ops: [] as Op[],
   storageOps: [] as { bucket: string; paths: string[] }[],
   revalidated: [] as string[],
+  rls: {} as Record<string, RlsRule>,
 }
 
 let nextId = 1
@@ -29,6 +33,7 @@ export function resetFake(init: { tables?: Record<string, Row[]>; storage?: Reco
   state.ops = []
   state.storageOps = []
   state.revalidated = []
+  state.rls = {}
 }
 
 /** Make matching calls fail. `times` limits how many calls fail (default: all). */
@@ -63,7 +68,7 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   private mode: 'many' | 'single' | 'maybeSingle' = 'many'
   private max: number | undefined
   private upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {}
-  constructor(private table: string) {}
+  constructor(private table: string, private via: Via = 'admin') {}
 
   select(columns = '*') { if (this.action === 'select') this.columns = columns; else { this.returning = true; this.columns = columns } return this }
   insert(values: Row | Row[]) { this.action = 'insert'; this.values = values; return this }
@@ -79,19 +84,22 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   maybeSingle() { this.mode = 'maybeSingle'; return this }
 
   private run(): { data: unknown; error: DbError | null } {
-    state.ops.push({ table: this.table, action: this.action, values: this.values, filters: this.filters })
+    state.ops.push({ table: this.table, action: this.action, values: this.values, filters: this.filters, via: this.via })
     const error = takeFailure(f => f.bucket === undefined && (f.table === undefined || f.table === this.table) && (f.action === undefined || f.action === this.action))
     if (error) return { data: null, error }
     const rows = (state.tables[this.table] ??= [])
+    // Session client: RLS hides rows the user may not touch (no error, just fewer rows).
+    const rule = this.via === 'session' ? state.rls[this.table] : undefined
+    const visible = (r: Row) => !rule || rule(r, this.action, state.user?.id ?? null)
     let out: Row[] = []
     if (this.action === 'select') {
-      out = rows.filter(r => matches(r, this.filters))
+      out = rows.filter(r => matches(r, this.filters) && visible(r))
     } else if (this.action === 'insert') {
       const list = (Array.isArray(this.values) ? this.values : [this.values]) as Row[]
       out = list.map(v => ({ id: `id-${nextId++}`, ...v }))
       rows.push(...out)
     } else if (this.action === 'update') {
-      out = rows.filter(r => matches(r, this.filters))
+      out = rows.filter(r => matches(r, this.filters) && visible(r))
       for (const r of out) Object.assign(r, this.values as Row)
     } else if (this.action === 'upsert') {
       const key = this.upsertOpts.onConflict ?? 'id'
@@ -101,7 +109,7 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
         else { const r = { ...v }; rows.push(r); out.push(r) }
       }
     } else {
-      out = rows.filter(r => matches(r, this.filters))
+      out = rows.filter(r => matches(r, this.filters) && visible(r))
       state.tables[this.table] = rows.filter(r => !out.includes(r))
     }
     if (this.max !== undefined) out = out.slice(0, this.max)
@@ -120,6 +128,9 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
     return Promise.resolve().then(() => this.run()).then(onfulfilled, onrejected)
   }
 }
+
+/** The signed-in user's client (createClient in @/lib/supabase/server): subject to state.rls. */
+export const sessionFrom = (table: string) => new Query(table, 'session')
 
 export const fakeClient = {
   from: (table: string) => new Query(table),

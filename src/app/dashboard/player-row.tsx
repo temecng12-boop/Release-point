@@ -166,10 +166,12 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
                       <span className="text-sm text-[#0F1F33]" style={{ textTransform: 'capitalize' }}>{clip.title}</span>
                       <span className="text-xs text-[#456080]">{fmtDate(clip.session_date, clip.created_at)}</span>
                     </Link>
+                    {/* Always visible on touch screens (no hover there); revealed on hover with a mouse. */}
                     <button
                       onClick={() => setConfirmClip(clip.id)}
-                      className="ml-3 text-[#3D5166] hover:text-[#C8102E] opacity-0 group-hover:opacity-100 transition-all text-xs leading-none shrink-0"
+                      className="ml-3 text-[#3D5166] hover:text-[#C8102E] [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(pointer:coarse)]:!min-h-11 [@media(pointer:coarse)]:!min-w-11 inline-flex items-center justify-center transition-all text-xs leading-none shrink-0"
                       title="Delete clip"
+                      aria-label={`Delete clip ${clip.title}`}
                     >
                       ✕
                     </button>
