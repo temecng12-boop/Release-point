@@ -1,0 +1,13 @@
+PitchNo,Date,Time,Pitcher,PitcherId,PitcherThrows,PitcherTeam,TaggedPitchType,RelSpeed,SpinRate,SpinAxis,Tilt,RelHeight,RelSide,Extension,InducedVertBreak,HorzBreak,VertApprAngle,PlateLocHeight,PlateLocSide
+1,2026-09-28,16:11:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Fastball,86.8,2253,219.6,1:15,5.72,1.89,6.2,16.4,-7.2,-5.96,2.04,0.12
+2,2026-09-28,16:12:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Slider,76.4,2466,95.8,9:00,5.86,1.94,6.08,2.1,5.4,-6.62,2.75,0.22
+3,2026-09-28,16:13:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Curveball,71.5,2527,55.9,7:00,5.82,1.76,6.18,-12.7,8,-4.86,2.85,0.22
+4,2026-09-28,16:14:05,Testman Quinn,QA-90001,Right,QA_SYNTH,ChangeUp,80.7,1654,245.8,2:00,5.78,1.9,6.14,10.7,-10.1,-4.47,2.07,-0.02
+5,2026-09-28,16:15:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Fastball,85.4,2260,223.2,1:15,5.78,1.67,6.01,17.9,-8.8,-7.16,1.64,-0.01
+6,2026-09-28,16:16:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Slider,77.5,2510,113.3,9:00,5.94,1.81,6.06,4,6.8,-4.59,3.47,-0.2
+7,2026-09-28,16:17:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Curveball,72,2538,59.8,7:00,5.63,2.04,5.93,-9.6,8.7,-4.7,3.41,0.47
+8,2026-09-28,16:18:05,Testman Quinn,QA-90001,Right,QA_SYNTH,ChangeUp,77.8,1698,241.7,2:00,5.96,1.83,5.95,8.1,-11.8,-5.05,2.84,0.04
+9,2026-09-28,16:19:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Fastball,84,2347,209.3,1:15,5.79,1.75,6.1,17.4,-9.1,-4.3,1.78,-0.15
+10,2026-09-28,16:20:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Slider,79.7,2470,101.6,9:00,5.61,1.78,5.91,2.7,3.6,-4.86,1.74,-0.06
+11,2026-09-28,16:21:05,Testman Quinn,QA-90001,Right,QA_SYNTH,Curveball,72.5,2497,52.6,7:00,5.84,1.91,5.92,-12.5,8,-4.66,1.69,0.41
+12,2026-09-28,16:22:05,Testman Quinn,QA-90001,Right,QA_SYNTH,ChangeUp,80.5,1748,243.2,2:00,5.65,1.84,5.95,11.7,-11.7,-5.31,3.27,-0.78
