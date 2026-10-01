@@ -62,9 +62,20 @@ test('the email address never changes redirectTo (no user input in it)', async (
   assert.doesNotMatch(f.calls[0].redirectTo, /evil/)
 })
 
-test('errors are shown: rate limit, network failure, other Supabase errors, bad email', async () => {
-  const rl = await requestPasswordReset(fakeAuth({ error: { message: 'email rate limit exceeded', status: 429, code: 'over_email_send_rate_limit' } }).auth, 'c@example.com')
-  assert.deepEqual(rl, { ok: false, error: 'Too many reset requests. Wait a few minutes, then try again.' })
+test('a rate limit (429) gets the same neutral message as an unknown email', async () => {
+  const unknown = await requestPasswordReset(fakeAuth({ error: null }).auth, 'nobody@example.com')
+  for (const error of [
+    { message: 'email rate limit exceeded', status: 429, code: 'over_email_send_rate_limit' },
+    { message: 'For security purposes, you can only request this after 42 seconds.', status: 429, code: 'over_email_send_rate_limit' },
+    { message: 'Request rate limit reached', status: 429, code: 'over_request_rate_limit' },
+    { message: 'Too Many Requests', status: 429 },
+    { message: 'email rate limit exceeded', code: 'over_email_send_rate_limit' },
+  ]) {
+    assert.deepEqual(await requestPasswordReset(fakeAuth({ error }).auth, 'c@example.com'), unknown, error.message)
+  }
+})
+
+test('errors are shown: network failure, other Supabase errors, bad email', async () => {
   const net = await requestPasswordReset(fakeAuth('throw').auth, 'c@example.com')
   assert.equal(net.ok, false)
   assert.match((net as { error: string }).error, /Couldn't reach the server/)
@@ -111,6 +122,7 @@ test('reset page and login form: 44px targets and accessible errors', () => {
   assert.match(login, /inline-flex items-center !min-h-11 px-1[^"]*"\s*>\s*Forgot password\?/)
   assert.match(login, /id="forgot-error" role="alert"/)
   assert.match(login, /requestPasswordReset\(createClient\(\)\.auth, forgotEmail\)/)
+  assert.doesNotMatch(login, /Too many reset requests/)
 })
 
 test('copy: login says passwords are for coaches; signup error box is an alert; privacy mentions resets', () => {

@@ -6,6 +6,7 @@ import Logo from '@/components/Logo'
 import { signIn } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { requestPasswordReset, RESET_SENT_HINT } from '@/lib/password-reset'
+import { requestEmailLink } from '@/lib/email-link'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -64,14 +65,9 @@ export default function LoginPage() {
     e.preventDefault()
     setMagicPending(true)
     setMagicState({})
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({
-      email: magicEmail,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
+    const result = await requestEmailLink(createClient().auth, magicEmail, `${window.location.origin}/auth/callback`)
     setMagicPending(false)
-    if (error) setMagicState({ error: error.message })
-    else setMagicState({ success: 'Check your email for a sign-in link.' })
+    setMagicState(result.ok ? { success: result.message } : { error: result.error })
   }
 
   return (
@@ -123,7 +119,7 @@ export default function LoginPage() {
             <div className="p-8">
               <div className="mb-6">
                 <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Sign In</h1>
-                <p className="text-sm text-slate-500">Coaches: sign in with your password or an email link. Players: use an email link.</p>
+                <p className="text-sm text-slate-500">Coaches: use your password or an email link. Players sign up without a password, so use an email link.</p>
               </div>
 
               {/* Mode toggle */}
@@ -153,7 +149,7 @@ export default function LoginPage() {
               </div>
 
               {urlError && (
-                <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                <div role="alert" className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                   <p className="text-sm text-[#E8102A]">
                     {urlError === 'confirmation_failed'
                       ? 'That sign-in link has expired or already been used. Request a new one below.'
@@ -231,7 +227,7 @@ export default function LoginPage() {
                   </div>
                   <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2 max-sm:min-h-11 max-sm:min-w-11">Email Link</button> tab instead.</p>
                   {state?.error && (
-                    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{state.error}</p>
                     </div>
                   )}
@@ -258,7 +254,7 @@ export default function LoginPage() {
                     />
                   </div>
                   {magicState.error && (
-                    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{magicState.error}</p>
                     </div>
                   )}

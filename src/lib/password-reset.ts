@@ -32,15 +32,34 @@ export function passwordResetRedirectUrl(siteUrl: string | undefined = process.e
   return `${origin}/auth/confirm?next=${encodeURIComponent(RESET_PATH)}`
 }
 
-const NETWORK_ERROR = 'Couldn\'t reach the server. Check your connection and try again.'
+export const NETWORK_ERROR = 'Couldn\'t reach the server. Check your connection and try again.'
 
-type AuthErrorLike = { message: string; status?: number; code?: string; name?: string } | null
+export type AuthErrorLike = { message: string; status?: number; code?: string; name?: string } | null
 export type ResetRequestAuth = {
   resetPasswordForEmail(email: string, options: { redirectTo: string }): Promise<{ error: AuthErrorLike }>
 }
 export type ResetRequestResult = { ok: true; message: string } | { ok: false; error: string }
 
-/** Ask Supabase to send the reset email. Errors (rate limit, network) are returned, never hidden. */
+/** supabase-js returns (not throws) a fetch failure as status 0 / AuthRetryableFetchError. */
+export function isFetchFailure(error: NonNullable<AuthErrorLike>): boolean {
+  return error.status === 0 || error.name === 'AuthRetryableFetchError'
+}
+
+/**
+ * Supabase rate limits (HTTP 429). Some are per email address (a link was
+ * requested for it recently), so saying "too many requests" would tell
+ * someone that the address has an account. Callers show their neutral
+ * "sent" message instead.
+ */
+export function isRateLimited(error: NonNullable<AuthErrorLike>): boolean {
+  return error.status === 429 || error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit'
+}
+
+/**
+ * Ask Supabase to send the reset email. A rate limit (429) gets the same
+ * neutral message as an unknown email. Other errors (network, invalid
+ * email, Supabase failing to send) are returned, never hidden.
+ */
 export async function requestPasswordReset(auth: ResetRequestAuth, email: string): Promise<ResetRequestResult> {
   const address = email.trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return { ok: false, error: 'Enter the email address you sign in with.' }
@@ -51,11 +70,8 @@ export async function requestPasswordReset(auth: ResetRequestAuth, email: string
     return { ok: false, error: NETWORK_ERROR }
   }
   if (error) {
-    // supabase-js returns (not throws) a fetch failure as status 0 / AuthRetryableFetchError.
-    if (error.status === 0 || error.name === 'AuthRetryableFetchError') return { ok: false, error: NETWORK_ERROR }
-    if (error.status === 429 || error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
-      return { ok: false, error: 'Too many reset requests. Wait a few minutes, then try again.' }
-    }
+    if (isFetchFailure(error)) return { ok: false, error: NETWORK_ERROR }
+    if (isRateLimited(error)) return { ok: true, message: RESET_SENT_MESSAGE }
     return { ok: false, error: `Couldn't send the reset email: ${error.message}` }
   }
   return { ok: true, message: RESET_SENT_MESSAGE }
