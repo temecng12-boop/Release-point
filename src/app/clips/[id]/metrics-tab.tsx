@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
-import { readPitchCsv, skippedSummary, type CsvPitchRow } from '@/lib/pitch-csv'
+import { readPitchCsv, skippedSummary, warningsSummary, type CsvPitchRow } from '@/lib/pitch-csv'
 import { createClient } from '@/lib/supabase/client'
 import { addPitchMetric } from '@/app/actions/clips'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
@@ -168,7 +168,8 @@ export default function MetricsTab({
       const result = readPitchCsv(typeof reader.result === 'string' ? reader.result : '')
       if (!result.ok) { setSaveError(result.error); return }
       // Rows that can't be read are listed, never saved quietly (QA-014).
-      setCsvSkipped(skippedSummary(result.skipped))
+      // Stray quotes don't stop the import but are pointed out.
+      setCsvSkipped([skippedSummary(result.skipped), warningsSummary(result.warnings)].filter(Boolean).join(' ') || null)
       setPreview(result.rows)
     }
     reader.onerror = () => {
@@ -208,6 +209,7 @@ export default function MetricsTab({
       setAxisWarning(warning)
       updateMetrics(prev => [...prev, ...(data as MetricRow[])])
       setPreview(null)
+      setCsvSkipped(null)   // the skipped-rows note was about this import; it's done now
       if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save')
