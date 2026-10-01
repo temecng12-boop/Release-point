@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { parseCsv, readPitchCsv, skippedSummary, mapPitchRow } from '../pitch-csv'
+import { parseCsv, readPitchCsv, skippedSummary, warningsSummary, mapPitchRow } from '../pitch-csv'
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/csv/${name}`, import.meta.url), 'utf8')
 const fields = (r: Record<string, unknown>) => { const { _raw, ...f } = r; void _raw; return f }
@@ -114,4 +114,43 @@ test('re-picking the same CSV imports it again: the picker is cleared once the f
   assert.match(handler, /reader\.onloadend = \(\) => \{ input\.value = '' \}/)
   // Cleared after the read starts being handled, for success and error alike.
   assert.ok(handler.indexOf('reader.onloadend') < handler.indexOf('reader.readAsText(file)'))
+})
+
+test('a trailing comma on rows (and on the header) is ignored, not a column-count error', () => {
+  const rowsOnly = readPitchCsv('Pitch Type,Velocity\nFastball,92.1,\nSlider,84,\n')
+  assert.ok(rowsOnly.ok)
+  assert.deepEqual(rowsOnly.rows.map(r => [r.pitch_type, r.velocity]), [['Fastball', 92.1], ['Slider', 84]])
+  assert.deepEqual(rowsOnly.skipped, [])
+  const both = readPitchCsv('Pitch Type,Velocity,\nFastball,92.1,\nSlider,84\n')
+  assert.ok(both.ok)
+  assert.deepEqual(both.rows.map(r => r.velocity), [92.1, 84])
+  assert.deepEqual(both.skipped, [])
+  // A real extra value is still reported.
+  const extra = readPitchCsv('Pitch Type,Velocity\nFastball,92.1,x\n')
+  assert.ok(extra.ok)
+  assert.equal(extra.rows.length, 0)
+  assert.equal(extra.skipped[0].line, 2)
+})
+
+test('a stray quote is kept as text but warned about with its line number', () => {
+  const r = readPitchCsv('Pitch Type,Velocity\nFastball,92\nCut"ter,88\n"Slider"x,84\n')
+  assert.ok(r.ok)
+  assert.equal(r.rows.length, 3)
+  assert.equal(r.rows[1].pitch_type, 'Cut"ter')
+  assert.equal(r.warnings.length, 2)
+  assert.match(r.warnings[0], /^line 3 has a stray quote/)
+  assert.match(r.warnings[1], /^line 4 has a stray quote/)
+  assert.match(warningsSummary(r.warnings)!, /line 3.*line 4/)
+  const clean = readPitchCsv('Pitch Type,Velocity\n"Fastball, 4-seam",92\n"say ""hi""",90\n')
+  assert.ok(clean.ok)
+  assert.deepEqual(clean.warnings, [])
+  assert.equal(warningsSummary([]), null)
+})
+
+test('the page shows stray-quote warnings and clears the skipped-rows note after a successful save', () => {
+  const tab = readFileSync(new URL('../../app/clips/[id]/metrics-tab.tsx', import.meta.url), 'utf8')
+  assert.match(tab, /warningsSummary\(result\.warnings\)/)
+  const save = tab.slice(tab.indexOf('async function handleSave'), tab.indexOf('function handlePdfFile'))
+  const ok = save.slice(save.indexOf('if (error) throw error'), save.indexOf('} catch'))
+  assert.match(ok, /setCsvSkipped\(null\)/)
 })

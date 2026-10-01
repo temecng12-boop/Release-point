@@ -2,6 +2,7 @@
 // client after the caller's access has been checked; the pure helpers are
 // shared by the clip page, the player page and tests.
 import { canViewPlayerContent } from './clip-access'
+import { finiteDuration, formatClock } from './media-duration'
 
 export type LessonRow = {
   id: string
@@ -61,6 +62,18 @@ export function formatLessonDuration(ms: number | null | undefined): string | nu
   if (ms == null || !Number.isFinite(ms) || ms < 0) return null
   const s = Math.round(ms / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/**
+ * Length shown on a lesson row: the stored duration_ms when there is a real
+ * one; otherwise (older lessons saved before duration_ms) the media's own
+ * duration once the open player has a finite one; "--:--" while an open
+ * player is still working it out; nothing for a closed row.
+ */
+export function lessonRowDuration(storedMs: number | null | undefined, mediaSeconds: number | null | undefined, open: boolean): string | null {
+  if (storedMs != null && finiteDuration(storedMs / 1000) != null) return formatLessonDuration(storedMs)
+  if (finiteDuration(mediaSeconds) != null) return formatClock(mediaSeconds)
+  return open ? '--:--' : null
 }
 
 type Q = PromiseLike<{ data: unknown; error: DbError }> & {
