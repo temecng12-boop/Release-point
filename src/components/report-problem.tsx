@@ -3,7 +3,14 @@
 // "Report a problem": a small button in the sticky app header (so it never
 // sits over the video controls on clip pages) that opens a form. Sends the
 // text report even if the screenshot upload fails. See src/lib/feedback/.
-import { useEffect, useId, useRef, useState } from 'react'
+//
+// Sizing: globals.css has unlayered `button, a { min-height: 36px }` and
+// `header a, header button, header span { min-height: unset }`, which beat
+// Tailwind's layered min-h-* utilities. So every tap target here uses the
+// important variants (!min-h-11 / !min-h-12), and the dialog is portaled to
+// document.body so it isn't styled as part of the header.
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { submitFeedbackReport } from '@/app/actions/feedback'
 import { captureFromWindow } from '@/lib/feedback/capture'
@@ -26,11 +33,20 @@ function newId(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
+// false on the server and during hydration, true in the browser afterwards,
+// so the portal target (document.body) is only touched on the client.
+const noopSubscribe = () => () => {}
+function useIsClient(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false)
+}
+
 type Status = { tone: 'ok' | 'warn' | 'error'; text: string } | null
 type Uploaded = { file: File; path: string; mime: string; bytes: number }
 
 export default function ReportProblemButton() {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const isClient = useIsClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const ids = useId()
   const [message, setMessage] = useState('')
@@ -46,10 +62,16 @@ export default function ReportProblemButton() {
   useEffect(() => {
     const d = dialogRef.current
     if (!d) return
-    const onClose = () => { if (status?.tone === 'ok') setStatus(null) }
+    // Native modal <dialog>: showModal() makes the rest of the page inert
+    // (focus stays inside) and Esc closes it. On close, focus goes back to
+    // the header button explicitly, since the dialog lives under <body>.
+    const onClose = () => {
+      if (status?.tone === 'ok') setStatus(null)
+      triggerRef.current?.focus()
+    }
     d.addEventListener('close', onClose)
     return () => d.removeEventListener('close', onClose)
-  }, [status])
+  }, [status, isClient])
 
   function open() {
     setStatus(s => (s?.tone === 'ok' ? null : s))
@@ -134,10 +156,11 @@ export default function ReportProblemButton() {
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={open}
         aria-haspopup="dialog"
-        className={`inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 sm:min-w-0 px-2 rounded-md text-xs transition-colors hover:bg-[#FDEEF0] ${focus}`}
+        className={`inline-flex items-center justify-center gap-1.5 !min-h-11 !min-w-11 sm:!min-w-0 px-2 rounded-md text-xs transition-colors hover:bg-[#FDEEF0] ${focus}`}
         style={{ ...oswald, color: RED }}
       >
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -146,6 +169,7 @@ export default function ReportProblemButton() {
         <span className="sr-only sm:not-sr-only">Report a problem</span>
       </button>
 
+      {isClient && createPortal(
       <dialog
         ref={dialogRef}
         aria-labelledby={`${ids}-title`}
@@ -154,7 +178,7 @@ export default function ReportProblemButton() {
         <form onSubmit={onSubmit} noValidate className="px-5 pt-5 sm:px-6" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
           <div className="flex items-start justify-between gap-4">
             <h2 id={`${ids}-title`} className="text-lg tracking-wide" style={oswald}>Report a problem</h2>
-            <button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close" className={`-mr-2 -mt-1 min-h-11 min-w-11 rounded-md text-2xl leading-none text-[#45556C] hover:text-[#020618] ${focus}`}>×</button>
+            <button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close" className={`-mr-2 -mt-1 !min-h-11 !min-w-11 rounded-md text-2xl leading-none text-[#45556C] hover:text-[#020618] ${focus}`}>×</button>
           </div>
 
           <label htmlFor={`${ids}-msg`} className="mt-3 block text-sm font-semibold">What happened? <span className="font-normal text-[#45556C]">(required)</span></label>
@@ -185,7 +209,7 @@ export default function ReportProblemButton() {
           {file && (
             <p className="mt-1 flex items-center gap-2 text-sm text-[#314158]">
               <span className="truncate">{file.name}</span>
-              <button type="button" onClick={clearFile} className={`min-h-11 px-2 underline ${focus}`}>Remove</button>
+              <button type="button" onClick={clearFile} className={`!min-h-11 px-2 underline ${focus}`}>Remove</button>
             </p>
           )}
           {fileError && <p id={`${ids}-file-err`} role="alert" className="mt-1 text-sm" style={{ color: RED }}>{fileError}</p>}
@@ -202,11 +226,11 @@ export default function ReportProblemButton() {
           </div>
 
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={() => dialogRef.current?.close()} className={`min-h-12 rounded-[10px] px-4 text-[15px] tracking-wider text-[#023167] hover:bg-[#EEF3FA] ${focus}`} style={oswald}>Close</button>
+            <button type="button" onClick={() => dialogRef.current?.close()} className={`!min-h-12 rounded-[10px] px-4 text-[15px] tracking-wider text-[#023167] hover:bg-[#EEF3FA] ${focus}`} style={oswald}>Close</button>
             <button
               type="submit"
               disabled={sending}
-              className={`min-h-12 rounded-[10px] px-5 text-[15px] tracking-wider text-white disabled:opacity-60 ${focus}`}
+              className={`!min-h-12 rounded-[10px] px-5 text-[15px] tracking-wider text-white disabled:opacity-60 ${focus}`}
               style={{ ...oswald, background: RED }}
               onMouseEnter={e => { e.currentTarget.style.background = RED_HOVER }}
               onMouseLeave={e => { e.currentTarget.style.background = RED }}
@@ -215,7 +239,9 @@ export default function ReportProblemButton() {
             </button>
           </div>
         </form>
-      </dialog>
+      </dialog>,
+      document.body,
+      )}
     </>
   )
 }

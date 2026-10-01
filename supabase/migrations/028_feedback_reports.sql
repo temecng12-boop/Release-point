@@ -141,19 +141,35 @@ ON CONFLICT (id) DO UPDATE
       allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- True if the caller may upload another screenshot (same limits as reports).
+-- Takes a per-user transaction lock before counting, so two uploads running at
+-- the same time can't both see room under the limit: the second waits until
+-- the first commits, then counts it. (VOLATILE, so the count after the lock
+-- uses a fresh snapshot.)
 CREATE OR REPLACE FUNCTION public.feedback_screenshot_upload_allowed()
 RETURNS boolean
-LANGUAGE sql
-STABLE
+LANGUAGE plpgsql
+VOLATILE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  SELECT count(*) FILTER (WHERE o.created_at > now() - interval '10 minutes') < 5
-     AND count(*) < 20
+DECLARE
+  v_uid uuid := auth.uid();
+  v_10m int;
+  v_day int;
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN false;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('feedback_screenshots:' || v_uid::text));
+  SELECT count(*) FILTER (WHERE o.created_at > now() - interval '10 minutes'),
+         count(*)
+    INTO v_10m, v_day
     FROM storage.objects o
    WHERE o.bucket_id = 'feedback-screenshots'
-     AND o.name LIKE auth.uid()::text || '/%'
-     AND o.created_at > now() - interval '1 day'
+     AND o.name LIKE v_uid::text || '/%'
+     AND o.created_at > now() - interval '1 day';
+  RETURN v_10m < 5 AND v_day < 20;
+END;
 $$;
 REVOKE ALL ON FUNCTION public.feedback_screenshot_upload_allowed() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.feedback_screenshot_upload_allowed() TO authenticated;
