@@ -4,34 +4,63 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
-export async function recordConsent(playerId: string) {
+const CONSENT_FAILED = 'We couldn\'t record your consent. Please try again. If it keeps happening, contact your coach.'
+
+// Returns { error } to the form if any write fails; redirects to /guardian
+// only after all of them succeeded. Every write is idempotent (same values on
+// a retry), and consent is written last: if an earlier step fails, no consent
+// is on file and trying again finishes the job.
+export async function recordConsent(playerId: string): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: guardian } = await supabaseAdmin
+  const { data: guardian, error: guardianError } = await supabaseAdmin
     .from('guardians')
     .select('id, full_name')
     .eq('email', user.email!)
     .single()
 
+  // PGRST116: no guardian row for this email (handled as before).
+  if (guardianError && guardianError.code !== 'PGRST116') {
+    console.error('[recordConsent] guardian lookup failed', { code: guardianError.code, message: guardianError.message })
+    return { error: CONSENT_FAILED }
+  }
   if (!guardian) redirect('/auth/login')
 
-  await supabaseAdmin
+  const { error: linkError } = await supabaseAdmin
     .from('guardians')
     .update({ user_id: user.id })
     .eq('id', guardian.id)
+  if (linkError) {
+    console.error('[recordConsent] guardian link failed', { code: linkError.code, message: linkError.message })
+    return { error: CONSENT_FAILED }
+  }
 
-  await supabaseAdmin
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .upsert({ id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' })
+  if (profileError) {
+    console.error('[recordConsent] guardian profile failed', { code: profileError.code, message: profileError.message })
+    return { error: CONSENT_FAILED }
+  }
+
+  const { data: consented, error: consentError } = await supabaseAdmin
     .from('players')
     .update({ consent_given_at: new Date().toISOString() })
     .eq('id', playerId)
     .eq('guardian_id', guardian.id)
-
-  await supabaseAdmin
-    .from('profiles')
-    .upsert({ id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' })
+    .select('id')
+  if (consentError) {
+    console.error('[recordConsent] consent write failed', { code: consentError.code, message: consentError.message })
+    return { error: CONSENT_FAILED }
+  }
+  if (!consented || consented.length === 0) {
+    // Not this guardian's player (or it no longer exists): nothing was recorded.
+    console.error('[recordConsent] consent matched no player', { playerId, guardianId: guardian.id })
+    return { error: 'We couldn\'t record consent for this player. Ask your coach to check that your email is listed as the guardian.' }
+  }
 
   redirect('/guardian')
 }

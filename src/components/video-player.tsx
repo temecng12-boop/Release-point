@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
+import { runAction } from '@/lib/action-result'
+import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
@@ -344,6 +346,7 @@ export default function VideoPlayer({
   const [lessonPhase,    setLessonPhase]      = useState<'idle' | 'recording' | 'saving'>('idle')
   const [lessonSecs,     setLessonSecs]       = useState(0)
   const [lessonError,    setLessonError]      = useState<string | null>(null)
+  const [lessonWarning,  setLessonWarning]    = useState<string | null>(null)
   const lessonCanvasRef  = useRef<HTMLCanvasElement | null>(null)
   const lessonRecRef     = useRef<MediaRecorder | null>(null)
   const lessonChunksRef  = useRef<Blob[]>([])
@@ -565,7 +568,7 @@ export default function VideoPlayer({
           origin_time: d.originTime ?? 0,
         }).then(result => {
           if (result?.error) {
-            setMarkError(result.error)
+            setMarkError(`Mark not saved: ${result.error}`)
             annotationsRef.current = annotationsRef.current.filter(s => s !== d)
             setMarkList(prev => prev.filter(m => m.ref !== d))
             setMarkerCount(c => c - 1)
@@ -695,8 +698,15 @@ export default function VideoPlayer({
   }
   function selectTool(t: string)  { toolRef.current = t;     setTool(t) }
   function selectColor(c: string) { inkColorRef.current = c; setInkColor(c) }
+  // Marks leave the screen only after the server removed them; on failure
+  // they stay and the error is shown.
   async function removeAnnotation(shape: Shape) {
-    if (shape.id) await deleteAnnotation(shape.id)
+    // Still saving: removing it now would let the save land afterwards.
+    if (!shape.id) return
+    const id = shape.id
+    const result = await runAction(() => deleteAnnotation(id))
+    if (!result.ok) { setMarkError(`Mark not removed: ${result.error}`); return }
+    setMarkError(null)
     annotationsRef.current = annotationsRef.current.filter(s => s !== shape)
     setMarkList(prev => prev.filter(m => m.ref !== shape))
     setMarkerCount(c => c - 1)
@@ -704,9 +714,16 @@ export default function VideoPlayer({
   }
 
   async function clearMarks() {
-    await clearAnnotations(clipId)
-    annotationsRef.current = []; draftRef.current = null
-    setMarkList([]); setMarkerCount(0); drawFrame()
+    const result = await runAction(() => clearAnnotations(clipId))
+    if (!result.ok) { setMarkError(`Marks not cleared: ${result.error}`); return }
+    // Only the marks the server deleted (this coach's saved marks) leave the screen.
+    const removedIds = (result.value && 'removedIds' in result.value ? result.value.removedIds : undefined) ?? []
+    const { kept, removed } = marksAfterClear(annotationsRef.current, removedIds)
+    annotationsRef.current = kept; draftRef.current = null
+    setMarkList(prev => prev.filter(m => kept.includes(m.ref)))
+    setMarkerCount(c => c - removed)
+    setMarkError(kept.length > 0 ? 'Some marks weren\'t cleared: marks added by someone else, or still saving, stay on the clip.' : null)
+    drawFrame()
   }
   async function saveStamp() {
     if (!stampText.trim()) return
@@ -743,7 +760,7 @@ export default function VideoPlayer({
   }
 
   async function startLessonRecording() {
-    setLessonError(null)
+    setLessonError(null); setLessonWarning(null)
     const video = videoRef.current
     const overlay = overlayRef.current
     if (!video || !overlay) return
@@ -843,6 +860,7 @@ export default function VideoPlayer({
 
     const saveResult = await saveLessonPath(clipId, path)
     if (saveResult && 'error' in saveResult) { setLessonError('Saved video but failed to attach to clip. Try again.'); setLessonPhase('idle'); return }
+    setLessonWarning(saveResult && 'warning' in saveResult && saveResult.warning ? saveResult.warning : null)
 
     const signedResult = await getLessonSignedUrl(path)
     if ('signedUrl' in signedResult) setLessonUrl(signedResult.signedUrl ?? null)
@@ -1204,7 +1222,8 @@ export default function VideoPlayer({
             ● Record Lesson
           </button>
           {lessonError && <span className="text-xs text-[#C8102E]">{lessonError}</span>}
-          {lessonUrl && !lessonError && <span className="text-xs text-slate-400" style={oswald}>Lesson saved</span>}
+          {lessonUrl && !lessonError && !lessonWarning && <span className="text-xs text-slate-400" style={oswald}>Lesson saved</span>}
+          {lessonUrl && !lessonError && lessonWarning && <span role="status" className="text-xs text-[#8A5A00]">{lessonWarning}</span>}
         </div>
       )}
 
@@ -1240,8 +1259,9 @@ export default function VideoPlayer({
                 <span className="text-[#8096AE] tabular-nums">{m.time.toFixed(2)}s</span>
                 <button
                   onClick={() => removeAnnotation(m.ref)}
-                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none"
-                  title="Remove annotation"
+                  disabled={!m.ref.id}
+                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none disabled:opacity-40"
+                  title={m.ref.id ? 'Remove annotation' : 'Saving…'}
                 >
                   ✕
                 </button>
@@ -1255,7 +1275,7 @@ export default function VideoPlayer({
       <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
         {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">· coach annotations</span>}
-        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8102E]">Mark not saved: {markError}</p>}
+        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8102E]">{markError}</p>}
       </div>
     </div>
   )

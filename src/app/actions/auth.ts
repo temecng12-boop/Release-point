@@ -80,50 +80,72 @@ export async function signIn(_prevState: { error?: string } | undefined, formDat
 
 export async function signOut() {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  // Sign out this device only; other devices stay signed in (QA-012).
+  await supabase.auth.signOut({ scope: 'local' })
   redirect('/auth/login')
 }
 
-export async function linkPlayerRow() {
+// Links the signed-in player to their invited player row (or creates one).
+// Returns { error } if a step failed, so the confirm page can say so and offer
+// a retry; every step is safe to run again. The sign-in itself is not undone.
+const LINK_FAILED = 'You\'re signed in, but we couldn\'t connect your account to your player profile. Try again, or contact your coach if it keeps happening.'
+
+export async function linkPlayerRow(): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) return
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('[linkPlayerRow] no session after sign-in', userError?.message)
+    return { error: LINK_FAILED }
+  }
+  if (!user.email) return { success: true }
 
   const role     = (user.user_metadata?.role ?? 'player') as string
   const fullName = (user.user_metadata?.full_name ?? '') as string
   const now      = new Date().toISOString()
 
   // Ensure profile row exists
-  await supabaseAdmin
+  const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .upsert({ id: user.id, full_name: fullName, role }, { onConflict: 'id', ignoreDuplicates: true })
+  if (profileError) {
+    console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
+    return { error: LINK_FAILED }
+  }
 
-  if (role !== 'player') return
+  if (role !== 'player') return { success: true }
 
   // Link to an existing invited player record. Accepting an invite is not
   // guardian consent, and the coach's age choice from the invite stands.
-  const { data: linked } = await supabaseAdmin
+  const { data: linked, error: linkError } = await supabaseAdmin
     .from('players')
     .update({ user_id: user.id, accepted_at: now })
     .eq('email', user.email)
     .is('user_id', null)
     .select('id')
+  if (linkError) {
+    console.error('[linkPlayerRow] invite link failed', { code: linkError.code, message: linkError.message })
+    return { error: LINK_FAILED }
+  }
 
   // No invite — create a standalone player row
   if (!linked || linked.length === 0) {
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('players')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .limit(1)
+    if (existingError) {
+      console.error('[linkPlayerRow] player lookup failed', { code: existingError.code, message: existingError.message })
+      return { error: LINK_FAILED }
+    }
 
-    if (!existing) {
+    if (!existing || existing.length === 0) {
       // 18+ confirmation from the self-signup form (RP-041). No guardian
       // consent is recorded here.
       // Before migration 023 the adult columns don't exist; the row is then
       // created without them (see writeWithAdultFields).
       const adultConfirmed = user.user_metadata?.adult_confirmed === true
-      await writeWithAdultFields(
+      const { error: insertError } = await writeWithAdultFields(
         adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {},
         (adultFields) => supabaseAdmin.from('players').insert({
           user_id:     user.id,
@@ -133,8 +155,13 @@ export async function linkPlayerRow() {
           ...adultFields,
         }),
       )
+      if (insertError) {
+        console.error('[linkPlayerRow] player insert failed', { code: insertError.code, message: insertError.message })
+        return { error: LINK_FAILED }
+      }
     }
   }
+  return { success: true }
 }
 
 /**
@@ -172,7 +199,8 @@ export async function deleteAccount(): Promise<{ error: string } | undefined> {
     skipped: result.log,
   })
 
-  const { error: signOutError } = await supabase.auth.signOut()
+  // Account deleted: end every session of this account, on all devices.
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
   if (signOutError) console.warn('[deleteAccount] signOut after delete', { userId: user.id, error: signOutError.message })
   redirect('/auth/login')
 }

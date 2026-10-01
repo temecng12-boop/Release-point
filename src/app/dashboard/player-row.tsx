@@ -11,6 +11,7 @@ import EditPlayerModal from './edit-player-modal'
 import BullpenModal from './bullpen-modal'
 import type { BullpenSession } from './bullpen-modal'
 import { deleteClip } from '@/app/actions/clips'
+import { runAction } from '@/lib/action-result'
 
 interface Clip {
   id: string
@@ -54,16 +55,20 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
   const uploadAllowed = canUploadVideo(player)
+  const [deleteWarning, setDeleteWarning] = useState<string | null>(null)
 
   async function handleDeleteClip(clipId: string) {
     setDeletingClip(clipId)
     setDeleteError(null)
-    const result = await deleteClip(clipId)
+    setDeleteWarning(null)
+    const result = await runAction(() => deleteClip(clipId))
     setDeletingClip(null)
-    if (result?.error) {
+    if (!result.ok) {
       setDeleteError(result.error)
     } else {
       setConfirmClip(null)
+      // Deleted, but storage cleanup failed: say so instead of a clean success.
+      setDeleteWarning(result.warning)
     }
   }
 
@@ -142,6 +147,13 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
               action={<MarkAdultButton playerId={player.id} playerName={player.full_name} />}
             />
           </div>
+        )}
+
+        {deleteWarning && (
+          <p role="status" className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#8A5A00] bg-[#FFF8E6]">
+            {deleteWarning}
+            <button onClick={() => setDeleteWarning(null)} className="text-[#3D5166] hover:text-[#0F1F33]" aria-label="Dismiss">✕</button>
+          </p>
         )}
 
         {/* Clips list */}

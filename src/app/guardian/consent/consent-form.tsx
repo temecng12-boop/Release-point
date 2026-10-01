@@ -2,17 +2,25 @@
 
 import { useState } from 'react'
 import { recordConsent } from '@/app/actions/guardian'
+import { runAction } from '@/lib/action-result'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 export default function ConsentForm({ playerId }: { playerId: string }) {
   const [agreed, setAgreed] = useState(false)
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
+  // On success the server action redirects to /guardian; it only returns on failure.
   async function handleConsent() {
     if (!agreed) return
     setPending(true)
-    await recordConsent(playerId)
+    setError(null)
+    const result = await runAction(() => recordConsent(playerId))
+    if (!result.ok) {
+      setError(result.error)
+      setPending(false)
+    }
   }
 
   return (
@@ -29,6 +37,8 @@ export default function ConsentForm({ playerId }: { playerId: string }) {
           I am the parent or legal guardian of this player and I consent to video storage as described above.
         </span>
       </label>
+
+      {error && <p role="alert" className="text-sm text-[#C8102E]">{error}</p>}
 
       <button
         onClick={handleConsent}

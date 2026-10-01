@@ -3,7 +3,7 @@
  * Run with: npx tsx src/lib/__tests__/clip-notes.test.ts
  */
 
-import { normalizeClipNotes, CLIP_NOTES_MAX_LENGTH } from '../clip-notes'
+import { normalizeClipNotes, CLIP_NOTES_MAX_LENGTH, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } from '../clip-notes'
 
 let passed = 0
 let failed = 0
@@ -40,6 +40,17 @@ console.log('\n── normalizeClipNotes ─────────────
   const r = normalizeClipNotes('a'.repeat(CLIP_NOTES_MAX_LENGTH + 1))
   assert(!r.ok && r.error === 'Notes are too long (max 20,000 characters).', 'over the limit: rejected with the limit in the message', !r.ok ? r.error : '')
 }
+
+console.log('\n── isStaleClipNotesWrite (QA-002) ──────────────────────────────')
+assert(!isStaleClipNotesWrite('Stay tall', 'Stay tall'), 'same notes: not stale')
+assert(isStaleClipNotesWrite('Newer text from another tab', 'Stay tall'), 'notes changed elsewhere: stale')
+assert(isStaleClipNotesWrite('Saved text', null), 'stale page loaded empty notes, server has text: stale')
+assert(isStaleClipNotesWrite('Saved text', ''), 'stale page loaded blank notes, server has text: stale')
+assert(isStaleClipNotesWrite(null, 'Old text'), 'notes cleared elsewhere: stale')
+assert(!isStaleClipNotesWrite(null, null), 'both empty: not stale')
+assert(!isStaleClipNotesWrite(null, '   '), 'blank and null compare equal')
+assert(!isStaleClipNotesWrite('Saved text', undefined), 'no baseline sent: not checked')
+assert(CLIP_NOTES_CONFLICT_ERROR === 'This note changed elsewhere. Reload to see the latest.', 'conflict message text')
 
 const total = passed + failed
 console.log(`\n  ${passed}/${total} passed${failed > 0 ? `, ${failed} FAILED` : ' ✓'}`)

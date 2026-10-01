@@ -1,6 +1,6 @@
 'use server'
 import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
-import { normalizeClipNotes } from '@/lib/clip-notes'
+import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
@@ -14,6 +14,7 @@ import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-a
 import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
 import { checkUploadConsent } from '@/lib/consent-server'
+import { removeClipMediaAsOwnCoach } from '@/lib/clip-media-delete'
 
 // Loads the coach and account ids of the player a clip belongs to.
 async function playerForClip(clipId: string) {
@@ -266,9 +267,11 @@ export async function clearAnnotations(clipId: string) {
   const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
   if (player?.coach_id !== user.id) return { error: 'Not authorized' }
 
-  const { error } = await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId).eq('created_by', user.id)
+  // Only this coach's own marks are deleted; the ids tell the player which
+  // marks to take off the screen (src/lib/mark-clear.ts).
+  const { data: removed, error } = await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId).eq('created_by', user.id).select('id')
   if (error) return { error: error.message }
-  return { success: true }
+  return { success: true, removedIds: (removed ?? []).map(r => r.id as string) }
 }
 
 export async function saveTimestampNote(data: {
@@ -371,7 +374,11 @@ export async function saveLessonPath(clipId: string, lessonPath: string) {
   const previous = clip.lesson_path as string | null
   if (previous && previous !== lessonPath && isLessonPathFor(previous, clip.player_id, clipId)) {
     const { error: removeError } = await supabaseAdmin.storage.from('lessons').remove([previous])
-    if (removeError) console.warn('[saveLessonPath] could not remove previous lesson file', { previous, error: removeError.message })
+    if (removeError) {
+      console.warn('[saveLessonPath] could not remove previous lesson file', { previous, error: removeError.message })
+      revalidatePath(`/clips/${clipId}`)
+      return { success: true, warning: 'Lesson saved, but the previous recording couldn\'t be removed from storage.' }
+    }
   }
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
@@ -381,29 +388,10 @@ export async function deleteLessonPath(clipId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-  if (clip.lesson_path) {
-    await supabaseAdmin.storage.from('lessons').remove([clip.lesson_path])
-  }
-  await supabaseAdmin.from('clips').update({ lesson_path: null }).eq('id', clipId)
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
-}
-
-// The player, their direct coach, or a coach on one of their teams. Team
-// membership uses the shared rule in src/lib/clip-access.ts (players.team_id
-// plus player_teams), instead of a separate team_id-only lookup.
-async function isCoachForPlayer(userId: string, playerId: string): Promise<boolean> {
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('coach_id, team_id, user_id')
-    .eq('id', playerId)
-    .maybeSingle()
-  if (!player) return false
-  if (player.coach_id === userId || player.user_id === userId) return true
-  return isCoachOnPlayersTeam(userId, playerId, player.team_id as string | null)
+  // Only the player's own coach (see src/lib/clip-media-delete.ts).
+  const result = await removeClipMediaAsOwnCoach(supabaseAdmin, user.id, clipId, 'lesson')
+  if ('success' in result) revalidatePath(`/clips/${clipId}`)
+  return result
 }
 
 export async function deleteVoicePath(clipId: string) {
@@ -411,16 +399,10 @@ export async function deleteVoicePath(clipId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, voice_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!await isCoachForPlayer(user.id, clip.player_id)) return { error: 'Not authorized' }
-
-  if (clip.voice_path) {
-    await supabaseAdmin.storage.from('clips').remove([clip.voice_path])
-  }
-  await supabaseAdmin.from('clips').update({ voice_path: null }).eq('id', clipId)
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
+  // Only the player's own coach, as for saving (see src/lib/clip-media-delete.ts).
+  const result = await removeClipMediaAsOwnCoach(supabaseAdmin, user.id, clipId, 'voice')
+  if ('success' in result) revalidatePath(`/clips/${clipId}`)
+  return result
 }
 
 export async function saveVoicePath(clipId: string, voicePath: string) {
@@ -446,6 +428,8 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
 }
+
+const CLIP_FILES_CLEANUP_WARNING = 'Clip deleted, but some of its files couldn\'t be cleaned up.'
 
 export async function deleteClip(clipId: string) {
   const supabase = await createClient()
@@ -475,9 +459,12 @@ export async function deleteClip(clipId: string) {
   const { data: lessonRow } = await supabaseAdmin.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
   const lessonPath = (lessonRow as { lesson_path?: string | null } | null)?.lesson_path ?? null
 
-  await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
-  await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
-  await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
+  // Stop before the clip row if any of these fails, so a failed delete reports
+  // an error instead of a clip that silently lost its marks or notes.
+  for (const table of ['annotations', 'timestamp_notes', 'pitch_metrics']) {
+    const { error: childError } = await supabaseAdmin.from(table).delete().eq('clip_id', clipId)
+    if (childError) return { error: describeDbError(`deleteClip:${table}`, childError, 'Could not delete this clip.') }
+  }
 
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
@@ -485,19 +472,22 @@ export async function deleteClip(clipId: string) {
   // Files are removed only after the check above passed and the clip row is
   // gone, with the service client (the caller's session may not be allowed to
   // delete another uploader's files), and only inside this player's folder.
+  // A failed file removal doesn't undo the delete: it is logged and the
+  // caller gets a warning to show.
+  let cleanupFailed = false
   const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path])
   if (files.length > 0) {
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
-    if (storageError) console.error('[deleteClip] storage cleanup failed', clipId, storageError.message)
+    if (storageError) { console.error('[deleteClip] storage cleanup failed', clipId, storageError.message); cleanupFailed = true }
   }
   // Lesson recordings live in the lessons bucket.
   if (lessonPath && isLessonPathFor(lessonPath, clip.player_id as string, clipId)) {
     const { error: lessonError } = await supabaseAdmin.storage.from('lessons').remove([lessonPath])
-    if (lessonError) console.error('[deleteClip] lesson cleanup failed', clipId, lessonError.message)
+    if (lessonError) { console.error('[deleteClip] lesson cleanup failed', clipId, lessonError.message); cleanupFailed = true }
   }
 
   revalidatePath('/dashboard')
-  return { success: true }
+  return cleanupFailed ? { success: true, warning: CLIP_FILES_CLEANUP_WARNING } : { success: true }
 }
 
 export async function savePhaseChecklist(clipId: string, checklist: {
@@ -637,7 +627,7 @@ export async function saveReframe(clipId: string, reframe: { left: number; top: 
 // rule as the corrected 018 RLS policies. "Player's teams" means players.team_id
 // plus player_teams rows, because the app links players through player_teams.
 // Blank text clears the notes (stored as null); see src/lib/clip-notes.ts.
-export async function saveClipNotes(clipId: string, notes: string | null) {
+export async function saveClipNotes(clipId: string, notes: string | null, expectedNotes?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Your session has expired. Please sign in again.' }
@@ -647,7 +637,7 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
 
   const { data: clip, error: clipError } = await supabaseAdmin
     .from('clips')
-    .select('player_id')
+    .select('player_id, notes')
     .eq('id', clipId)
     .maybeSingle()
   if (clipError) return { error: describeDbError('saveClipNotes:clip', clipError, 'Could not save notes.') }
@@ -664,6 +654,13 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
     || await isCoachOnPlayersTeam(user.id, clip.player_id, player.team_id as string | null)
   if (!allowed) return { error: 'Only the player\'s coaches can edit these notes.' }
 
+  // Stale-write guard (QA-002): refuse to overwrite notes that changed since
+  // this client loaded or last saved them. No version column exists, so the
+  // notes text itself is the version (check-then-write; no migration).
+  if (isStaleClipNotesWrite(clip.notes as string | null, expectedNotes)) {
+    return { error: CLIP_NOTES_CONFLICT_ERROR, conflict: true }
+  }
+
   const { data: updated, error } = await supabaseAdmin
     .from('clips')
     .update({ notes: normalized.notes })
@@ -674,5 +671,5 @@ export async function saveClipNotes(clipId: string, notes: string | null) {
     console.error('[saveClipNotes] update matched no rows', { clipId })
     return { error: 'Could not save notes. Please refresh and try again.' }
   }
-  return { success: true }
+  return { success: true, notes: normalized.notes }
 }
