@@ -14,10 +14,11 @@ export async function sendPlayerInviteEmail({
   playerName?: string
   coachName: string
   inviteUrl: string
-}) {
-  if (!resend) return
+}): Promise<{ error?: string }> {
+  // The caller reports a failure instead of saying an email is on its way.
+  if (!resend) return { error: 'Email sending is not set up' }
   const greeting = playerName ? `Hey ${playerName},` : 'Hey,'
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: toEmail,
     subject: `${coachName} invited you to Release Point`,
@@ -45,6 +46,7 @@ export async function sendPlayerInviteEmail({
       </div>
     `,
   })
+  return error ? { error: error.message } : {}
 }
 
 export async function sendClipUploadedEmail({
