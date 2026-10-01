@@ -181,13 +181,13 @@ export default function AboutPage() {
             Purpose-built infrastructure<br />for player development data.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point is built on a modern full-stack architecture designed for real-time collaboration between coaches and players, with security and data privacy as a first-class concern.
+            Release Point is built on a modern full-stack architecture that lets coaches and players work from the same film, with security and data privacy as a first-class concern.
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
               {
                 label: 'Secure Video Storage',
-                desc: 'Every clip is stored in private cloud buckets with signed, time-limited access URLs. A player\'s video is only accessible to that player and their assigned coach.',
+                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, their coach, coaches of teams the player is on, and their linked parent or guardian.',
               },
               {
                 label: 'Shared Feedback',
@@ -198,8 +198,8 @@ export default function AboutPage() {
                 desc: 'Both AI agents run on Anthropic\'s Claude, streaming responses in real time. Context from the clip, including metrics, checklist, and coach notes, is sent with every conversation.',
               },
               {
-                label: 'Row-Level Security',
-                desc: 'Every database query enforces access at the row level. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
+                label: 'Access Checks',
+                desc: 'The app checks who you are and how you are connected to a player before it shows or changes their data, and the database\'s row-level security rules also protect every table. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
               },
               {
                 label: 'Cross-Device',
