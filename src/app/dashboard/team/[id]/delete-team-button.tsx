@@ -2,22 +2,39 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { deleteTeam } from '@/app/actions/team'
+import { deleteTeam, getTeamDeletePreview, type TeamDeletePreview } from '@/app/actions/team'
 import { runAction } from '@/lib/action-result'
+import { blockedLine, losingAccessLine } from '@/lib/team-delete-copy'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 // Inline, because globals.css sets an unlayered `button { min-height: 36px }`
 // that wins over Tailwind's min-h-* utilities.
 const tap = { minHeight: 44 }
 
-// Delete the team after a confirm step that names it. The screen only leaves
-// the team page once the server confirmed the delete; otherwise the dialog
-// stays open with the error and the team is unchanged.
+// Delete the team after a confirm step that names it and says, from the
+// server's counts, how many players coaches will stop seeing. Delete stays
+// disabled while the counts load, if they can't be loaded, and when a player
+// would be left with no coach (the server refuses that too). The screen only
+// leaves the team page once the server confirmed the delete; otherwise the
+// dialog stays open with the error and the team is unchanged.
 export default function DeleteTeamButton({ teamId, teamName }: { teamId: string; teamName: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [preview, setPreview] = useState<TeamDeletePreview | null>(null)
+  const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function openDialog() {
+    setOpen(true)
+    setPreview(null)
+    setError(null)
+    setLoading(true)
+    const result = await runAction(() => getTeamDeletePreview(teamId))
+    setLoading(false)
+    if (!result.ok) { setError(result.error); return }
+    setPreview(result.value.preview ?? null)
+  }
 
   async function handleDelete() {
     setDeleting(true)
@@ -25,6 +42,12 @@ export default function DeleteTeamButton({ teamId, teamName }: { teamId: string;
     const result = await runAction(() => deleteTeam(teamId))
     if (!result.ok) {
       setError(result.error)
+      setDeleting(false)
+      return
+    }
+    if (result.value.blocked !== undefined || !result.value.success) {
+      // Never treat a refused delete as success.
+      setError('The team was not deleted.')
       setDeleting(false)
       return
     }
@@ -38,11 +61,14 @@ export default function DeleteTeamButton({ teamId, teamName }: { teamId: string;
     setError(null)
   }
 
+  const blocked = preview !== null && preview.playersWithoutCoach > 0
+  const canDelete = preview !== null && !blocked && !loading && !deleting
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openDialog}
         className="px-4 rounded-md border border-[#C8102E]/40 text-[#C8102E] text-xs active:bg-red-50 transition-colors"
         style={{ ...oswald, ...tap }}
       >
@@ -64,13 +90,20 @@ export default function DeleteTeamButton({ teamId, teamName }: { teamId: string;
             <p id="delete-team-title" className="text-base text-[#0F1F33] mb-2 break-words" style={oswald}>
               Delete &ldquo;{teamName}&rdquo;?
             </p>
-            <p className="text-sm text-[#456080] leading-relaxed mb-4">
+            <p className="text-sm text-[#456080] leading-relaxed mb-3">
               The team, its roster list and its coaching staff list are removed. Players are not deleted: their clips and data stay on their profiles.
             </p>
-            {error && (
-              <p role="alert" className="text-sm text-[#C8102E] mb-4">{error}</p>
+            {loading && <p className="text-sm text-[#456080] mb-3">Checking this team&apos;s players…</p>}
+            {preview && (
+              <p className="text-sm text-[#0F1F33] leading-relaxed mb-3">{losingAccessLine(preview.playersLosingAccess)}</p>
             )}
-            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            {blocked && (
+              <p className="text-sm text-[#C8102E] leading-relaxed mb-3">{blockedLine(preview.playersWithoutCoach)}</p>
+            )}
+            {error && (
+              <p role="alert" className="text-sm text-[#C8102E] mb-3">{error}</p>
+            )}
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end mt-4">
               <button
                 type="button"
                 onClick={close}
@@ -83,8 +116,8 @@ export default function DeleteTeamButton({ teamId, teamName }: { teamId: string;
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 rounded-md bg-[#C8102E] text-white text-sm disabled:opacity-60"
+                disabled={!canDelete}
+                className="px-4 rounded-md bg-[#C8102E] text-white text-sm disabled:opacity-40"
                 style={tap}
               >
                 {deleting ? 'Deleting…' : 'Delete team'}
