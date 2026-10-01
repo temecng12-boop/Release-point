@@ -1,0 +1,14 @@
+{
+  // recordConsent with Supabase and next/navigation swapped for the fakes in
+  // ./fake.ts. Run with:
+  //   npx tsx --tsconfig src/lib/__tests__/guardian-profile/tsconfig.json --test src/lib/__tests__/guardian-profile/guardian-profile.test.ts
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/lib/supabase/admin": ["./fake.ts"],
+      "@/lib/supabase/server": ["./fake.ts"],
+      "next/navigation": ["./fake.ts"],
+      "@/*": ["../../../*"]
+    }
+  }
+}

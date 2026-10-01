@@ -29,9 +29,14 @@ export async function recordConsent(playerId: string) {
     .eq('id', playerId)
     .eq('guardian_id', guardian.id)
 
+  // Creates the guardian profile only if none exists. An existing profile
+  // (and its role) is never changed here.
   await supabaseAdmin
     .from('profiles')
-    .upsert({ id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' })
+    .upsert(
+      { id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
 
   redirect('/guardian')
 }
