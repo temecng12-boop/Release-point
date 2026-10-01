@@ -11,7 +11,8 @@ type Via = 'admin' | 'session'
 /** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
 export type RlsRule = (row: Row, action: Action, userId: string | null) => boolean
 // Storage failures: { bucket } fails removes; { bucket, storageOp: 'list' } fails listings.
-type Failure = { table?: string; action?: Action; bucket?: string; storageOp?: 'list' | 'remove'; error: DbError; times?: number }
+// `when` (optional) makes the failure apply only while it returns true.
+type Failure = { table?: string; action?: Action; bucket?: string; storageOp?: 'list' | 'remove'; error: DbError; times?: number; when?: () => boolean }
 
 export const state = {
   tables: {} as Record<string, Row[]>,
@@ -41,7 +42,7 @@ export function resetFake(init: { tables?: Record<string, Row[]>; storage?: Reco
 export function fail(f: Failure) { state.failures.push(f) }
 
 function takeFailure(match: (f: Failure) => boolean): DbError | null {
-  const f = state.failures.find(x => (x.times === undefined || x.times > 0) && match(x))
+  const f = state.failures.find(x => (x.times === undefined || x.times > 0) && (!x.when || x.when()) && match(x))
   if (!f) return null
   if (f.times !== undefined) f.times--
   return f.error

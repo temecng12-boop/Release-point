@@ -127,6 +127,49 @@ test('deleteTimestampNote: row delete fails -> error, no file removed', async ()
   assert.deepEqual(state.storageOps, [])
 })
 
+test('deleteTimestampNote: a crafted body copying another note\'s recording removes no file', async () => {
+  seedVoiceNotes()
+  // The player adds a note whose body points at the coach's recording, then deletes it.
+  state.tables.timestamp_notes.push({ id: 'n4', clip_id: C, created_by: 'player-user', body: `__voice__:${TS_VOICE}` })
+  state.user = { id: 'player-user' }
+  const orig = console.error
+  console.error = () => {}
+  try { assert.deepEqual(await deleteTimestampNote('n4'), { success: true }) } finally { console.error = orig }
+  assert.deepEqual(state.storageOps, [])
+  assert.ok(state.storage.clips.includes(TS_VOICE))
+  assert.ok(state.tables.timestamp_notes.some(n => n.id === 'n1'), 'the coach\'s note is untouched')
+})
+
+test('deleteTimestampNote: a crafted body naming the clip voice note or another clip\'s recording removes no file', async () => {
+  seedVoiceNotes()
+  const C2 = '33333333-3333-4333-8333-333333333334'
+  const OTHER_CLIP_TS = `${P}/${C2}/ts_voice/def456.webm`
+  state.storage.clips.push(OTHER_CLIP_TS)
+  state.tables.timestamp_notes.push(
+    { id: 'n5', clip_id: C, created_by: COACH.id, body: `__voice__:${VOICE}` },
+    { id: 'n6', clip_id: C, created_by: COACH.id, body: `__voice__:${OTHER_CLIP_TS}` },
+    { id: 'n7', clip_id: C, created_by: COACH.id, body: `__voice__:${P}/${C}/ts_voice/../voice.webm` },
+  )
+  for (const id of ['n5', 'n6', 'n7']) assert.deepEqual(await deleteTimestampNote(id), { success: true })
+  assert.deepEqual(state.storageOps, [])
+  assert.ok(state.storage.clips.includes(VOICE) && state.storage.clips.includes(OTHER_CLIP_TS))
+})
+
+test('deleteTimestampNote: the recording-ownership check fails -> note deleted, file kept, warning (not plain success)', async () => {
+  seedVoiceNotes()
+  // Fail only the select that runs after the note row is deleted.
+  const afterDelete = () => state.ops.some(o => o.table === 'timestamp_notes' && o.action === 'delete')
+  fail({ table: 'timestamp_notes', action: 'select', error: { message: 'timeout' }, when: afterDelete })
+  const orig = console.error
+  console.error = () => {}
+  let r
+  try { r = await deleteTimestampNote('n1') as { success?: true; warning?: string } } finally { console.error = orig }
+  assert.equal(r.success, true)
+  assert.match(String(r.warning), /recording couldn't be removed/)
+  assert.ok(!state.tables.timestamp_notes.some(n => n.id === 'n1'))
+  assert.deepEqual(state.storageOps, [])
+})
+
 test('clearAnnotations: returns the ids it deleted (own marks only)', async () => {
   seed()
   const r = await clearAnnotations(C)

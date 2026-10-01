@@ -451,13 +451,26 @@ export async function deleteTimestampNote(noteId: string) {
     .select('id')
 
   if (error) return { error: describeDbError('deleteTimestampNote', error, 'Could not delete this note.') }
+  if (!deleted || deleted.length !== 1) return { error: 'Not authorized' }
 
   // A voice note's file goes too, once the row is gone, and only inside this clip's ts_voice folder.
   const { data: clipRow } = await supabaseAdmin.from('clips').select('player_id').eq('id', note.clip_id as string).maybeSingle()
-  const voicePath = deleted && deleted.length > 0 && clipRow
+  const voicePath = clipRow
     ? timestampVoicePathFor(note.body, clipRow.player_id as string, note.clip_id as string)
     : null
   if (voicePath) {
+    // The file must be this note's own: if any other note still points at the
+    // same path (e.g. a crafted body copying another note's recording), keep it.
+    const { data: others, error: othersError } = await supabaseAdmin
+      .from('timestamp_notes')
+      .select('id')
+      .eq('clip_id', note.clip_id as string)
+      .eq('body', note.body as string)
+    if (othersError || (others ?? []).length > 0) {
+      console.error('[deleteTimestampNote] recording kept: another note uses it or the check failed', { noteId, path: `clips:${voicePath}`, error: othersError?.message ?? null })
+      if (othersError) return { success: true, warning: 'Note deleted, but its recording couldn\'t be removed.' }
+      return { success: true }
+    }
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove([voicePath])
     if (storageError) {
       console.error('[deleteTimestampNote] storage files left after delete', { noteId, leftoverFiles: [`clips:${voicePath}`], error: storageError.message })

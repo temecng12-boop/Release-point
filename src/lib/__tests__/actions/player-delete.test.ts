@@ -17,11 +17,13 @@ const OTHER = '11111111-1111-4111-8111-111111111112'
 const C = '33333333-3333-4333-8333-333333333333'
 
 const MINE = {
-  clips: [`${P}/1.mp4`, `${P}/${C}/voice.webm`, `${P}/${C}/ts_voice/abc.webm`, `avatars/${P_USER}.jpg`],
+  clips: [`${P}/1.mp4`, `${P}/${C}/voice.webm`, `${P}/${C}/ts_voice/abc.webm`],
   lessons: [`${P}/${C}/lesson-1-a.webm`],
 }
 const THEIRS = {
-  clips: [`${OTHER}/2.mp4`, `avatars/${P_USER}0.jpg`, `avatars/${COACH.id}.jpg`],
+  // The linked account's avatar is never the coach's to delete (account deletion handles it).
+  clips: [`${OTHER}/2.mp4`, `avatars/${P_USER}.jpg`, `avatars/${P_USER}0.jpg`, `avatars/${COACH.id}.jpg`],
+  profiles: [`avatars/${P_USER}.png`],
   lessons: [`${OTHER}/${C}/lesson-1-a.webm`],
 }
 
@@ -35,21 +37,32 @@ function seed(userId: string | null = P_USER) {
       ],
       profiles: [{ id: P_USER, avatar_url: 'https://storage.test/x' }],
     },
-    storage: { clips: [...MINE.clips, ...THEIRS.clips], lessons: [...MINE.lessons, ...THEIRS.lessons] },
+    storage: { clips: [...MINE.clips, ...THEIRS.clips], lessons: [...MINE.lessons, ...THEIRS.lessons], profiles: [...THEIRS.profiles] },
   })
 }
 const removed = () => state.storageOps.flatMap(o => o.paths.map(p => `${o.bucket}:${p}`)).sort()
 
-test('deletePlayer: removes the row, clip videos, voice notes, lessons and the account avatar; nothing else', async () => {
+test('deletePlayer: removes the row, clip videos, voice notes and lessons; nothing else', async () => {
   seed()
   assert.deepEqual(await deletePlayer(P), { success: true })
   assert.deepEqual(state.tables.players.map(r => r.id), [OTHER])
   assert.deepEqual(removed(), [...MINE.clips.map(p => `clips:${p}`), ...MINE.lessons.map(p => `lessons:${p}`)].sort())
   assert.deepEqual(state.storage, THEIRS)
-  assert.equal(state.tables.profiles[0].avatar_url, null)
 })
 
-test('deletePlayer: player without an account -> no avatar lookup, folders still removed', async () => {
+test('deletePlayer: leaves the linked account\'s avatar alone (file and profiles.avatar_url)', async () => {
+  // A players row can name any user_id (e.g. forged through the API before
+  // migration 032), so deletePlayer must never reach into that account.
+  seed()
+  assert.deepEqual(await deletePlayer(P), { success: true })
+  assert.ok(state.storage.clips.includes(`avatars/${P_USER}.jpg`))
+  assert.ok(state.storage.profiles.includes(`avatars/${P_USER}.png`))
+  assert.equal(state.tables.profiles[0].avatar_url, 'https://storage.test/x')
+  assert.ok(!state.ops.some(o => o.table === 'profiles'), 'no profiles read or write')
+  assert.ok(!removed().some(p => p.includes('avatars/')), 'no avatar removal requested')
+})
+
+test('deletePlayer: player without an account -> folders still removed', async () => {
   seed(null)
   assert.deepEqual(await deletePlayer(P), { success: true })
   assert.ok(state.storage.clips.includes(`avatars/${P_USER}.jpg`))
@@ -74,10 +87,16 @@ test('deletePlayer: storage removal fails after the row is gone -> warning, left
   assert.deepEqual((entry?.[1] as { leftoverFiles: string[] }).leftoverFiles, [`lessons:${P}/${C}/lesson-1-a.webm`])
 })
 
-test('deletePlayer: row delete fails -> error, no files removed', async () => {
+test('deletePlayer: row delete fails -> neutral error (no DB text), logged, no files removed', async () => {
   seed()
-  fail({ table: 'players', action: 'delete', error: { message: 'boom' } })
-  assert.ok('error' in await deletePlayer(P))
+  fail({ table: 'players', action: 'delete', error: { message: 'boom: relation "players" secret detail' } })
+  const logged: unknown[][] = []
+  const orig = console.error
+  console.error = (...a: unknown[]) => { logged.push(a) }
+  let r
+  try { r = await deletePlayer(P) } finally { console.error = orig }
+  assert.deepEqual(r, { error: 'Could not remove this player. Please try again.' })
+  assert.ok(logged.some(a => JSON.stringify(a).includes('secret detail')), 'the DB error is logged server-side')
   assert.deepEqual(state.storageOps, [])
   assert.equal(state.tables.players.length, 2)
 })
