@@ -159,9 +159,11 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
  * Delete the signed-in user's account on the server: clean up their rows and
  * storage files with the service client (policy: src/lib/account-deletion.ts),
  * then delete the auth user and sign out. Returns { error } and leaves the
- * session in place if any step fails; redirects to login only on success.
+ * session in place if any step fails; redirects to login only on full success.
+ * If the account was deleted but some storage files couldn't be removed, the
+ * leftover paths are logged and { warning } is returned instead of a redirect.
  */
-export async function deleteAccount(): Promise<{ error: string } | undefined> {
+export async function deleteAccount(): Promise<{ error: string } | { warning: string } | undefined> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.id) return { error: 'Your session has expired. Sign in again, then try deleting your account.' }
@@ -174,7 +176,7 @@ export async function deleteAccount(): Promise<{ error: string } | undefined> {
     deleteAuthUser: (id) => supabaseAdmin.auth.admin.deleteUser(id),
   })
   if (!result.ok) {
-    console.error('[deleteAccount] failed', { userId: user.id, step: result.step, error: result.detail })
+    console.error('[deleteAccount] failed', { userId: user.id, step: result.step, error: result.detail, leftoverFiles: result.leftoverFiles ?? [] })
     return { error: result.error }
   }
   const { plan } = result
@@ -193,5 +195,10 @@ export async function deleteAccount(): Promise<{ error: string } | undefined> {
   // Account deleted: end every session of this account, on all devices.
   const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
   if (signOutError) console.warn('[deleteAccount] signOut after delete', { userId: user.id, error: signOutError.message })
+  if (result.warning) {
+    // Rows and login are gone, but some files are still in storage: log them for cleanup and say so.
+    console.error('[deleteAccount] storage files left after delete', { userId: user.id, leftoverFiles: result.leftoverFiles })
+    return { warning: result.warning }
+  }
   redirect('/auth/login')
 }
