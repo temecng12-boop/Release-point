@@ -41,7 +41,7 @@ CREATE OR REPLACE FUNCTION public.promote_empty_player_to_guardian(p_user_id uui
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   spec record;
