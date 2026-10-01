@@ -53,7 +53,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
           )}
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          Player receives an invite email to set up their account and join the roster.
+          New players get an email to set up their account. Players who already have an account are added without an email.
         </p>
       </div>
     </div>
