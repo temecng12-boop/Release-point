@@ -1,0 +1,7 @@
+pitch_type,velocity_mph,spin_rate_rpm,spin_axis_tilt,ivb_in,hb_in,extension_ft,vaa_deg
+Fastball,84.3,2239,1:15,15.8,-7.3,6.27,-4
+Slider,78.1,2422,9:00,2,6.4,6.05,-6.9
+Curveball,73.2,2417,7:00,-11.1,5.8,5.91,-4.5
+ChangeUp,80.6,1786,2:00,11.2,-12.4,6.33,-5.9
+Fastball,86.6,2237,1:15,15.5,-7.6,6.39,-6.7
+Slider,76.9,2390,9:00,2.1,6.1,5.94,-5.4
