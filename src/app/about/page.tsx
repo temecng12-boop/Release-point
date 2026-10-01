@@ -190,8 +190,8 @@ export default function AboutPage() {
                 desc: 'Every clip is stored in private cloud buckets with signed, time-limited access URLs. A player\'s video is only accessible to that player and their assigned coach.',
               },
               {
-                label: 'Real-Time Data',
-                desc: 'Coach annotations, metrics, and notes update instantly across devices. The player sees feedback the moment a coach saves it.',
+                label: 'Shared Feedback',
+                desc: 'Coach annotations, metrics, and notes are saved with the clip. The player sees them the next time they open or refresh the clip, on any device.',
               },
               {
                 label: 'AI at the Edge',
@@ -199,7 +199,7 @@ export default function AboutPage() {
               },
               {
                 label: 'Row-Level Security',
-                desc: 'Every database query enforces access at the row level. A coach can only query their own players. A player can only see their own data.',
+                desc: 'Every database query enforces access at the row level. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
               },
               {
                 label: 'Cross-Device',
