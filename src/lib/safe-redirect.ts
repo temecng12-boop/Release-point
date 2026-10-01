@@ -14,17 +14,25 @@ function isSafeForm(s: string) {
     && !CONTROL.test(s)
 }
 
+// A decoded form may contain a single '/' from an encoded %2F (e.g. a path
+// segment or query value), but never '//' anywhere (protocol-relative or
+// "scheme://"), a backslash, or a still-encoded backslash.
+function isSafeDecoded(s: string) {
+  return isSafeForm(s) && !s.includes('//') && !/%5c/i.test(s)
+}
+
 export function safeRedirectPath(next: unknown, fallback = '/dashboard', origin: string = BASE): string {
   if (typeof next !== 'string' || next === '' || !isSafeForm(next)) return fallback
-  // Encoded slashes or backslashes ("%2F%2F", "%5C") are never needed here.
-  if (/%(2f|5c)/i.test(next)) return fallback
-  // The decoded forms (including double encoding) must be safe too.
+  // Encoded backslashes ("%5C") are never needed here.
+  if (/%5c/i.test(next)) return fallback
+  // Every decoded form (including double encoding) must be safe too.
+  // Four rounds or more of encoding is too deep to check, so it is refused.
   let decoded = next
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; ; i++) {
     let d: string
     try { d = decodeURIComponent(decoded) } catch { return fallback }
     if (d === decoded) break
-    if (!isSafeForm(d) || /%(2f|5c)/i.test(d)) return fallback
+    if (i === 3 || !isSafeDecoded(d)) return fallback
     decoded = d
   }
   let url: URL

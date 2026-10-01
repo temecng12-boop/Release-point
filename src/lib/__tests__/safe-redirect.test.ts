@@ -17,6 +17,11 @@ const GOOD = [
   '/profile#settings',
   '/a/b/c?x=%20y',
   '/',
+  // an encoded '/' inside a path segment or query value
+  '/foo%2Fbar',
+  '/clips?return=%2Fdashboard',
+  '/clips/compare?a=yt%3Aabc%2Fdef&b=1',
+  '/players/a%2Fb/edit',
 ]
 
 const BAD: unknown[] = [
@@ -29,7 +34,11 @@ const BAD: unknown[] = [
   'dashboard', 'evil.com', '@evil.com', '.evil.com', '?next=/x', '#x', '',
   // encoded variants
   '/%2F%2Fevil.com', '/%2f%2fevil.com', '%2F%2Fevil.com', '/%5Cevil.com', '/%5cevil.com', '%5C%5Cevil.com',
-  '/%252F%252Fevil.com', '/%255Cevil.com', '/foo%2Fbar', '/%E0%A4%A', '/%09/evil.com', '/%0d%0a/evil.com',
+  '/%252F%252Fevil.com', '/%255Cevil.com', '/%E0%A4%A', '/%09/evil.com', '/%0d%0a/evil.com',
+  // encoded '/' that decodes to '//', '/\\', a scheme or a backslash
+  '/%2Fevil.com', '/%2fevil.com', '/%2F/evil.com', '/foo%2F%2Fbar', '/foo/%2F/bar', '/%2F%5Cevil.com',
+  '/%2F%255Cevil.com', '/x?u=https%3A%2F%2Fevil.com', '/x?u=%2F%2Fevil.com', '/%252Fevil.com',
+  '/%25252F%25252Fevil.com', '/%2525252F%2525252Fevil.com', '/a%2F%5Cb', '/a%2Fb%5C', '/%2525252525E0',
   // leading whitespace and control characters
   ' /dashboard', '\t/dashboard', '\n//evil.com', '\u0000/dashboard', '/\t/evil.com', '/\n/evil.com',
   '/\r\n/evil.com', '/dash\u007fboard', '\u0001javascript:alert(1)',
