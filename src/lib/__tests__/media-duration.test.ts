@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { finiteDuration, formatClock, lessonLengthSeconds, watchMediaDuration, type MediaLike } from '../media-duration'
+import { finiteDuration, formatClock, formatSeconds, lessonLengthSeconds, watchMediaDuration, type MediaLike } from '../media-duration'
 
 const BAD = [Infinity, -Infinity, NaN, 0, -0, -1, -0.001, '5', null, undefined, {}]
 
@@ -164,4 +164,50 @@ test('video-player: the lesson length goes through formatClock and the watcher',
   assert.match(src, /<video ref=\{lessonVideoRef\} src=\{lessonUrl\} controls playsInline className/)
   // The measured length is kept only when the new lesson URL is set.
   assert.match(src, /setLessonRecordedSec\(recordedSec\); setLessonUrl\(/)
+})
+
+// ── QA-007: the clip player's own time readout ─────────────────────────────
+
+test('formatSeconds: Infinity and NaN show "--", never 0.00s; normal values as before', () => {
+  for (const v of [Infinity, -Infinity, NaN, -1, '5', null, undefined, {}]) assert.equal(formatSeconds(v), '--', String(v))
+  assert.equal(formatSeconds(0), '0.00s', 'a playhead at the start is a real 0')
+  assert.equal(formatSeconds(1.234), '1.23s')
+  assert.equal(formatSeconds(12.5), '12.50s')
+  // The duration side goes through finiteDuration first, so an unknown length is "--".
+  assert.equal(formatSeconds(finiteDuration(Infinity)), '--')
+  assert.equal(formatSeconds(finiteDuration(NaN)), '--')
+  assert.equal(formatSeconds(finiteDuration(0)), '--')
+  assert.equal(formatSeconds(finiteDuration(8.4)), '8.40s')
+})
+
+test('clip readout: Infinity, then a late durationchange, shows -- then the real length', () => {
+  const v = new FakeMedia(Infinity)
+  const shown: string[] = []
+  const t = fakeTimers()
+  const stop = watchMediaDuration(v, d => shown.push(formatSeconds(d)), t)
+  assert.deepEqual(shown, ['--'])
+  v.duration = 6.25; v.fire('durationchange')
+  assert.equal(shown.at(-1), '6.25s')
+  stop()
+})
+
+test('clip readout: NaN before metadata, then loadedmetadata with a normal value', () => {
+  const v = new FakeMedia(NaN)
+  const shown: string[] = []
+  const stop = watchMediaDuration(v, d => shown.push(formatSeconds(d)), fakeTimers())
+  assert.deepEqual(shown, ['--'])
+  v.duration = 3; v.fire('loadedmetadata')
+  assert.equal(shown.at(-1), '3.00s')
+  assert.doesNotMatch(shown.join(' '), /0\.00s|Infinity|NaN/)
+  stop()
+})
+
+test('video-player: the clip readout uses the shared duration watcher, not the raw duration', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../components/video-player.tsx', import.meta.url), 'utf8')
+  assert.match(src, /function fmtTime\(t: number \| null\) \{ return formatSeconds\(t\) \}/)
+  assert.match(src, /const stopDuration = watchMediaDuration\(video, \(d\) => \{\s*setDuration\(d\)/)
+  assert.doesNotMatch(src, /setDuration\(video!\.duration\)/)
+  assert.match(src, /useState<number \| null>\(null\)\s*\/\/ null until/)
+  assert.match(src, /\{fmtTime\(currentTime\)\} \/ \{fmtTime\(duration\)\}/)
 })
