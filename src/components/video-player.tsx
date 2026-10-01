@@ -263,7 +263,7 @@ const COLORS = [
 
 const oswald  = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }
 const divider = { borderTop: '1px solid #DDE4ED' }
-const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors'
+const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors max-sm:min-h-11 max-sm:min-w-11'
 const btnIdle = 'text-[#456080] hover:bg-[#EEF2F7] hover:text-[#0F1F33]'
 const btnOn   = 'bg-[#C8102E] text-white'
 const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border border-[#DDE4ED]'
@@ -1081,7 +1081,7 @@ export default function VideoPlayer({
           ref={scrubRef}
           type="range" min="0" max="1000" defaultValue="0" step="1"
           onInput={onScrubInput} onChange={onScrubChange}
-          className="flex-1 accent-[#C8102E] cursor-pointer h-1"
+          className="flex-1 accent-[#C8102E] cursor-pointer h-1 max-sm:h-11"
         />
       </div>
 
@@ -1124,6 +1124,7 @@ export default function VideoPlayer({
             <div className="flex items-center gap-2 px-1">
               {COLORS.map(c => (
                 <button key={c.hex} onClick={() => selectColor(c.hex)} title={c.label}
+                  className="max-sm:min-h-11 max-sm:min-w-11"
                   style={{
                     width: 20, height: 20, borderRadius: '50%', background: c.hex, padding: 0, cursor: 'pointer',
                     border: inkColor === c.hex ? '2px solid white' : '2px solid transparent',
@@ -1201,19 +1202,19 @@ export default function VideoPlayer({
             onChange={e => { setStampText(e.target.value); setStampError(null) }}
             onKeyDown={e => { if (e.key === 'Enter') saveStamp(); if (e.key === 'Escape') { setStampMode(false); setStampText('') } }}
             placeholder="Describe this moment…"
-            className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+            className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080] max-sm:min-h-11"
           />
           <button
             onClick={saveStamp}
             disabled={stampSaving || !stampText.trim()}
-            className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0"
+            className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0 max-sm:min-h-11"
             style={oswald}
           >
             {stampSaving ? 'Saving…' : 'Save'}
           </button>
           <button
             onClick={() => { setStampMode(false); setStampText('') }}
-            className="text-xs text-[#8096AE] hover:text-[#C8102E] transition-colors"
+            className="text-xs text-[#8096AE] hover:text-[#C8102E] transition-colors max-sm:min-h-11 max-sm:min-w-11"
           >
             ✕
           </button>
@@ -1269,7 +1270,7 @@ export default function VideoPlayer({
                 <button
                   onClick={() => removeAnnotation(m.ref)}
                   disabled={!m.ref.id}
-                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none disabled:opacity-40"
+                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none disabled:opacity-40 max-sm:min-h-11 max-sm:min-w-11"
                   title={m.ref.id ? 'Remove annotation' : 'Saving…'}
                 >
                   ✕

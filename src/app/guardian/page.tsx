@@ -60,7 +60,7 @@ export default async function GuardianPage() {
           </span>
           <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded" style={oswald}>Guardian</span>
           <SignOutForm>
-            <button type="submit" className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors" style={oswald}>
+            <button type="submit" className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors max-sm:min-h-11 max-sm:min-w-11" style={oswald}>
               Sign Out
             </button>
           </SignOutForm>

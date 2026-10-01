@@ -141,7 +141,7 @@ export default function PhaseChecklist({
                           <button
                             key={r.value}
                             onClick={() => setRating(i, active ? null : r.value)}
-                            className="text-[10px] px-2 py-1 rounded transition-all active:scale-95"
+                            className="text-[10px] px-2 py-1 rounded transition-all active:scale-95 max-sm:min-h-11 max-sm:min-w-11"
                             style={{
                               ...os,
                               border: `1px solid ${active ? r.color : '#e2e8f0'}`,
@@ -172,7 +172,7 @@ export default function PhaseChecklist({
                     value={phase.note}
                     onChange={e => setNote(i, e.target.value)}
                     placeholder="Add a note…"
-                    className="mt-2 w-full text-xs rounded-md px-3 py-1.5 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 transition-all"
+                    className="mt-2 w-full text-xs rounded-md px-3 py-1.5 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 transition-all max-sm:min-h-11"
                     style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
                   />
                 )}
@@ -200,7 +200,7 @@ export default function PhaseChecklist({
             <motion.button
               onClick={handleSave}
               disabled={ratedCount === 0 || saveState === 'saving'}
-              className="relative overflow-hidden text-xs text-white rounded-lg transition-all disabled:opacity-40 min-w-[120px] h-9 flex items-center justify-center"
+              className="relative overflow-hidden text-xs text-white rounded-lg transition-all disabled:opacity-40 min-w-[120px] h-9 flex items-center justify-center max-sm:h-11"
               style={{ ...os, background: saveState === 'done' ? '#16a34a' : '#E8102A' }}
               whileTap={{ scale: 0.95 }}
               animate={{
