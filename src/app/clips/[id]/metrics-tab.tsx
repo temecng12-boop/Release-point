@@ -1,26 +1,13 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, parseImportedSpinAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
+import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
+import { readPitchCsv, skippedSummary, type CsvPitchRow } from '@/lib/pitch-csv'
 import { createClient } from '@/lib/supabase/client'
 import { addPitchMetric } from '@/app/actions/clips'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-
-// ── Column aliases — maps device-specific CSV headers to our DB fields ───────
-const COLUMN_MAP = {
-  pitch_type:     ['Pitch Type', 'PitchType', 'Type', 'AutoPitchType', 'TaggedPitchType'],
-  velocity:       ['Velocity', 'Speed (mph)', 'RelSpeed', 'Pitch Speed', 'ReleaseSpeed'],
-  spin_rate:      ['Spin Rate (rpm)', 'SpinRate', 'Spin Rate', 'SpinRpm'],
-  spin_axis:      ['Spin Axis (deg)', 'SpinAxis', 'Spin Axis', 'SpinAxis2d'],
-  tilt:           ['Tilt'],   // TrackMan clock string, e.g. "1:15"
-  horiz_break:    ['Horizontal Break (in)', 'HorzBreak', 'Horizontal Break', 'pfxX', 'HorzMovement'],
-  vert_break:     ['Induced Vertical Break (in)', 'InducedVertBreak', 'Induced Vert Break', 'pfxZ', 'InducedVertMovement'],
-  extension:      ['Extension (ft)', 'Extension', 'ReleaseExtension'],
-  vaa:            ['Vert. Appr. Angle', 'VertApprAngle', 'VAA', 'VerticalApproachAngle'],
-  release_height: ['Release Height (ft)', 'ReleaseHeight', 'RelHeight'],
-}
 
 // ── Spin axis → clock-face string ──────────────────────────────────────────
 function axisToClock(degrees: number): string {
@@ -40,36 +27,7 @@ const VELOCITY_BENCHMARKS: Record<string, { avg: number; good: number; elite: nu
   'Professional':  { avg: 94, good: 97, elite: 99 },
 }
 
-// ── CSV parsing ─────────────────────────────────────────────────────────────
-function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split('\n')
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-  return lines.slice(1).filter(l => l.trim()).map(line => {
-    const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
-  })
-}
-
-function mapRow(row: Record<string, string>) {
-  const get = (aliases: string[]): string | null => {
-    for (const a of aliases) {
-      if (row[a] !== undefined && row[a] !== '') return row[a]
-    }
-    return null
-  }
-  return {
-    pitch_type:        get(COLUMN_MAP.pitch_type),
-    velocity:          parseFloat(get(COLUMN_MAP.velocity) ?? '') || null,
-    spin_rate:         parseInt(get(COLUMN_MAP.spin_rate) ?? '') || null,
-    // Degrees are TrackMan convention (180° = 12:00) and converted; clock strings are used as-is.
-    spin_axis:         parseImportedSpinAxis(get(COLUMN_MAP.spin_axis)) ?? parseImportedSpinAxis(get(COLUMN_MAP.tilt)),
-    horizontal_break:  parseFloat(get(COLUMN_MAP.horiz_break) ?? '') || null,
-    vertical_break:    parseFloat(get(COLUMN_MAP.vert_break) ?? '') || null,
-    extension:         parseFloat(get(COLUMN_MAP.extension) ?? '') || null,
-    vaa:               parseFloat(get(COLUMN_MAP.vaa) ?? '') || null,
-    release_height:    parseFloat(get(COLUMN_MAP.release_height) ?? '') || null,
-  }
-}
+// ── CSV parsing: src/lib/pitch-csv.ts (quote-aware; reports skipped rows) ──
 
 // ── Insert imported rows ─────────────────────────────────────────────────────
 // Until migration 020 makes pitch_metrics.spin_axis numeric, the column is
@@ -106,7 +64,7 @@ type MetricRow = {
   vaa?: number | null
 }
 
-type ParsedRow = ReturnType<typeof mapRow> & { _raw: Record<string, string> }
+type ParsedRow = CsvPitchRow
 
 // ── Velocity indicator ───────────────────────────────────────────────────────
 function VelocityIndicator({ velocity, ageGroup }: { velocity: number | null; ageGroup: string | null }) {
@@ -153,6 +111,7 @@ export default function MetricsTab({
     })
   }
   const [preview, setPreview] = useState<ParsedRow[] | null>(null)
+  const [csvSkipped, setCsvSkipped] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [axisWarning, setAxisWarning] = useState<string | null>(null)
@@ -198,18 +157,27 @@ export default function MetricsTab({
 
   // ── Handle file selection ──────────────────────────────────────────────
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const input = e.target
+    const file = input.files?.[0]
     if (!file) return
     setSaveError(null)
+    setCsvSkipped(null)
+    setPreview(null)
     const reader = new FileReader()
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string
-      const rows = parseCSV(text)
-      const mapped: ParsedRow[] = rows
-        .map(r => ({ ...mapRow(r), _raw: r }))
-        .filter(r => r.pitch_type !== null || r.velocity !== null)
-      setPreview(mapped)
+    reader.onload = () => {
+      const result = readPitchCsv(typeof reader.result === 'string' ? reader.result : '')
+      if (!result.ok) { setSaveError(result.error); return }
+      // Rows that can't be read are listed, never saved quietly (QA-014).
+      setCsvSkipped(skippedSummary(result.skipped))
+      setPreview(result.rows)
     }
+    reader.onerror = () => {
+      console.error('[csv import] could not read file', reader.error)
+      setSaveError('Couldn\'t read this file. Try exporting the CSV again.')
+    }
+    // Clear the picker once the file is read, so picking the same file again
+    // (e.g. after fixing it) fires onChange and imports it again.
+    reader.onloadend = () => { input.value = '' }
     reader.readAsText(file)
   }
 
@@ -307,7 +275,7 @@ export default function MetricsTab({
         <div className="grid grid-cols-2 gap-3">
           {/* CSV */}
           <div>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
             <button
               onClick={() => fileRef.current?.click()}
               className="w-full border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
@@ -334,6 +302,8 @@ export default function MetricsTab({
         {saveError && <p className="text-xs text-[#C8102E]">{saveError}</p>}
         {pdfError  && <p className="text-xs text-[#C8102E]">{pdfError}</p>}
         {axisWarning && <p role="status" className="text-xs text-[#B45309]">{axisWarning}</p>}
+
+        {csvSkipped && <p role="status" className="text-xs text-[#B45309]">{csvSkipped}</p>}
 
         {/* CSV preview */}
         {preview && preview.length > 0 && (
