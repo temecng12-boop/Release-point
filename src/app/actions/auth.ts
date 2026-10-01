@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writeWithAdultFields } from '@/lib/consent-server'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
+import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
 function toTitleCase(s: string) {
@@ -61,7 +62,8 @@ export async function signUpPlayer(
     options: {
       shouldCreateUser: true,
       data: { role: 'player', full_name: fullName, adult_confirmed: true },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/confirm`,
+      // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
   })
 

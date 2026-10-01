@@ -43,7 +43,7 @@ test('email that already has an account: added, no email sent, message does not 
   authAdmin.existingEmails.add('has@example.com')
   const r = await invitePlayer(undefined, form({ full_name: 'Has Account', player_email: 'has@example.com', team_ids: ['t1'] }))
   assert.equal(emailFake.invites.length, 0)
-  assert.equal(r.success, 'has@example.com already has an account and has been added to your roster and to the selected team. No email was sent.')
+  assert.equal(r.success, 'has@example.com already has an account and has been added to your roster and to the selected team. No email was sent; they\'ll see it next time they sign in.')
   assert.doesNotMatch(r.success!, /set up|will receive/)
   assert.equal(state.tables.player_teams.length, 1)
 })
@@ -132,4 +132,33 @@ test('existing roster player marked 18+ but the confirmation write fails: error,
   assert.match(r.error ?? '', /18\+ confirmation could not be saved/)
   assert.equal(r.success, undefined)
   assert.equal(emailFake.invites.length, 0)
+})
+
+test('already on the roster: partial failures say so instead of "Player added"', async () => {
+  state.tables.players.push({ id: 'p1', coach_id: COACH.id, email: 'kid@example.com', user_id: null })
+  fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
+  fail({ table: 'player_teams', action: 'upsert', error: { message: 'boom' } })
+  const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com', team_id: 't1' }))
+  assert.equal(r.error, 'kid@example.com is already on your roster, but they could not be added to the team. Please try again.')
+
+  resetFake({ tables: tables(), user: COACH }); emailFake.reset()
+  state.tables.players.push({ id: 'p1', coach_id: COACH.id, email: 'kid@example.com', user_id: null })
+  fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
+  emailFake.inviteResult = { error: 'provider down' }
+  const r2 = await invitePlayer(undefined, form({ player_email: 'kid@example.com' }))
+  assert.equal(r2.error, 'kid@example.com is already on your roster, but the invite email could not be sent (provider down). Please try again.')
+  assert.doesNotMatch(r2.error!, /Player added/)
+
+  // A new player keeps "Player added, but".
+  resetFake({ tables: tables(), user: COACH }); emailFake.reset()
+  emailFake.inviteResult = { error: 'provider down' }
+  assert.match((await invitePlayer(undefined, form({ player_email: 'new@example.com' }))).error ?? '', /^Player added, but the invite email could not be sent/)
+})
+
+test('already on the roster with an account, new team: will see it next time they sign in', async () => {
+  state.tables.players.push({ id: 'p1', coach_id: COACH.id, email: 'kid@example.com', user_id: 'u-kid' })
+  fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
+  authAdmin.existingEmails.add('kid@example.com')
+  const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com', team_id: 't1' }))
+  assert.equal(r.success, "kid@example.com already has an account and is already on your roster. They've been added to the selected team and will see it next time they sign in. No email was sent.")
 })

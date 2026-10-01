@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080]'
+const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] max-sm:min-h-11'
 
 export default function TeamInviteForm({ teamId }: { teamId: string }) {
   const [state, action, pending] = useActionState(invitePlayer, undefined)
@@ -46,7 +46,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
               <button
                 type="submit"
                 disabled={pending}
-                className="bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50 whitespace-nowrap"
+                className="bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50 whitespace-nowrap max-sm:min-h-11"
                 style={oswald}
               >
                 {pending ? 'Sending…' : 'Send Invite'}

@@ -81,7 +81,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href={`/profile/${player.id}`}
-                className="text-sm font-medium text-[#0F1F33] hover:text-[#1C3A5C] hover:underline"
+                className="text-sm font-medium text-[#0F1F33] hover:text-[#1C3A5C] hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-11 max-sm:min-w-11"
               >
                 {player.full_name}
               </Link>
@@ -112,14 +112,14 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
             </span>
             <button
               onClick={() => setEditOpen(true)}
-              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED]"
+              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] max-sm:min-h-11 max-sm:min-w-11"
             >
               Edit
             </button>
             <button
               onClick={() => setBullpenOpen(true)}
               title="Log a bullpen session: track pitch types, velo, spin, and coach notes"
-              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] whitespace-nowrap flex items-center gap-1"
+              className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] whitespace-nowrap flex items-center gap-1 max-sm:min-h-11"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#1C3A5C] shrink-0" />
               Bullpen
@@ -152,7 +152,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
         {deleteWarning && (
           <p role="status" className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#8A5A00] bg-[#FFF8E6]">
             {deleteWarning}
-            <button onClick={() => setDeleteWarning(null)} className="text-[#3D5166] hover:text-[#0F1F33]" aria-label="Dismiss">✕</button>
+            <button onClick={() => setDeleteWarning(null)} className="text-[#3D5166] hover:text-[#0F1F33] max-sm:min-h-11 max-sm:min-w-11" aria-label="Dismiss">✕</button>
           </p>
         )}
 
@@ -172,13 +172,13 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                       <button
                         onClick={() => handleDeleteClip(clip.id)}
                         disabled={deletingClip === clip.id}
-                        className="text-xs bg-[#C8102E] hover:bg-red-700 text-white px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                        className="text-xs bg-[#C8102E] hover:bg-red-700 text-white px-2 py-0.5 rounded transition-colors disabled:opacity-50 max-sm:min-h-11"
                       >
                         {deletingClip === clip.id ? 'Deleting…' : 'Delete'}
                       </button>
                       <button
                         onClick={() => { setConfirmClip(null); setDeleteError(null) }}
-                        className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors"
+                        className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors max-sm:min-h-11 max-sm:min-w-11"
                       >
                         Cancel
                       </button>
@@ -186,7 +186,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                   </div>
                 ) : (
                   <div className="flex items-center justify-between px-4 py-2 hover:bg-[#F0F4F8] transition-colors group">
-                    <Link href={`/clips/${clip.id}`} className="flex-1 flex items-center justify-between">
+                    <Link href={`/clips/${clip.id}`} className="flex-1 flex items-center justify-between max-sm:min-h-11">
                       <span className="text-sm text-[#0F1F33]" style={{ textTransform: 'capitalize' }}>{clip.title}</span>
                       <span className="text-xs text-[#456080]">{fmtDate(clip.session_date, clip.created_at)}</span>
                     </Link>

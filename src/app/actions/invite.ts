@@ -116,7 +116,7 @@ export async function invitePlayer(
       teamIds.map((tid) => ({ player_id: playerId, team_id: tid })),
       { onConflict: 'player_id,team_id', ignoreDuplicates: true }
     )
-    if (teamsAssignError) return { error: 'Player added, but they could not be added to the team. Please try again.' }
+    if (teamsAssignError) return { error: `${addedBut(playerEmail, alreadyOnRoster)} they could not be added to the team. Please try again.` }
   }
 
   // Generate invite link via Supabase, send email via Resend
@@ -134,7 +134,7 @@ export async function invitePlayer(
   // account. No setup email is sent then, so the message must not promise one.
   const hasAccount = !!linkErr && (linkErr.code === 'email_exists' || linkErr.message.toLowerCase().includes('already'))
   if (linkErr && !hasAccount) {
-    return { error: `Player added but invite link failed: ${linkErr.message}` }
+    return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite link failed: ${linkErr.message}` }
   }
 
   if (hasAccount) {
@@ -143,7 +143,7 @@ export async function invitePlayer(
   }
 
   const inviteUrl = linkData?.properties?.action_link
-  if (!inviteUrl) return { error: 'Player added, but the invite email could not be created. Please try again.' }
+  if (!inviteUrl) return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be created. Please try again.` }
   const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
   const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'
   // TODO(Compliance): guardian email wording. This invite goes to the address
@@ -163,7 +163,7 @@ export async function invitePlayer(
   revalidatePath('/', 'layout')
   if (sent.error) {
     console.error('[invite] invite email not sent', sent.error)
-    return { error: `Player added, but the invite email could not be sent (${sent.error}). Please try again.` }
+    return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be sent (${sent.error}). Please try again.` }
   }
 
   const who = playerName || 'The player'
@@ -174,10 +174,19 @@ export async function invitePlayer(
   }
 }
 
+/** Start of a partial-failure message: "Player added, but" or, for a player already on the roster, says so. */
+function addedBut(email: string, alreadyOnRoster: boolean): string {
+  return alreadyOnRoster ? `${email} is already on your roster, but` : 'Player added, but'
+}
+
 /** Success text when the email already has an account (no email is sent). */
 function existingAccountMessage(email: string, alreadyOnRoster: boolean, teamCount: number): string {
-  const teams = teamCount > 0 ? ` and to the selected team${teamCount === 1 ? '' : 's'}` : ''
-  return alreadyOnRoster
-    ? `${email} already has an account and is already on your roster${teamCount > 0 ? `. They've been added to the selected team${teamCount === 1 ? '' : 's'}` : ''}. No email was sent.`
-    : `${email} already has an account and has been added to your roster${teams}. No email was sent.`
+  const s = teamCount === 1 ? '' : 's'
+  if (alreadyOnRoster) {
+    return teamCount > 0
+      ? `${email} already has an account and is already on your roster. They've been added to the selected team${s} and will see it next time they sign in. No email was sent.`
+      : `${email} already has an account and is already on your roster. No email was sent.`
+  }
+  const teams = teamCount > 0 ? ` and to the selected team${s}` : ''
+  return `${email} already has an account and has been added to your roster${teams}. No email was sent; they'll see it next time they sign in.`
 }
