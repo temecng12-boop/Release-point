@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import SignOutForm from '@/components/sign-out-form'
+import ReportProblemButton from '@/components/report-problem'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -52,6 +53,9 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
 
       <div className="flex items-center gap-3 shrink-0">
         {right}
+        {/* Signed-in pages pass showSignOut; the header is sticky, so this is
+            always reachable and never over the video controls. */}
+        {showSignOut && <ReportProblemButton />}
         {showSignOut && (
           <SignOutForm>
             <button

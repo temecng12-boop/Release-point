@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutForm from '@/components/sign-out-form'
+import ReportProblemButton from '@/components/report-problem'
 import Logo from '@/components/Logo'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -58,6 +59,7 @@ export default async function GuardianPage() {
             {profile?.full_name ?? user.email}
           </span>
           <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded" style={oswald}>Guardian</span>
+          <ReportProblemButton />
           <SignOutForm>
             <button type="submit" className="text-xs text-[#3D5166] hover:text-[#456080] transition-colors" style={oswald}>
               Sign Out
