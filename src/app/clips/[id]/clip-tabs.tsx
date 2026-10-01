@@ -60,6 +60,7 @@ export default function ClipTabs({
   initialVoiceUrl,
   initialTsNotes,
   initialMetrics,
+  canDeleteMetrics = false,
   initialChecklist,
   initialHittingMetrics,
   playerName,
@@ -75,6 +76,8 @@ export default function ClipTabs({
   initialVoiceUrl: string | null
   initialTsNotes: TSNote[]
   initialMetrics: Metric[]
+  /** Show delete buttons for saved metrics: only for the player's direct coach. */
+  canDeleteMetrics?: boolean
   initialChecklist: PhaseRow[] | null
   initialHittingMetrics: HittingMetrics | null
   playerName: string
@@ -152,12 +155,14 @@ export default function ClipTabs({
                   playerPosition={playerPosition}
                   initialMetrics={metrics}
                   onMetricsChange={setMetrics}
+                  canDelete={canDeleteMetrics}
                 />
               ) : (
                 <HittingMetricsTab
                   clipId={clipId}
                   role={role}
                   initial={initialHittingMetrics}
+                  canDelete={canDeleteMetrics}
                 />
               )
             )}

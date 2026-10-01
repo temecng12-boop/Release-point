@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
-import { formatClock, lessonLengthSeconds, watchMediaDuration } from '@/lib/media-duration'
+import { formatClock, formatSeconds, lessonLengthSeconds, watchMediaDuration } from '@/lib/media-duration'
 import { runAction } from '@/lib/action-result'
 import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
@@ -217,7 +217,8 @@ function nccSearch(
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
-function fmtTime(t: number) { return (isFinite(t) ? t : 0).toFixed(2) + 's' }
+// Unknown values show "--", never 0.00s (QA-007).
+function fmtTime(t: number | null) { return formatSeconds(t) }
 
 function dbToShape(a: DbAnnotation): Shape {
   const shape: Shape = {
@@ -306,7 +307,7 @@ export default function VideoPlayer({
   // UI state
   const [playing,         setPlaying]         = useState(false)
   const [currentTime,     setCurrentTime]     = useState(0)
-  const [duration,        setDuration]        = useState(0)
+  const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
   const [tool,            setTool]            = useState('pointer')
   const [inkColor,        setInkColor]        = useState('#E9412F')
@@ -614,8 +615,6 @@ export default function VideoPlayer({
     if (!video || !scrub) return
 
     function onLoadedMetadata() {
-      setDuration(video!.duration)
-      scrub!.max = String(Math.floor(video!.duration * 1000) || 1000)
       if (video!.videoWidth && video!.videoHeight) {
         setVideoAspect(video!.videoWidth / video!.videoHeight)
       }
@@ -636,8 +635,16 @@ export default function VideoPlayer({
     video.addEventListener('pause',          onPause)
     video.addEventListener('ended',          onEnded)
     window.addEventListener('resize',        resizeCanvas)
+    // Duration (QA-007): webm clips can report Infinity until resolved, and it
+    // can change later (durationchange). Shared with the lesson player.
+    const stopDuration = watchMediaDuration(video, (d) => {
+      setDuration(d)
+      scrub!.max = String(d != null ? Math.floor(d * 1000) || 1000 : 1000)
+    })
 
     return () => {
+      stopDuration()
+      setDuration(null)
       prevFrameRef.current = null
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       video.removeEventListener('timeupdate',     onTimeUpdate)
