@@ -11,7 +11,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
-import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
+import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach, isThePlayer } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
 import { removeClipMediaAsOwnCoach } from '@/lib/clip-media-delete'
 
@@ -269,6 +269,51 @@ export async function deleteAnnotation(annotationId: string) {
   const { error } = await supabaseAdmin.from('annotations').delete().eq('id', annotationId)
   if (error) return { error: error.message }
   return { success: true }
+}
+
+// Pitch rows (QA-017). Same rule as deleting a clip: the player's current
+// coach may delete any pitch row on the clip; the player only rows they added
+// themselves. Each delete reports how many rows really went, so the screen
+// only drops what the database removed.
+const PITCH_DELETE_DENIED = 'Only the player\'s coach can delete these pitches.'
+
+export async function deletePitchMetric(metricId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof metricId !== 'string' || !metricId) return { error: 'Pitch not found' }
+
+  const { data: row, error: readError } = await supabaseAdmin
+    .from('pitch_metrics').select('clip_id, created_by').eq('id', metricId).maybeSingle()
+  if (readError) return { error: describeDbError('deletePitchMetric:read', readError, 'Could not delete this pitch.') }
+  if (!row) return { error: 'This pitch was already removed. Refresh the page.' }
+  const player = await playerForClip(row.clip_id as string)
+  if (!player || !canDeleteClip(user.id, row.created_by as string | null, player)) return { error: PITCH_DELETE_DENIED }
+
+  const { data: removed, error } = await supabaseAdmin.from('pitch_metrics').delete().eq('id', metricId).select('id')
+  if (error) return { error: describeDbError('deletePitchMetric', error, 'Could not delete this pitch.') }
+  if (!removed || removed.length !== 1) return { error: 'Could not delete this pitch. Refresh and try again.' }
+  revalidatePath(`/clips/${row.clip_id}`)
+  return { success: true }
+}
+
+export async function deleteAllPitchMetrics(clipId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+
+  const player = await playerForClip(clipId)
+  if (!player) return { error: 'Clip not found' }
+  const ownCoach = isPlayersOwnCoach(user.id, player)
+  if (!ownCoach && !isThePlayer(user.id, player)) return { error: PITCH_DELETE_DENIED }
+
+  let query = supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
+  if (!ownCoach) query = query.eq('created_by', user.id)   // the player: only their own rows
+  const { data: removed, error } = await query.select('id')
+  if (error) return { error: describeDbError('deleteAllPitchMetrics', error, 'Could not delete these pitches.') }
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true, removedIds: ((removed ?? []) as { id: string }[]).map(r => r.id) }
 }
 
 export async function clearAnnotations(clipId: string) {
