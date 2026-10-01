@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { resetFake, fail, state } from './fakes/db'
-import { deleteClip, clearAnnotations, saveLessonPath, renameClip, deleteAnnotation } from '../../../app/actions/clips'
+import { deleteClip, clearAnnotations, saveLessonPath, renameClip, deleteAnnotation, deleteTimestampNote } from '../../../app/actions/clips'
 
 const P = '11111111-1111-4111-8111-111111111111'
 const C = '33333333-3333-4333-8333-333333333333'
@@ -74,6 +74,56 @@ test('deleteClip: clip row delete fails -> error, no files removed', async () =>
   seed()
   fail({ table: 'clips', action: 'delete', error: { message: 'boom' } })
   assert.ok('error' in await deleteClip(C))
+  assert.deepEqual(state.storageOps, [])
+})
+
+// D3: timestamp voice note files go with their notes.
+const TS_VOICE = `${P}/${C}/ts_voice/abc123.webm`
+const OTHER_P = '11111111-1111-4111-8111-111111111112'
+const FOREIGN = `${OTHER_P}/${C}/ts_voice/zzz.webm`
+function seedVoiceNotes() {
+  seed()
+  state.tables.timestamp_notes = [
+    { id: 'n1', clip_id: C, created_by: COACH.id, body: `__voice__:${TS_VOICE}` },
+    { id: 'n2', clip_id: C, created_by: COACH.id, body: `__voice__:${FOREIGN}` },   // not under this player: never removed
+    { id: 'n3', clip_id: C, created_by: COACH.id, body: 'text note' },
+  ]
+  state.storage.clips.push(TS_VOICE, FOREIGN)
+}
+
+test('deleteClip: removes the clip\'s timestamp voice note files too, only under this player and clip', async () => {
+  seedVoiceNotes()
+  assert.deepEqual(await deleteClip(C), { success: true })
+  assert.deepEqual(state.storage.clips, [FOREIGN])
+})
+
+test('deleteTimestampNote: a voice note\'s file is removed after the row', async () => {
+  seedVoiceNotes()
+  assert.deepEqual(await deleteTimestampNote('n1'), { success: true })
+  assert.deepEqual(state.tables.timestamp_notes.map(n => n.id), ['n2', 'n3'])
+  assert.deepEqual(state.storageOps, [{ bucket: 'clips', paths: [TS_VOICE] }])
+})
+
+test('deleteTimestampNote: a path outside this player\'s clip folder or a text note removes no file', async () => {
+  seedVoiceNotes()
+  assert.deepEqual(await deleteTimestampNote('n2'), { success: true })
+  assert.deepEqual(await deleteTimestampNote('n3'), { success: true })
+  assert.deepEqual(state.storageOps, [])
+})
+
+test('deleteTimestampNote: file removal fails -> note deleted, warning returned', async () => {
+  seedVoiceNotes()
+  fail({ bucket: 'clips', error: { message: 'storage unavailable' } })
+  const r = await deleteTimestampNote('n1') as { success?: true; warning?: string }
+  assert.equal(r.success, true)
+  assert.match(String(r.warning), /recording couldn't be removed/)
+  assert.ok(state.storage.clips.includes(TS_VOICE))
+})
+
+test('deleteTimestampNote: row delete fails -> error, no file removed', async () => {
+  seedVoiceNotes()
+  fail({ table: 'timestamp_notes', action: 'delete', error: { message: 'boom' } })
+  assert.ok('error' in await deleteTimestampNote('n1'))
   assert.deepEqual(state.storageOps, [])
 })
 

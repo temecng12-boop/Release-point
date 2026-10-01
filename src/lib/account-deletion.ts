@@ -4,8 +4,10 @@
 //   1. gatherDeletionFacts: read every row that references U (tolerates missing
 //      tables/columns, e.g. migrations 018-020 not applied).
 //   2. planAccountDeletion: pure function deciding, per row, delete vs detach.
-//   3. executeDeletionPlan: remove storage files (listed first, exact paths only),
-//      then run the DB steps in FK-safe order. The caller then deletes the auth user.
+//   3. executeDeletionPlan: list the storage files (exact paths only), run the DB
+//      steps in FK-safe order, then remove the listed files and report any that
+//      couldn't be removed (leftoverFiles). The caller then deletes the auth user.
+//      A listing failure stops before any DB write; a DB failure removes no files.
 //
 // Per-table policy (U = the deleting user):
 //   players.user_id = U         delete the player row (cascades clips, annotations,
@@ -33,7 +35,8 @@
 //   players.adult_confirmed_by  ON DELETE SET NULL (branch column), nothing to do.
 //   bullpen_sessions.coach_id, pitch_analysis.coach_id
 //                               no FK; kept with the player's data (the id just dangles).
-//   storage profiles/avatars/<U>.<ext>  removed.
+//   storage clips/avatars/<U>.<ext>     removed (profile photos are uploaded here, D1),
+//   storage profiles/avatars/<U>.<ext>  and the old public profiles bucket too.
 
 export type Row = Record<string, unknown>
 export type DbError = { code?: string; message: string }
@@ -200,7 +203,7 @@ export type DeletionPlan = {
   deleteGuardianIds: string[]
   storageFolders: StorageTarget[]   // listed, then each listed file removed by exact path
   storageFiles: StorageTarget[]     // exact paths known from rows
-  avatarOwner: string               // profiles bucket: avatars/<userId>.<ext>
+  avatarOwner: string               // avatars/<userId>.<ext> in clips (and old profiles) bucket
 }
 
 const VOICE_PREFIX = '__voice__:'
@@ -327,6 +330,56 @@ export function isSafeStoragePath(path: string): boolean {
   return seg.every(s => s !== '' && !s.includes('..') && SEGMENT_RE.test(s))
 }
 
+// ── Storage helpers (also used by deletePlayer) ──────────────────────────────
+export type StorageFiles = Map<string, Set<string>>
+
+/**
+ * List every file to remove: each folder recursively (exact paths only, never a
+ * bare prefix), the exact paths, and each user's avatar (`avatars/<id>.<ext>` in
+ * the clips bucket and the old profiles bucket). Throws if a listing fails.
+ */
+export async function collectStorageFiles(
+  storage: DeletionStorage,
+  folders: StorageTarget[],
+  exact: StorageTarget[],
+  avatarUserIds: string[],
+  log: string[] = [],
+): Promise<StorageFiles> {
+  const files: StorageFiles = new Map()
+  const add = (bucket: string, path: string) => { if (!files.has(bucket)) files.set(bucket, new Set()); files.get(bucket)!.add(path) }
+  for (const t of folders) {
+    if (!isSafeStoragePath(t.path)) throw new AccountDeletionError('storage', `unsafe folder ${t.path}`)
+    for (const p of await listRecursive(storage, t.bucket, t.path)) if (isSafeStoragePath(p)) add(t.bucket, p)
+  }
+  for (const t of exact) add(t.bucket, t.path)
+  for (const id of uniq(avatarUserIds.filter(x => UUID_RE.test(x)))) {
+    // `<id>.` exactly, so another user whose id starts with these characters is never matched.
+    const isOwn = (name: string) => name.startsWith(`${id}.`) && SEGMENT_RE.test(name) && SEGMENT_RE.test(name.slice(id.length + 1))
+    const current = await storage.list('clips', 'avatars', id)
+    if (current.error) throw new AccountDeletionError('list clips/avatars', current.error.message)
+    for (const name of current.files) if (isOwn(name)) add('clips', `avatars/${name}`)
+    const legacy = await storage.list('profiles', 'avatars', id)
+    if (legacy.error) log.push(`skip profiles avatar: ${legacy.error.message}`)
+    else for (const name of legacy.files) if (isOwn(name)) add('profiles', `avatars/${name}`)
+  }
+  return files
+}
+
+/** Remove the files; every result is checked. Paths that couldn't be removed come back as "bucket:path". */
+export async function removeStorageFiles(storage: DeletionStorage, files: StorageFiles): Promise<{ removed: number; leftover: string[] }> {
+  let removed = 0
+  const leftover: string[] = []
+  for (const [bucket, set] of files) {
+    for (const part of chunks([...set])) {
+      let error: { message: string } | null | undefined
+      try { error = (await storage.remove(bucket, part)).error } catch (e) { error = { message: e instanceof Error ? e.message : String(e) } }
+      if (error) leftover.push(...part.map(p => `${bucket}:${p}`))
+      else removed += part.length
+    }
+  }
+  return { removed, leftover }
+}
+
 // ── Execute ──────────────────────────────────────────────────────────────────
 async function listRecursive(storage: DeletionStorage, bucket: string, folder: string, depth = 0): Promise<string[]> {
   if (depth > 4) return []
@@ -337,33 +390,17 @@ async function listRecursive(storage: DeletionStorage, bucket: string, folder: s
   return out
 }
 
-export type ExecuteResult = { removedFiles: number; log: string[] }
+export type ExecuteResult = { removedFiles: number; leftoverFiles: string[]; log: string[] }
 
 export async function executeDeletionPlan(db: DeletionDb, storage: DeletionStorage, plan: DeletionPlan, log: string[] = []): Promise<ExecuteResult> {
   const U = plan.userId
   if (!U) throw new AccountDeletionError('execute', 'no user id')
 
-  // 1. Storage. List first, remove exact paths only, never a bare prefix.
-  const files = new Map<string, Set<string>>()
-  const add = (bucket: string, path: string) => { if (!files.has(bucket)) files.set(bucket, new Set()); files.get(bucket)!.add(path) }
-  for (const t of plan.storageFolders) {
-    if (!isSafeStoragePath(t.path)) throw new AccountDeletionError('storage', `unsafe folder ${t.path}`)
-    for (const p of await listRecursive(storage, t.bucket, t.path)) if (isSafeStoragePath(p)) add(t.bucket, p)
-  }
-  for (const t of plan.storageFiles) add(t.bucket, t.path)
-  const avatars = await storage.list('profiles', 'avatars', U)
-  if (avatars.error) log.push(`skip avatar: ${avatars.error.message}`)
-  else for (const name of avatars.files) if (name.startsWith(`${U}.`) && SEGMENT_RE.test(name)) add('profiles', `avatars/${name}`)
-  let removedFiles = 0
-  for (const [bucket, set] of files) {
-    for (const part of chunks([...set])) {
-      const r = await storage.remove(bucket, part)
-      if (r.error) throw new AccountDeletionError(`remove files from ${bucket}`, r.error.message)
-      removedFiles += part.length
-    }
-  }
+  // 1. Storage: collect the exact paths first (a listing failure stops here,
+  //    before any database write). Files are removed after the rows (step 3).
+  const files = await collectStorageFiles(storage, plan.storageFolders, plan.storageFiles, [plan.avatarOwner], log)
 
-  // 2. Database, FK-safe order.
+  // 2. Database, FK-safe order. A failure here throws, so no file is removed.
   type Step = { name: string; optional?: 'column'; run: () => Promise<{ error?: DbError | null }> }
   const steps: Step[] = []
   const del = (table: string, column: string, ids: string[], name = `delete ${table}`) => {
@@ -403,13 +440,19 @@ export async function executeDeletionPlan(db: DeletionDb, storage: DeletionStora
     if (s.optional === 'column' && isMissingColumn(error)) { log.push(`skip ${s.name}: column missing`); continue }
     throw new AccountDeletionError(s.name, error.message)
   }
-  return { removedFiles, log }
+
+  // 3. Remove the files. A failure doesn't undo the deletion; the paths are returned.
+  const { removed, leftover } = await removeStorageFiles(storage, files)
+  return { removedFiles: removed, leftoverFiles: leftover, log }
 }
 
 // ── Whole flow (used by the deleteAccount server action) ─────────────────────
 export type DeleteFlowResult =
-  | { ok: true; plan: DeletionPlan; removedFiles: number; log: string[] }
-  | { ok: false; error: string; step: string; detail: string }
+  | { ok: true; plan: DeletionPlan; removedFiles: number; leftoverFiles: string[]; log: string[]; warning: string | null }
+  | { ok: false; error: string; step: string; detail: string; leftoverFiles?: string[] }
+
+export const ACCOUNT_FILES_LEFT_WARNING =
+  'Your account was deleted, but some of your files couldn\'t be removed from storage. They have been logged so they can be removed.'
 
 /**
  * Clean up, then delete the auth user. Never reports success unless every step,
@@ -444,11 +487,16 @@ export async function deleteAccountFlow(deps: {
   } catch (e) {
     authError = { message: e instanceof Error ? e.message : String(e) }
   }
+  const leftoverFiles = result.leftoverFiles
   if (authError) {
     return {
-      ok: false, step: 'delete login', detail: authError.message,
-      error: 'Your data was removed, but we couldn\'t delete your login. You\'re still signed in. Please try again, or contact support.',
+      ok: false, step: 'delete login', detail: authError.message, leftoverFiles,
+      error: 'Your data was removed, but we couldn\'t delete your login. You\'re still signed in. Please try again, or contact support.'
+        + (leftoverFiles.length > 0 ? ' Some of your files also couldn\'t be removed.' : ''),
     }
   }
-  return { ok: true, plan, removedFiles: result.removedFiles, log: result.log }
+  return {
+    ok: true, plan, removedFiles: result.removedFiles, leftoverFiles, log: result.log,
+    warning: leftoverFiles.length > 0 ? ACCOUNT_FILES_LEFT_WARNING : null,
+  }
 }

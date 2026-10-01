@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
+import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
+import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
 export async function uploadAvatar(formData: FormData) {
   const supabase = await createClient()
@@ -121,14 +123,57 @@ export async function deletePlayer(playerId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabaseAdmin
+  // Only the player's own coach. Read the account id first: its avatar goes too.
+  const { data: player, error: readError } = await supabaseAdmin
+    .from('players')
+    .select('id, user_id')
+    .eq('id', playerId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+  if (readError) return { error: 'Could not remove this player. Please try again.' }
+  if (!player) return { error: 'Player not found' }
+
+  // Collect the player's files first: clips/<playerId>/… (videos, voice notes),
+  // lessons/<playerId>/… and the account's avatar. A listing failure stops here,
+  // before anything is deleted.
+  const storage = supabaseDeletionStorage(supabaseAdmin)
+  let files
+  try {
+    files = await collectStorageFiles(
+      storage,
+      [{ bucket: 'clips', path: playerId }, { bucket: 'lessons', path: playerId }],
+      [],
+      player.user_id ? [player.user_id as string] : [],
+    )
+  } catch (e) {
+    console.error('[deletePlayer] listing files failed', { playerId, error: e instanceof Error ? e.message : String(e) })
+    return { error: 'Could not remove this player. Please try again.' }
+  }
+
+  const { data: deleted, error } = await supabaseAdmin
     .from('players')
     .delete()
     .eq('id', playerId)
     .eq('coach_id', user.id)
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!deleted || deleted.length !== 1) return { error: 'Player not found' }
+
+  // Rows are gone; remove the files. A failure doesn't undo the delete: the
+  // leftover paths are logged for cleanup and the coach gets a warning.
+  const { leftover } = await removeStorageFiles(storage, files)
+  // The player's login stays; don't leave its profile pointing at a removed photo.
+  const avatarRemoved = [...(files.get('clips') ?? [])].some(p => p.startsWith('avatars/') && !leftover.includes(`clips:${p}`))
+  if (avatarRemoved) {
+    const { error: profileError } = await supabaseAdmin.from('profiles').update({ avatar_url: null }).eq('id', player.user_id as string)
+    if (profileError) console.error('[deletePlayer] clearing avatar_url failed', { playerId, error: profileError.message })
+  }
   revalidatePath('/', 'layout')
+  if (leftover.length > 0) {
+    console.error('[deletePlayer] storage files left after delete', { playerId, leftoverFiles: leftover })
+    return { success: true, warning: 'Player removed, but some of their files couldn\'t be deleted.' }
+  }
   return { success: true }
 }
 

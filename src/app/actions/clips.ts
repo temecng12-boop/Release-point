@@ -4,7 +4,7 @@ import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } 
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { isLessonPathFor } from '@/lib/lesson-path'
-import { isVoicePathFor } from '@/lib/voice-path'
+import { isVoicePathFor, timestampVoicePathFor } from '@/lib/voice-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -436,20 +436,34 @@ export async function deleteTimestampNote(noteId: string) {
   // coach, or are the player themself.
   const { data: note } = await supabaseAdmin
     .from('timestamp_notes')
-    .select('created_by, clip_id')
+    .select('created_by, clip_id, body')
     .eq('id', noteId)
     .maybeSingle()
   if (!note) return { error: 'Not authorized' }
   const player = await playerForClip(note.clip_id as string)
   if (!canDeleteClipItem(user.id, note.created_by as string | null, player)) return { error: 'Not authorized' }
 
-  const { error } = await supabaseAdmin
+  const { data: deleted, error } = await supabaseAdmin
     .from('timestamp_notes')
     .delete()
     .eq('id', noteId)
     .eq('created_by', user.id)
+    .select('id')
 
   if (error) return { error: describeDbError('deleteTimestampNote', error, 'Could not delete this note.') }
+
+  // A voice note's file goes too, once the row is gone, and only inside this clip's ts_voice folder.
+  const { data: clipRow } = await supabaseAdmin.from('clips').select('player_id').eq('id', note.clip_id as string).maybeSingle()
+  const voicePath = deleted && deleted.length > 0 && clipRow
+    ? timestampVoicePathFor(note.body, clipRow.player_id as string, note.clip_id as string)
+    : null
+  if (voicePath) {
+    const { error: storageError } = await supabaseAdmin.storage.from('clips').remove([voicePath])
+    if (storageError) {
+      console.error('[deleteTimestampNote] storage files left after delete', { noteId, leftoverFiles: [`clips:${voicePath}`], error: storageError.message })
+      return { success: true, warning: 'Note deleted, but its recording couldn\'t be removed.' }
+    }
+  }
   return { success: true }
 }
 
@@ -556,6 +570,13 @@ export async function deleteClip(clipId: string) {
   const { data: lessonRow } = await supabaseAdmin.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
   const lessonPath = (lessonRow as { lesson_path?: string | null } | null)?.lesson_path ?? null
 
+  // Timestamp voice note files (D3), collected before their rows are deleted.
+  const { data: tsNotes, error: tsError } = await supabaseAdmin.from('timestamp_notes').select('body').eq('clip_id', clipId)
+  if (tsError) return { error: describeDbError('deleteClip:timestamp_notes', tsError, 'Could not delete this clip.') }
+  const tsVoicePaths = ((tsNotes ?? []) as { body: unknown }[])
+    .map(n => timestampVoicePathFor(n.body, clip.player_id as string, clipId))
+    .filter((p): p is string => p !== null)
+
   // Stop before the clip row if any of these fails, so a failed delete reports
   // an error instead of a clip that silently lost its marks or notes.
   for (const table of ['annotations', 'timestamp_notes', 'pitch_metrics']) {
@@ -572,7 +593,7 @@ export async function deleteClip(clipId: string) {
   // A failed file removal doesn't undo the delete: it is logged and the
   // caller gets a warning to show.
   let cleanupFailed = false
-  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path])
+  const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path, ...tsVoicePaths])
   if (files.length > 0) {
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
     if (storageError) { console.error('[deleteClip] storage cleanup failed', clipId, storageError.message); cleanupFailed = true }
