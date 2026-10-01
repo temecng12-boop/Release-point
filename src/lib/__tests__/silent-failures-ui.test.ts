@@ -109,7 +109,12 @@ test('clip-notes.tsx is gone and nothing imports it', () => {
     const p = join(dir, n)
     return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(n) ? [p] : []
   })
+  // './clip-notes' only means the deleted component inside app/clips/[id]/;
+  // elsewhere (src/lib) it is the clip-notes helper module.
+  const clipDir = new URL('app/clips/[id]/', SRC).pathname
   for (const f of walk(new URL('.', SRC).pathname)) {
-    assert.doesNotMatch(readFileSync(f, 'utf8'), /from ['"](\.\/|@\/app\/clips\/\[id\]\/)clip-notes['"]/, f)
+    const src = readFileSync(f, 'utf8')
+    assert.doesNotMatch(src, /from ['"]@\/app\/clips\/\[id\]\/clip-notes['"]/, f)
+    if (f.startsWith(clipDir)) assert.doesNotMatch(src, /from ['"]\.\/clip-notes['"]/, f)
   }
 })
