@@ -73,8 +73,10 @@ test('about page: security and access claims match the code', () => {
   // Server reads use the service-role client with checks in code, so no claim
   // that every query is enforced by row-level security.
   assert.doesNotMatch(about, /every database query/i)
-  assert.match(about, /checks who you are and how you are connected to a player/)
-  assert.match(about, /row-level security rules also protect every table/)
+  assert.match(about, /checks your access on every request before it shows or changes a player\\'s data/)
+  // Service-role (admin) reads skip RLS, so RLS is a second layer on most direct access, not on every table read.
+  assert.match(about, /database rules add a second layer of protection on most direct access/)
+  assert.doesNotMatch(about, /protect(s)? every table/i)
   // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
   assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
   assert.match(about, /the player, their coach, coaches of teams the player is on, and their linked parent or guardian/)

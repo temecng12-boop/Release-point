@@ -67,14 +67,14 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
   return (
     <li className="py-2">
       <div className="flex items-center gap-3">
-        <button onClick={toggle} disabled={pending} className="text-xs text-[#1C3A5C] hover:text-[#C8102E] transition-colors disabled:opacity-50 shrink-0" style={oswald}>
+        <button onClick={toggle} disabled={pending} className="text-xs text-[#1C3A5C] hover:text-[#C8102E] transition-colors disabled:opacity-50 shrink-0 max-sm:min-h-11 max-sm:min-w-11" style={oswald}>
           {open ? '■ Close' : '▶ Play'}
         </button>
         <span className="text-xs text-[#0F1F33]">{fmtDateTime(lesson.created_at)}</span>
         <span className="text-xs text-[#3D5166] truncate">{lesson.coach_name ?? 'Coach'}</span>
         {duration && <span className="text-xs text-[#8096AE] font-mono">{duration}</span>}
         {canManage && (
-          <button onClick={remove} disabled={pending} className="ml-auto text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors disabled:opacity-50" style={oswald}>
+          <button onClick={remove} disabled={pending} className="ml-auto text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors disabled:opacity-50 max-sm:min-h-11 max-sm:min-w-11" style={oswald}>
             Delete
           </button>
         )}

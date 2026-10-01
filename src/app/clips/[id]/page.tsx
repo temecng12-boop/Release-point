@@ -246,7 +246,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href={`/clips/compare?a=${id}`}
-              className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-sm:min-h-11"
               style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +258,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
             {nextClipRow && (
               <Link
                 href={`/clips/${nextClipRow.id}`}
-                className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38vw]"
+                className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38vw] max-sm:min-h-11"
                 style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
               >
                 <span className="truncate leading-tight">

@@ -48,7 +48,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm') {
+  // /auth/reset is opened signed in (the reset link's recovery session).
+  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/reset') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
