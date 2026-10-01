@@ -127,7 +127,7 @@ export default function LoginPage() {
               </div>
 
               {/* Mode toggle */}
-              <div className="flex rounded-lg p-1 mb-6 gap-1"
+              <div role="group" aria-label="Sign-in method" className="flex rounded-lg p-1 mb-6 gap-1"
                 style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                 {(['Password', 'Email Link'] as const).map((label, idx) => {
                   const active = idx === 0 ? !magicMode : magicMode

@@ -28,7 +28,9 @@ export function passwordResetRedirectUrl(siteUrl: string | undefined = process.e
   return `${origin}/auth/confirm?next=${encodeURIComponent(RESET_PATH)}`
 }
 
-type AuthErrorLike = { message: string; status?: number; code?: string } | null
+const NETWORK_ERROR = 'Couldn\'t reach the server. Check your connection and try again.'
+
+type AuthErrorLike = { message: string; status?: number; code?: string; name?: string } | null
 export type ResetRequestAuth = {
   resetPasswordForEmail(email: string, options: { redirectTo: string }): Promise<{ error: AuthErrorLike }>
 }
@@ -42,9 +44,11 @@ export async function requestPasswordReset(auth: ResetRequestAuth, email: string
   try {
     ({ error } = await auth.resetPasswordForEmail(address, { redirectTo: passwordResetRedirectUrl() }))
   } catch {
-    return { ok: false, error: 'Couldn\'t reach the server. Check your connection and try again.' }
+    return { ok: false, error: NETWORK_ERROR }
   }
   if (error) {
+    // supabase-js returns (not throws) a fetch failure as status 0 / AuthRetryableFetchError.
+    if (error.status === 0 || error.name === 'AuthRetryableFetchError') return { ok: false, error: NETWORK_ERROR }
     if (error.status === 429 || error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
       return { ok: false, error: 'Too many reset requests. Wait a few minutes, then try again.' }
     }

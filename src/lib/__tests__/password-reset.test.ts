@@ -64,6 +64,8 @@ test('errors are shown: rate limit, network failure, other Supabase errors, bad 
   const net = await requestPasswordReset(fakeAuth('throw').auth, 'c@example.com')
   assert.equal(net.ok, false)
   assert.match((net as { error: string }).error, /Couldn't reach the server/)
+  const returned = await requestPasswordReset(fakeAuth({ error: { message: 'Failed to fetch', status: 0, name: 'AuthRetryableFetchError' } }).auth, 'c@example.com')
+  assert.deepEqual(returned, net, 'a fetch failure returned by supabase-js reads the same as a thrown one')
   const other = await requestPasswordReset(fakeAuth({ error: { message: 'Error sending recovery email', status: 500 } }).auth, 'c@example.com')
   assert.deepEqual(other, { ok: false, error: 'Couldn\'t send the reset email: Error sending recovery email' })
   const f = fakeAuth({ error: null })

@@ -36,7 +36,7 @@ function ConfirmInner() {
 
       // Supabase sends an expired or used reset link back with ?error= (or #error=).
       if (next === RESET_PATH && (searchParams.get('error') || hashParams.get('error'))) {
-        window.location.href = `${RESET_PATH}?error=link`
+        window.location.replace(`${window.location.origin}${RESET_PATH}?error=link`)
         return
       }
       const accessToken  = hashParams.get('access_token')

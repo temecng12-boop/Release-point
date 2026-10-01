@@ -27,7 +27,7 @@ export default function ResetForm({ problem }: { problem: string | null }) {
   // Success only after the server confirmed the update; then on to the dashboard.
   useEffect(() => {
     if (!state?.success) return
-    const t = setTimeout(() => { window.location.href = '/dashboard' }, 1500)
+    const t = setTimeout(() => { window.location.replace(`${window.location.origin}/dashboard`) }, 1500)
     return () => clearTimeout(t)
   }, [state?.success])
 
