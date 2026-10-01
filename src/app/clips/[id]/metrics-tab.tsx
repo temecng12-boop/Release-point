@@ -90,6 +90,7 @@ export default function MetricsTab({
   playerAgeGroup,
   initialMetrics,
   onMetricsChange,
+  canDelete = false,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -98,6 +99,8 @@ export default function MetricsTab({
   playerPosition: string | null
   initialMetrics: MetricRow[]
   onMetricsChange?: (metrics: MetricRow[]) => void
+  /** Only the player's direct coach (the rule RLS enforces on pitch_metrics). */
+  canDelete?: boolean
 }) {
   const isCoach = role === 'coach'
   const fileRef = useRef<HTMLInputElement>(null)
@@ -451,7 +454,7 @@ export default function MetricsTab({
             </div>
             <div className="flex items-center gap-2">
               <p className="text-[10px] text-[#3D5166]/50">{metrics.length} pitch{metrics.length !== 1 ? 'es' : ''}</p>
-              {isCoach && !confirmAll && (
+              {canDelete && !confirmAll && (
                 <button type="button" onClick={() => { setConfirmAll(true); setMetricDeleteError(null) }}
                   className="!min-h-11 px-2 text-[10px] tracking-widest text-[#3D5166] hover:text-[#C8102E] transition-colors" style={oswald}>
                   Delete all
@@ -459,7 +462,7 @@ export default function MetricsTab({
               )}
             </div>
           </div>
-          {confirmAll && (
+          {canDelete && confirmAll && (
             <div role="alertdialog" aria-label="Delete all pitches" className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] bg-[#FFF5F5]">
               <span className="text-xs text-[#456080]">Delete all {metrics.length} pitch{metrics.length !== 1 ? 'es' : ''} on this clip? This can&apos;t be undone.</span>
               <div className="flex items-center gap-2">
@@ -493,7 +496,7 @@ export default function MetricsTab({
                       {h.label}
                     </th>
                   ))}
-                  {isCoach && <th className="px-1 py-2"><span className="sr-only">Delete</span></th>}
+                  {canDelete && <th className="px-1 py-2"><span className="sr-only">Delete</span></th>}
                 </tr>
               </thead>
               <tbody>
@@ -539,7 +542,7 @@ export default function MetricsTab({
                     <td className="px-3 py-2.5 text-[#0F1F33] font-mono">
                       {m.vaa != null ? m.vaa.toFixed(1) : <span className="text-[#3D5166]/40">—</span>}
                     </td>
-                    {isCoach && (
+                    {canDelete && (
                       <td className="px-1 py-1 text-right">
                         <button type="button" onClick={() => handleDeleteMetric(m.id)} disabled={deletingId !== null || deletingAll}
                           aria-label={`Delete pitch ${m.pitch_type ?? ''}${m.velocity != null ? ` ${m.velocity.toFixed(1)} mph` : ''}`.trim()}
