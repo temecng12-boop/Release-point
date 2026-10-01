@@ -25,7 +25,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 **Storage buckets must be Private.** The app serves stored files only through
 signed URLs (`createSignedUrl`) and never uses public URLs. The buckets the code uses:
 
-- `clips`: clip videos, coach voice notes (`<clipId>/voice/...`), and profile photos (`avatars/<userId>.<ext>`)
+- `clips`: clip videos, coach voice notes (`<playerId>/<clipId>/voice.<ext>`), timestamp voice notes (`<playerId>/<clipId>/ts_voice/<uid>.<ext>`), and profile photos (`avatars/<userId>.<ext>`)
 - `lessons`: coach lesson recordings (created by migration 016 as private)
 
 In the Supabase dashboard, go to Storage, open each bucket's settings and turn
