@@ -98,7 +98,7 @@ export async function linkPlayerRow() {
   // Link to an existing invited player record
   const { data: linked } = await supabaseAdmin
     .from('players')
-    .update({ user_id: user.id, accepted_at: now, consent_given_at: now })
+    .update({ user_id: user.id, accepted_at: now })
     .eq('email', user.email)
     .is('user_id', null)
     .select('id')
@@ -117,7 +117,6 @@ export async function linkPlayerRow() {
         full_name:        fullName,
         email:            user.email,
         accepted_at:      now,
-        consent_given_at: now,
       })
     }
   }
