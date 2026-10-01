@@ -177,7 +177,10 @@ export default function TimestampNotes({
     setError(null)
     const result = await deleteTimestampNote(id)
     if (result?.error) setError(result.error)
-    else setNotes(prev => prev.filter(n => n.id !== id))
+    else {
+      setNotes(prev => prev.filter(n => n.id !== id))
+      if (result && 'warning' in result && result.warning) setError(result.warning)
+    }
   }
 
   return (

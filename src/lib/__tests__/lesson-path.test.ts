@@ -63,7 +63,7 @@ test('deleteClip removes the lesson recording from the lessons bucket, not clips
   const fn = src.slice(src.indexOf('export async function deleteClip'), src.indexOf('export async function savePhaseChecklist'))
   // Every lesson file of the clip (checked to be in this player's folder by
   // clipLessonFiles), removed from the lessons bucket; never from clips.
-  assert.match(fn, /clipLessonFiles\(supabaseAdmin, clipId, clip\.player_id as string\)/)
+  assert.match(fn, /readClipLessonFiles\(supabaseAdmin, clipId, clip\.player_id as string\)/)
   assert.match(fn, /storage\.from\('lessons'\)\.remove\(lessonFiles\)/)
   assert.doesNotMatch(fn, /clipFilesToRemove\([^)]*lesson/)
 })
