@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from 'reac
 import { addCoachToTeam, removeCoachFromTeam } from '@/app/actions/team-coaches'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'flex-1 bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080]'
+const inputClass = 'flex-1 bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] max-sm:min-h-11'
 
 interface Coach {
   coach_id: string
@@ -64,7 +64,7 @@ export default function AddCoachForm({
               <button
                 type="submit"
                 disabled={pending}
-                className="bg-[#1C3A5C] hover:bg-[#223F63] text-white rounded-md px-4 py-2 text-xs transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+                className="bg-[#1C3A5C] hover:bg-[#223F63] text-white rounded-md px-4 py-2 text-xs transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 max-sm:min-h-11"
                 style={oswald}
               >
                 {pending ? 'Adding…' : 'Add Coach'}
@@ -100,7 +100,7 @@ function RemoveButton({ teamId, coachId }: { teamId: string; coachId: string }) 
           })
         }}
         disabled={pending}
-        className="text-[11px] text-[#8096AE] hover:text-[#C8102E] transition-colors disabled:opacity-50"
+        className="text-[11px] text-[#8096AE] hover:text-[#C8102E] transition-colors disabled:opacity-50 max-sm:min-h-11 max-sm:min-w-11"
         style={oswald}
       >
         {pending ? '…' : 'Remove'}

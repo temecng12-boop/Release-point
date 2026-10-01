@@ -100,7 +100,7 @@ export default function ClipTabs({
             <button
               key={tab}
               onClick={() => setActive(tab)}
-              className="relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center"
+              className="relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center max-sm:min-h-11"
               style={{ ...os, color: isActive ? '#0f172a' : '#94a3b8' }}
             >
               <span className="hidden sm:inline">{TAB_LABEL[tab](isPitcher)}</span>

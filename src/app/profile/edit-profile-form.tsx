@@ -155,7 +155,7 @@ export default function EditProfileForm({
                       <button
                         type="button"
                         onClick={() => setSchools(schools.filter(x => x !== s))}
-                        className="opacity-60 hover:opacity-100 leading-none min-h-0"
+                        className="opacity-60 hover:opacity-100 leading-none max-sm:min-h-11 max-sm:min-w-11"
                       >×</button>
                     </span>
                   ))}
@@ -215,7 +215,7 @@ export default function EditProfileForm({
                   <button
                     type="button"
                     onClick={() => setCertifications(certifications.filter(x => x !== c))}
-                    className="opacity-60 hover:opacity-100 leading-none min-h-0"
+                    className="opacity-60 hover:opacity-100 leading-none max-sm:min-h-11 max-sm:min-w-11"
                   >×</button>
                 </span>
               ))}
