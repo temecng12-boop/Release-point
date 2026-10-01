@@ -136,7 +136,7 @@ function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void
         {
           role: 'coach' as const,
           title: 'Coach',
-          desc: 'Manage your roster, upload and annotate clips, import pitch metrics, enter swing metrics, and track player development.',
+          desc: 'Manage your roster, upload and annotate clips, enter pitch and swing metrics, and track player development.',
           tags: ['Teams', 'Video Analysis', 'Pitch & Swing Metrics', 'AI Coach'],
         },
         {
@@ -239,7 +239,7 @@ export default function SignupPage() {
           <div className="space-y-6">
             {[
               { n: '01', title: 'Video Analysis', desc: 'Frame-by-frame mechanics breakdown with canvas annotation tools' },
-              { n: '02', title: 'Pitch Metrics',   desc: 'Import pitch metrics: velocity, spin, break, benchmarked automatically' },
+              { n: '02', title: 'Pitch & Swing Metrics', desc: 'Velocity, spin and break for pitchers; exit velocity and bat speed for hitters' },
               { n: '03', title: 'AI Coach',         desc: 'Data-backed analysis tied to your player\'s age group and real numbers' },
               { n: '04', title: 'Team Management', desc: 'Organize players by team and age group, share clips instantly' },
             ].map((f) => (
