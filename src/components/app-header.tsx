@@ -28,7 +28,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
       }}
     >
       <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
-        <Logo size="sm" href="/" className="shrink-0" wordmarkClass="hidden md:inline" />
+        <Logo size="sm" href="/" className="shrink-0 max-sm:min-h-11" wordmarkClass="hidden md:inline" />
         {breadcrumbs?.map((crumb, i) => (
           <span key={i} className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             <span className="text-slate-300 shrink-0">/</span>
@@ -36,7 +36,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
               <Link
                 href={crumb.href}
                 transitionTypes={['nav-back']}
-                className="text-xs text-slate-400 hover:text-slate-700 transition-colors shrink-0 hidden sm:inline"
+                className="text-xs text-slate-400 hover:text-slate-700 transition-colors shrink-0 hidden sm:inline max-sm:min-h-11"
                 style={oswald}
               >
                 {crumb.label}
@@ -56,7 +56,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
           <SignOutForm>
             <button
               type="submit"
-              className="text-xs text-slate-400 hover:text-slate-700 transition-colors px-2 py-1"
+              className="text-xs text-slate-400 hover:text-slate-700 transition-colors px-2 py-1 max-sm:min-h-11 max-sm:min-w-11"
               style={oswald}
             >
               Sign Out

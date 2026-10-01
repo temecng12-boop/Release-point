@@ -137,7 +137,7 @@ export default function LoginPage() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => { setMagicMode(idx === 1); setForgotMode(false) }}
-                      className="flex-1 py-2 rounded-md text-xs transition-all"
+                      className="flex-1 py-2 rounded-md text-xs transition-all max-sm:min-h-11"
                       style={{
                         ...os,
                         background: active ? '#ffffff' : 'transparent',
@@ -229,7 +229,7 @@ export default function LoginPage() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2">Email Link</button> tab instead.</p>
+                  <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2 max-sm:min-h-11 max-sm:min-w-11">Email Link</button> tab instead.</p>
                   {state?.error && (
                     <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{state.error}</p>
@@ -321,7 +321,7 @@ export default function LoginPage() {
                     <Link
                       key={l}
                       href="/auth/signup"
-                      className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all text-center"
+                      className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all text-center max-sm:min-h-11 max-sm:flex max-sm:items-center max-sm:justify-center"
                       style={{ ...os, border: '1px solid #e2e8f0' }}
                     >
                       {l}

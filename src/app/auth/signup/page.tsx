@@ -304,7 +304,7 @@ export default function SignupPage() {
               <div className="mt-5 pt-5 text-center" style={{ borderTop: '1px solid #e2e8f0' }}>
                 <p className="text-sm text-slate-500">
                   Already have an account?{' '}
-                  <Link href="/auth/login" className="text-slate-800 hover:text-slate-950 transition-colors font-medium">
+                  <Link href="/auth/login" className="text-slate-800 hover:text-slate-950 transition-colors font-medium max-sm:inline-flex max-sm:items-center max-sm:min-h-11 max-sm:min-w-11 max-sm:justify-center">
                     Sign in
                   </Link>
                 </p>

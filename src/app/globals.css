@@ -63,16 +63,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Minimum tap targets */
-button, a {
-  min-height: 36px;
+/* These element defaults live in @layer base so Tailwind utilities
+   such as min-h-* override them. Unlayered rules beat every
+   layered utility, which made min-h-11 and friends silently do nothing. */
+@layer base {
+  /* Minimum tap targets */
+  button, a {
+    min-height: 36px;
+  }
+
+  /* Header links must not inherit min-height */
+  header a,
+  header button,
+  header span {
+    min-height: unset;
+  }
 }
 
-/* Header links must not inherit min-height */
+/* Header items are laid out inline-flex. Left unlayered on purpose: it still
+   overrides display utilities such as `hidden` inside headers, and changing
+   that would change how mobile headers look. */
 header a,
 header button,
 header span {
-  min-height: unset;
   display: inline-flex;
   align-items: center;
 }

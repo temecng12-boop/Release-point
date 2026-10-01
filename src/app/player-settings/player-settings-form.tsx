@@ -63,7 +63,7 @@ function CollegePicker({
           {value.map(p => (
             <span key={p} className="flex items-center gap-1.5 text-xs bg-[#1C3A5C] text-white px-2.5 py-1 rounded-full shrink-0">
               {p}
-              <button type="button" onClick={() => toggle(p)} className="opacity-60 hover:opacity-100 leading-none min-h-0">×</button>
+              <button type="button" onClick={() => toggle(p)} className="opacity-60 hover:opacity-100 leading-none max-sm:min-h-11 max-sm:min-w-11">×</button>
             </span>
           ))}
         </div>
@@ -84,7 +84,7 @@ function CollegePicker({
                 key={p}
                 type="button"
                 onClick={() => { toggle(p); setSearch('') }}
-                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F4F8] transition-colors min-h-0 ${value.includes(p) ? 'text-[#C8102E] font-medium' : 'text-[#0F1F33]'}`}
+                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F4F8] transition-colors max-sm:min-h-11 ${value.includes(p) ? 'text-[#C8102E] font-medium' : 'text-[#0F1F33]'}`}
               >
                 {value.includes(p) ? '✓ ' : ''}{p}
               </button>
@@ -258,7 +258,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
             <button
               type="button"
               onClick={addShowcase}
-              className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors"
+              className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors max-sm:min-h-11 max-sm:min-w-11"
               style={oswald}
             >
               + Add
