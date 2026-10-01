@@ -46,7 +46,8 @@ function fakeDb(tables: Tables, opts: { missingColumns?: string[]; failOn?: { op
   return { db, ops }
 }
 
-function fakeStorage(objects: Record<string, string[]>, opts: { failList?: boolean; failRemove?: boolean } = {}) {
+// failRemove: true fails every remove; a bucket name fails only removes from that bucket.
+function fakeStorage(objects: Record<string, string[]>, opts: { failList?: boolean; failRemove?: boolean | string } = {}) {
   const removed: string[] = []
   const listed: string[] = []
   const storage: DeletionStorage = {
@@ -62,7 +63,7 @@ function fakeStorage(objects: Record<string, string[]>, opts: { failList?: boole
       return { files: [...files], folders: [...folders] }
     },
     async remove(bucket, paths) {
-      if (opts.failRemove) return { error: { message: 'remove failed' } }
+      if (opts.failRemove === true || opts.failRemove === bucket) return { error: { message: 'remove failed' } }
       for (const p of paths) { removed.push(`${bucket}:${p}`); objects[bucket] = (objects[bucket] ?? []).filter(x => x !== p) }
       return {}
     },
@@ -134,6 +135,8 @@ function objects(): Record<string, string[]> {
       `${P_OWN}/1.mp4`, `${P_OWN}/6.mp4`, `${P_OWN}/${C1}/voice.webm`, `${P_OWN}/${C1}/ts_voice/z.webm`,
       `${P_UNCLAIMED}/2.mp4`, `${P_GUARDED}/3.mp4`, `${P_TEAM}/4.mp4`,
       `${P_OTHER}/5.mp4`, `${P_OTHER}/${C5}/ts_voice/abc.webm`, `${P_OTHER}/${C5}/ts_voice/other.webm`,
+      // Current avatars (D1). `${COACH}0.jpg` shares COACH's id as a prefix and must never be removed.
+      `avatars/${COACH}.png`, `avatars/${COACH}0.jpg`, `avatars/${OTHER_COACH}.jpg`, `avatars/${PLAYER_USER}.jpg`,
     ],
     lessons: [`${P_GUARDED}/${C3}/lesson.webm`, `${P_UNCLAIMED}/${C2}/lesson.webm`, `${P_OTHER}/${C5}/lesson.webm`],
     profiles: [`avatars/${COACH}.jpg`, `avatars/${OTHER_COACH}.jpg`],
@@ -193,7 +196,10 @@ test('coach: storage removes only listed files of deleted data, plus own avatar'
     `clips:${P_UNCLAIMED}/2.mp4`,
     `lessons:${P_UNCLAIMED}/${C2}/lesson.webm`,
     `profiles:avatars/${COACH}.jpg`,
+    `clips:avatars/${COACH}.png`,
   ].sort())
+  assert.ok(o.clips.includes(`avatars/${COACH}0.jpg`))
+  assert.ok(o.clips.includes(`avatars/${OTHER_COACH}.jpg`))
   assert.ok(o.clips.includes(`${P_OTHER}/${C5}/ts_voice/other.webm`))
   assert.ok(o.clips.includes(`${P_OWN}/1.mp4`))
   assert.ok(o.profiles.includes(`avatars/${OTHER_COACH}.jpg`))
@@ -205,7 +211,7 @@ test('player: own row deleted with its whole storage folders; coach and others u
   assert.deepEqual(plan.detachCoachPlayerIds, [])
   assert.ok(!ids(t.players).includes(P_OWN))
   assert.equal(ids(t.players).length, 5)
-  assert.deepEqual(removed.sort(), [`clips:${P_OWN}/1.mp4`, `clips:${P_OWN}/6.mp4`, `clips:${P_OWN}/${C1}/ts_voice/z.webm`, `clips:${P_OWN}/${C1}/voice.webm`].sort())
+  assert.deepEqual(removed.sort(), [`clips:${P_OWN}/1.mp4`, `clips:${P_OWN}/6.mp4`, `clips:${P_OWN}/${C1}/ts_voice/z.webm`, `clips:${P_OWN}/${C1}/voice.webm`, `clips:avatars/${PLAYER_USER}.jpg`].sort())
   assert.deepEqual(ids(t.teams), [T1, T2, T3])
 })
 
@@ -263,12 +269,42 @@ test('flow: a DB error stops the flow and the auth user is NOT deleted', async (
   assert.equal(called, false)
 })
 
-test('flow: storage remove error stops the flow before deleting the login', async () => {
-  const { db } = fakeDb(world())
+test('flow: storage removal fails after the rows are gone -> login deleted, honest warning, leftover paths returned', async () => {
+  const t = world()
+  const { db } = fakeDb(t)
+  const s = fakeStorage(objects(), { failRemove: 'lessons' })
   let called = false
-  const r = await deleteAccountFlow({ userId: PLAYER_USER, email: null, db, storage: fakeStorage(objects(), { failRemove: true }).storage, deleteAuthUser: async () => { called = true; return {} } })
+  const r = await deleteAccountFlow({ userId: COACH, email: null, db, storage: s.storage, deleteAuthUser: async () => { called = true; return {} } })
+  assert.equal(r.ok, true)
+  if (!r.ok) return
+  assert.equal(called, true)
+  assert.ok(!ids(t.players).includes(P_UNCLAIMED))
+  assert.deepEqual(r.leftoverFiles, [`lessons:${P_UNCLAIMED}/${C2}/lesson.webm`])
+  assert.match(r.warning ?? '', /deleted, but some of your files couldn't be removed/)
+  assert.ok(s.removed.includes(`clips:${P_UNCLAIMED}/2.mp4`))   // other buckets still cleaned
+  assert.ok(!s.removed.some(x => x.startsWith('lessons:')))
+})
+
+test('flow: every removal fails -> still not reported as a clean success', async () => {
+  const { db } = fakeDb(world())
+  const r = await deleteAccountFlow({ userId: PLAYER_USER, email: null, db, storage: fakeStorage(objects(), { failRemove: true }).storage, deleteAuthUser: async () => ({}) })
+  assert.equal(r.ok, true)
+  if (r.ok) { assert.equal(r.removedFiles, 0); assert.equal(r.leftoverFiles.length, 5); assert.ok(r.warning) }
+})
+
+test('flow: a DB error removes no files', async () => {
+  const { db } = fakeDb(world(), { failOn: { op: 'delete', table: 'players' } })
+  const s = fakeStorage(objects())
+  const r = await deleteAccountFlow({ userId: PLAYER_USER, email: null, db, storage: s.storage, deleteAuthUser: async () => ({}) })
   assert.equal(r.ok, false)
-  assert.equal(called, false)
+  assert.deepEqual(s.removed, [])
+})
+
+test('flow: full success has no warning and no leftovers', async () => {
+  const { db } = fakeDb(world())
+  const r = await deleteAccountFlow({ userId: COACH, email: null, db, storage: fakeStorage(objects()).storage, deleteAuthUser: async () => ({}) })
+  assert.equal(r.ok, true)
+  if (r.ok) { assert.equal(r.warning, null); assert.deepEqual(r.leftoverFiles, []) }
 })
 
 test('flow: auth deleteUser error (returned or thrown) is reported, not success', async () => {
