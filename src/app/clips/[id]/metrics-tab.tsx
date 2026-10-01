@@ -398,7 +398,7 @@ export default function MetricsTab({
           </p>
           <button
             onClick={() => setShowManual(v => !v)}
-            className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors"
+            className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors max-sm:min-h-11 max-sm:min-w-11"
             style={oswald}
           >
             {showManual ? 'Cancel' : '+ Add Pitch'}

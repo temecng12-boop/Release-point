@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendPlayerJoinedEmail } from '@/lib/email'
+import { RESET_PATH } from '@/lib/password-reset'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -11,6 +12,8 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
   const next = searchParams.get('next') ?? '/dashboard'
+  // A failed or expired password reset link goes back to the reset page, which explains it.
+  const failed = next === RESET_PATH ? `${origin}${RESET_PATH}?error=link` : `${origin}/auth/login?error=confirmation_failed`
 
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!sessionError) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.redirect(`${origin}/auth/login?error=confirmation_failed`)
+      return NextResponse.redirect(failed)
     }
     // Link player row to this auth account (for invited players)
     if (user.email) {
@@ -74,12 +77,12 @@ export async function GET(request: NextRequest) {
         }
       }
       // New invited player — send to onboarding to pick position + give consent
-      if ((updatedPlayers ?? []).length > 0) {
+      if ((updatedPlayers ?? []).length > 0 && next !== RESET_PATH) {
         return NextResponse.redirect(`${origin}/onboarding`)
       }
     }
     return NextResponse.redirect(`${origin}${next}`)
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=confirmation_failed`)
+  return NextResponse.redirect(failed)
 }
