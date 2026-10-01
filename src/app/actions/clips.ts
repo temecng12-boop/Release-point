@@ -283,9 +283,11 @@ export async function clearAnnotations(clipId: string) {
   const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
   if (player?.coach_id !== user.id) return { error: 'Not authorized' }
 
-  const { error } = await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId).eq('created_by', user.id)
+  // Only this coach's own marks are deleted; the ids tell the player which
+  // marks to take off the screen (src/lib/mark-clear.ts).
+  const { data: removed, error } = await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId).eq('created_by', user.id).select('id')
   if (error) return { error: error.message }
-  return { success: true }
+  return { success: true, removedIds: (removed ?? []).map(r => r.id as string) }
 }
 
 export async function saveTimestampNote(data: {
@@ -432,6 +434,8 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
   return { success: true }
 }
 
+const CLIP_FILES_CLEANUP_WARNING = 'Clip deleted, but some of its files couldn\'t be cleaned up.'
+
 export async function deleteClip(clipId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -459,9 +463,12 @@ export async function deleteClip(clipId: string) {
   // Every lesson file of this clip (lessons bucket), collected before the rows cascade away.
   const lessonFiles = await clipLessonFiles(supabaseAdmin, clipId, clip.player_id as string)
 
-  await supabaseAdmin.from('annotations').delete().eq('clip_id', clipId)
-  await supabaseAdmin.from('timestamp_notes').delete().eq('clip_id', clipId)
-  await supabaseAdmin.from('pitch_metrics').delete().eq('clip_id', clipId)
+  // Stop before the clip row if any of these fails, so a failed delete reports
+  // an error instead of a clip that silently lost its marks or notes.
+  for (const table of ['annotations', 'timestamp_notes', 'pitch_metrics']) {
+    const { error: childError } = await supabaseAdmin.from(table).delete().eq('clip_id', clipId)
+    if (childError) return { error: describeDbError(`deleteClip:${table}`, childError, 'Could not delete this clip.') }
+  }
 
   const { error } = await supabaseAdmin.from('clips').delete().eq('id', clipId)
   if (error) return { error: error.message }
@@ -469,19 +476,22 @@ export async function deleteClip(clipId: string) {
   // Files are removed only after the check above passed and the clip row is
   // gone, with the service client (the caller's session may not be allowed to
   // delete another uploader's files), and only inside this player's folder.
+  // A failed file removal doesn't undo the delete: it is logged and the
+  // caller gets a warning to show.
+  let cleanupFailed = false
   const files = clipFilesToRemove(clip.player_id as string, [clip.storage_path, clip.voice_path])
   if (files.length > 0) {
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
-    if (storageError) console.error('[deleteClip] storage cleanup failed', clipId, storageError.message)
+    if (storageError) { console.error('[deleteClip] storage cleanup failed', clipId, storageError.message); cleanupFailed = true }
   }
   // Every lesson file of this clip (lessons bucket), not only lesson_path.
   if (lessonFiles.length) {
     const { error: lessonRemoveError } = await supabaseAdmin.storage.from('lessons').remove(lessonFiles)
-    if (lessonRemoveError) console.error('[deleteClip] lesson file cleanup failed', clipId, lessonRemoveError.message)
+    if (lessonRemoveError) { console.error('[deleteClip] lesson file cleanup failed', clipId, lessonRemoveError.message); cleanupFailed = true }
   }
 
   revalidatePath('/dashboard')
-  return { success: true }
+  return cleanupFailed ? { success: true, warning: CLIP_FILES_CLEANUP_WARNING } : { success: true }
 }
 
 export async function savePhaseChecklist(clipId: string, checklist: {

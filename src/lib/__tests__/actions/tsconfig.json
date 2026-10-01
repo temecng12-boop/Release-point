@@ -1,0 +1,15 @@
+{
+  // Server-action tests: the real action modules, with Supabase and Next's
+  // server modules swapped for in-memory fakes (./fakes). Run with:
+  //   npx tsx --tsconfig src/lib/__tests__/actions/tsconfig.json --test src/lib/__tests__/actions/*.test.ts
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/lib/supabase/admin": ["./fakes/supabase-admin.ts"],
+      "@/lib/supabase/server": ["./fakes/supabase-server.ts"],
+      "next/cache": ["./fakes/next-cache.ts"],
+      "next/navigation": ["./fakes/next-navigation.ts"],
+      "@/*": ["../../../*"]
+    }
+  }
+}
