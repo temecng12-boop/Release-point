@@ -6,6 +6,10 @@
 // leading UTF-8 BOM are accepted. It only uses plain string operations, so it
 // behaves the same in Safari/WebKit and Chromium.
 //
+// A quote in the middle of an unquoted value (6'2") or text right after a
+// closing quote ("a"b) is kept as text, and the line is listed in `warnings`
+// so the user can check that row.
+//
 // readPitchCsv turns the text into pitch rows and never drops a row silently:
 // rows whose column count differs from the header, rows with a number that
 // can't be read, and rows with no pitch type or velocity are returned in
@@ -28,7 +32,7 @@ export const COLUMN_MAP = {
 }
 
 export type CsvParse =
-  | { ok: true; records: string[][]; lines: number[] }   // lines[k] = line record k starts on
+  | { ok: true; records: string[][]; lines: number[]; strayQuoteLines: number[] }   // lines[k] = line record k starts on
   | { ok: false; error: string }
 
 /**
@@ -45,16 +49,19 @@ export function parseCsv(text: string): CsvParse {
   let quoteLine = 0
   let line = 1
   let recordLine = 1
+  let afterClosingQuote = false
+  const strayQuoteLines: number[] = []
+  const stray = () => { if (strayQuoteLines[strayQuoteLines.length - 1] !== line) strayQuoteLines.push(line) }
   let i = text.charCodeAt(0) === 0xfeff ? 1 : 0
   const n = text.length
-  const endField = () => { record.push(field); field = ''; fieldStarted = false }
+  const endField = () => { record.push(field); field = ''; fieldStarted = false; afterClosingQuote = false }
   const endRecord = () => { endField(); records.push(record); lines.push(recordLine); record = [] }
   while (i < n) {
     const c = text[i]
     if (inQuotes) {
       if (c === '"') {
         if (text[i + 1] === '"') { field += '"'; i += 2; continue }
-        inQuotes = false; i++; continue
+        inQuotes = false; afterClosingQuote = true; i++; continue
       }
       if (c === '\n' || (c === '\r' && text[i + 1] !== '\n')) line++
       field += c; i++; continue
@@ -68,11 +75,12 @@ export function parseCsv(text: string): CsvParse {
       recordLine = line
       continue
     }
+    if (c === '"' || afterClosingQuote) stray()
     field += c; fieldStarted = true; i++
   }
   if (inQuotes) return { ok: false, error: `a quoted value that starts on line ${quoteLine} is never closed.` }
   if (fieldStarted || record.length > 0) endRecord()
-  return { ok: true, records, lines }
+  return { ok: true, records, lines, strayQuoteLines }
 }
 
 /** Empty-looking cells exports use for "no value". */
@@ -142,7 +150,7 @@ export function mapPitchRow(row: Record<string, string>): { fields: PitchFields;
 export type CsvPitchRow = PitchFields & { _raw: Record<string, string> }
 export type SkippedRow = { line: number; reason: string }
 export type PitchCsvResult =
-  | { ok: true; rows: CsvPitchRow[]; skipped: SkippedRow[] }
+  | { ok: true; rows: CsvPitchRow[]; skipped: SkippedRow[]; warnings: string[] }
   | { ok: false; error: string }
 
 /** Parse a pitch CSV file's text into rows to save plus the rows that were skipped. */
@@ -154,11 +162,14 @@ export function readPitchCsv(text: string): PitchCsvResult {
   const firstIdx = parsed.records.findIndex(r => !isBlank(r))
   if (firstIdx < 0) return { ok: false, error: 'This CSV is empty.' }
   const headers = parsed.records[firstIdx].map(h => h.trim())
+  if (headers.length > 1 && headers[headers.length - 1] === '') headers.pop()   // header line with a trailing comma
   const rows: CsvPitchRow[] = []
   const skipped: SkippedRow[] = []
   for (let k = firstIdx + 1; k < parsed.records.length; k++) {
     const values = parsed.records[k]
     if (isBlank(values)) continue
+    // A trailing comma (one extra, empty last value) is common in exports; ignore it.
+    if (values.length === headers.length + 1 && values[values.length - 1].trim() === '') values.pop()
     const line = lines[k]
     if (values.length !== headers.length) {
       skipped.push({ line, reason: `has ${values.length} columns, the header has ${headers.length}` })
@@ -173,10 +184,17 @@ export function readPitchCsv(text: string): PitchCsvResult {
     }
     rows.push({ ...fields, _raw: raw })
   }
-  return { ok: true, rows, skipped }
+  const warnings = parsed.strayQuoteLines.map(l => `line ${l} has a stray quote (") that was kept as text; check that row's values`)
+  return { ok: true, rows, skipped, warnings }
 }
 
 /** One line for the page: how many rows were skipped and why (first few). */
+export function warningsSummary(warnings: string[], max = 3): string | null {
+  if (warnings.length === 0) return null
+  const more = warnings.length > max ? `; and ${warnings.length - max} more` : ''
+  return `Check ${warnings.length === 1 ? 'this row' : 'these rows'}: ${warnings.slice(0, max).join('; ')}${more}.`
+}
+
 export function skippedSummary(skipped: SkippedRow[], max = 3): string | null {
   if (skipped.length === 0) return null
   const head = skipped.slice(0, max).map(s => `line ${s.line}: ${s.reason}`).join('; ')
