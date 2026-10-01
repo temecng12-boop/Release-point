@@ -1,27 +1,17 @@
 'use client'
 
-import { useState, useTransition, type SyntheticEvent } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { getLessonReplay, deleteLesson } from '@/app/actions/clips'
 import { validateTimeline, type Timeline } from '@/lib/lesson-timeline/schema'
 import LessonReplay from './lesson-replay'
-import { formatLessonDuration, type LessonItem } from '@/lib/lessons'
+import { lessonRowDuration, type LessonItem } from '@/lib/lessons'
+import { watchMediaDuration } from '@/lib/media-duration'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
-// MediaRecorder webm files have no duration (Infinity), so the bar can't be
-// dragged (QA-005). Seeking far past the end makes the browser work out the
-// real length; then jump back to the start.
-function fixInfiniteDuration(e: SyntheticEvent<HTMLMediaElement>) {
-  const v = e.currentTarget
-  if (Number.isFinite(v.duration)) return
-  const back = () => { if (Number.isFinite(v.duration)) { v.removeEventListener('durationchange', back); v.currentTime = 0 } }
-  v.addEventListener('durationchange', back)
-  v.currentTime = 1e101
 }
 
 /** One lesson: date, coach, duration; opens and replays in place. */
@@ -32,7 +22,21 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const duration = formatLessonDuration(lesson.duration_ms)
+  const [mediaSec, setMediaSec] = useState<number | null>(null)
+  const mediaRef = useRef<HTMLMediaElement | null>(null)
+  const fileUrl = media?.format === 1 ? media.url : null
+  const duration = lessonRowDuration(lesson.duration_ms, mediaSec, open && !!fileUrl)
+
+  // Format 1 files from MediaRecorder report duration = Infinity, so the bar
+  // can't be dragged (QA-005). watchMediaDuration seeks far past the end once
+  // so the browser works out the real length, goes back, and gives up after
+  // 5 s. Its length is shown only for older lessons without duration_ms.
+  useEffect(() => {
+    const el = mediaRef.current
+    if (!el || !open || !fileUrl) return
+    const stop = watchMediaDuration(el, setMediaSec)
+    return () => { stop(); setMediaSec(null) }
+  }, [open, fileUrl])
 
   function toggle() {
     setError(null)
@@ -77,8 +81,8 @@ function LessonRowItem({ lesson, canManage }: { lesson: LessonItem; canManage: b
       </div>
       {error && <p role="alert" className="text-xs text-[#C8102E] mt-1">{error}</p>}
       {open && media?.format === 1 && (lesson.mime?.startsWith('audio/')
-        ? <audio src={media.url} controls autoPlay onLoadedMetadata={fixInfiniteDuration} className="w-full mt-2" />
-        : <video src={media.url} controls autoPlay playsInline onLoadedMetadata={fixInfiniteDuration} className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
+        ? <audio ref={el => { mediaRef.current = el }} src={media.url} controls autoPlay className="w-full mt-2" />
+        : <video ref={el => { mediaRef.current = el }} src={media.url} controls autoPlay playsInline className="w-full rounded-lg mt-2" style={{ maxHeight: 300, background: '#000' }} />
       )}
       {open && media?.format === 2 && (
         <LessonReplay timeline={media.timeline} audioUrl={media.audioUrl} videoUrl={media.videoUrl} durationMs={media.durationMs} />
