@@ -60,3 +60,10 @@ test('the checker catches the claims it looks for', () => {
     assert.ok(!BANNED.some(([, re]) => re.test(s)), `false positive: ${s}`)
   }
 })
+
+test('about page: no realtime claim, and coach access described with team coaches', () => {
+  const about = read('app/about/page.tsx')
+  assert.doesNotMatch(about, /instantly|real-time data|the moment a coach saves/i)
+  assert.doesNotMatch(about, /coach can only query their own players/i)
+  assert.match(about, /players on teams they coach/)
+})
