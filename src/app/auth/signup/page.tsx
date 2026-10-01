@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { signUp, signUpPlayer } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
+import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -17,8 +18,19 @@ const inputCls = [
 function CoachForm({ onBack }: { onBack: () => void }) {
   const [state, action, pending] = useActionState(signUp, undefined)
   const [tosAccepted, setTosAccepted] = useState(false)
+  const [password, setPassword] = useState('')
+  const [passwordTouched, setPasswordTouched] = useState(false)
+  const pwProblem = passwordProblem(password)
+  const showPwProblem = passwordTouched && pwProblem !== null
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={action}
+      onSubmit={(e) => {
+        // Inline check first; the server checks again.
+        if (pwProblem) { e.preventDefault(); setPasswordTouched(true); document.getElementById('coach-password')?.focus() }
+      }}
+      className="space-y-4"
+    >
       <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-2" style={os}>
         ← Back
       </button>
@@ -31,8 +43,25 @@ function CoachForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="coach@example.com" className={inputCls} />
       </div>
       <div>
-        <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Password</label>
-        <input type="password" name="password" required minLength={8} placeholder="Minimum 8 characters" className={inputCls} />
+        <label htmlFor="coach-password" className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Password</label>
+        <input
+          id="coach-password"
+          type="password"
+          name="password"
+          required
+          minLength={PASSWORD_MIN_LENGTH}
+          autoComplete="new-password"
+          placeholder="Minimum 8 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onBlur={() => { if (password) setPasswordTouched(true) }}
+          aria-invalid={showPwProblem}
+          aria-describedby="coach-password-rule"
+          className={inputCls}
+        />
+        <p id="coach-password-rule" aria-live="polite" className={`mt-1.5 text-xs ${showPwProblem ? 'text-[#E8102A]' : 'text-slate-400'}`}>
+          {showPwProblem ? pwProblem : `At least ${PASSWORD_MIN_LENGTH} characters, and not a common password.`}
+        </p>
       </div>
       <label className="flex items-start gap-3 cursor-pointer">
         <input

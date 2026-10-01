@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { deleteAccountFlow } from '@/lib/account-deletion'
+import { passwordProblem } from '@/lib/password-rule'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
 function toTitleCase(s: string) {
@@ -19,6 +20,10 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   const password = formData.get('password') as string
   let fullName = formData.get('full_name') as string
   if (fullName) fullName = toTitleCase(fullName)
+
+  // Same rule as the form; checked here too because the browser check can be skipped.
+  const problem = passwordProblem(password)
+  if (problem) return { error: problem }
 
   const { data, error } = await supabase.auth.signUp({
     email,
