@@ -17,6 +17,11 @@ export function formatClock(seconds: unknown): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+/** Seconds as "1.25s" for the clip player's readout; "--" for Infinity, NaN, negatives and non-numbers (QA-007). */
+export function formatSeconds(seconds: unknown): string {
+  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0 ? `${seconds.toFixed(2)}s` : '--'
+}
+
 /** Length to show: the time measured while recording first, then the media's own duration. */
 export function lessonLengthSeconds(recordedSeconds: unknown, mediaSeconds: unknown): number | null {
   return finiteDuration(recordedSeconds) ?? finiteDuration(mediaSeconds)
