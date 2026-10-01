@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { linkPlayerRow } from '@/app/actions/auth'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -15,7 +16,7 @@ function ConfirmInner() {
   useEffect(() => {
     async function handleConfirm() {
       const supabase = createClient()
-      const next = searchParams.get('next') ?? '/dashboard'
+      const next = safeRedirectPath(searchParams.get('next'), '/dashboard', window.location.origin)
 
       const hash = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
@@ -34,7 +35,7 @@ function ConfirmInner() {
         }
 
         await linkPlayerRow()
-        window.location.href = next
+        window.location.href = safeRedirectPath(next, '/dashboard', window.location.origin)
         return
       }
 
@@ -43,11 +44,11 @@ function ConfirmInner() {
       const code      = searchParams.get('code')
 
       if (code) {
-        window.location.href = `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`
+        window.location.href = `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeRedirectPath(next, '/dashboard', window.location.origin))}`
         return
       }
       if (tokenHash && type) {
-        window.location.href = `/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&next=${encodeURIComponent(next)}`
+        window.location.href = `/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&next=${encodeURIComponent(safeRedirectPath(next, '/dashboard', window.location.origin))}`
         return
       }
 
