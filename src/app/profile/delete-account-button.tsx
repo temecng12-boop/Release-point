@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { deleteAccount } from '@/app/actions/auth'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -10,20 +11,32 @@ export default function DeleteAccountButton() {
   const [input, setInput] = useState('')
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [deletedWarning, setDeletedWarning] = useState<string | null>(null)
 
   function onConfirm() {
     setError(null)
     startTransition(async () => {
       try {
-        // On success the server action redirects to /auth/login; it only returns on failure.
+        // On full success the server action redirects to /auth/login. It returns
+        // { error } on failure, or { warning } if the account was deleted but some files weren't.
         const result = await deleteAccount()
-        if (result?.error) setError(result.error)
+        if (result && 'warning' in result) setDeletedWarning(result.warning)
+        else if (result?.error) setError(result.error)
       } catch (e) {
         // redirect() is delivered as a thrown control-flow signal; let Next handle it.
         if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT')) throw e
         setError('We couldn\'t reach the server to delete your account. Check your connection and try again.')
       }
     })
+  }
+
+  if (deletedWarning) {
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-xs text-[#C8102E] max-w-md">{deletedWarning}</p>
+        <Link href="/auth/login" className="text-xs text-[#456080] underline">Go to sign in</Link>
+      </div>
+    )
   }
 
   if (!confirming) {

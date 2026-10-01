@@ -50,6 +50,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [removedWarning, setRemovedWarning] = useState<string | null>(null)
   const [error, setError]         = useState<string | null>(null)
   const router = useRouter()
 
@@ -79,7 +80,19 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
     const result = await deletePlayer(player.id)
     setDeleting(false)
     if (result?.error) setError(result.error)
+    else if ('warning' in result && result.warning) { setRemovedWarning(result.warning); router.refresh() }
     else { onClose(); router.refresh() }
+  }
+
+  if (removedWarning) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 py-6">
+        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-lg p-6 w-full max-w-md mx-4 space-y-4">
+          <p role="alert" className="text-sm text-[#C8102E]">{removedWarning}</p>
+          <button onClick={onClose} className="bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-4 py-2 text-sm font-medium">OK</button>
+        </div>
+      </div>
+    )
   }
 
   const inputClass = 'w-full bg-white border border-[#DDE4ED] text-[#0F1F33] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#456080] placeholder:text-[#3D5166]'
