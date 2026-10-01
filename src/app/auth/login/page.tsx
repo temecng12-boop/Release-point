@@ -5,6 +5,8 @@ import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { signIn } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
+import { requestPasswordReset, RESET_SENT_HINT } from '@/lib/password-reset'
+import { requestEmailLink } from '@/lib/email-link'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -18,14 +20,30 @@ export default function LoginPage() {
   const [urlError, setUrlError] = useState<string | null>(null)
   const [state, action, pending] = useActionState(signIn, undefined)
 
+  // Forgot password (coaches): ?reset=1 (from /auth/reset) opens it directly.
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotState, setForgotState] = useState<{ error?: string; success?: string }>({})
+  const [forgotPending, setForgotPending] = useState(false)
+
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     setUrlError(p.get('error'))
+    if (p.get('reset') === '1') setForgotMode(true)
   }, [])
   const [magicMode, setMagicMode]   = useState(false)
   const [magicEmail, setMagicEmail] = useState('')
   const [magicState, setMagicState] = useState<{ error?: string; success?: string }>({})
   const [magicPending, setMagicPending] = useState(false)
+
+  async function sendResetLink(e: React.FormEvent) {
+    e.preventDefault()
+    setForgotPending(true)
+    setForgotState({})
+    const result = await requestPasswordReset(createClient().auth, forgotEmail)
+    setForgotPending(false)
+    setForgotState(result.ok ? { success: result.message } : { error: result.error })
+  }
 
   async function signInWithGoogle() {
     const supabase = createClient()
@@ -47,14 +65,9 @@ export default function LoginPage() {
     e.preventDefault()
     setMagicPending(true)
     setMagicState({})
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({
-      email: magicEmail,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
+    const result = await requestEmailLink(createClient().auth, magicEmail, `${window.location.origin}/auth/callback`)
     setMagicPending(false)
-    if (error) setMagicState({ error: error.message })
-    else setMagicState({ success: 'Check your email for a sign-in link.' })
+    setMagicState(result.ok ? { success: result.message } : { error: result.error })
   }
 
   return (
@@ -80,8 +93,8 @@ export default function LoginPage() {
             <div className="pt-8 space-y-5" style={{ borderTop: '1px solid #e2e8f0' }}>
               <p className="text-[10px] text-slate-400 tracking-[0.25em]" style={os}>Sign in with</p>
               {[
-                { t: 'Email + Password', d: 'Works for coaches and players. Use the credentials you signed up with.' },
-                { t: 'Email Link',       d: 'No password? Request a one-click sign-in link sent to your email.' },
+                { t: 'Email + Password', d: 'For coaches. Use the email and password you signed up with.' },
+                { t: 'Email Link',       d: 'For players, or anyone without a password. Request a one-click sign-in link sent to your email.' },
               ].map(i => (
                 <div key={i.t}>
                   <p className="text-sm text-slate-800 mb-1 tracking-tight" style={os}>{i.t}</p>
@@ -106,19 +119,21 @@ export default function LoginPage() {
             <div className="p-8">
               <div className="mb-6">
                 <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Sign In</h1>
-                <p className="text-sm text-slate-500">Coaches and players: sign in with your password or email link</p>
+                <p className="text-sm text-slate-500">Coaches: use your password or an email link. Players sign up without a password, so use an email link.</p>
               </div>
 
               {/* Mode toggle */}
-              <div className="flex rounded-lg p-1 mb-6 gap-1"
+              <div role="group" aria-label="Sign-in method" className="flex rounded-lg p-1 mb-6 gap-1"
                 style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                 {(['Password', 'Email Link'] as const).map((label, idx) => {
                   const active = idx === 0 ? !magicMode : magicMode
                   return (
                     <button
                       key={label}
-                      onClick={() => setMagicMode(idx === 1)}
-                      className="flex-1 py-2 rounded-md text-xs transition-all"
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => { setMagicMode(idx === 1); setForgotMode(false) }}
+                      className="flex-1 py-2 rounded-md text-xs transition-all max-sm:min-h-11"
                       style={{
                         ...os,
                         background: active ? '#ffffff' : 'transparent',
@@ -134,7 +149,7 @@ export default function LoginPage() {
               </div>
 
               {urlError && (
-                <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                <div role="alert" className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                   <p className="text-sm text-[#E8102A]">
                     {urlError === 'confirmation_failed'
                       ? 'That sign-in link has expired or already been used. Request a new one below.'
@@ -143,7 +158,55 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {!magicMode ? (
+              {forgotMode ? (
+                <form onSubmit={sendResetLink} className="space-y-4" aria-labelledby="forgot-title">
+                  <div>
+                    <p id="forgot-title" className="text-sm text-slate-800 mb-1 tracking-tight" style={os}>Reset Your Password</p>
+                    <p className="text-xs text-slate-500">Enter the email you sign in with and we&apos;ll send a link to set a new password.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="forgot-email" className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Email Address</label>
+                    <input
+                      id="forgot-email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="coach@example.com"
+                      aria-describedby={forgotState.error ? 'forgot-error' : forgotState.success ? 'forgot-sent' : undefined}
+                      className={inputCls}
+                    />
+                  </div>
+                  {forgotState.error && (
+                    <div id="forgot-error" role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                      <p className="text-sm text-[#E8102A]">{forgotState.error}</p>
+                    </div>
+                  )}
+                  {forgotState.success && (
+                    <div id="forgot-sent" role="status" className="rounded-lg px-4 py-3" style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)' }}>
+                      <p className="text-sm text-green-700">{forgotState.success}</p>
+                      <p className="text-xs text-green-700 mt-1">{RESET_SENT_HINT}</p>
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={forgotPending}
+                    className="w-full !min-h-11 bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm font-medium transition-all disabled:opacity-50"
+                    style={os}
+                  >
+                    {forgotPending ? 'Sending…' : 'Send Reset Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setForgotMode(false); setForgotState({}) }}
+                    className="w-full !min-h-11 text-xs text-slate-500 hover:text-slate-800"
+                    style={os}
+                  >
+                    ← Back to Sign In
+                  </button>
+                </form>
+              ) : !magicMode ? (
                 <form action={action} className="space-y-4">
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Email Address</label>
@@ -152,10 +215,19 @@ export default function LoginPage() {
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Password</label>
                     <input type="password" name="password" required placeholder="Your password" className={inputCls} />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setForgotMode(true); setForgotState({}) }}
+                        className="inline-flex items-center !min-h-11 px-1 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2">Email Link</button> tab instead.</p>
+                  <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2 max-sm:min-h-11 max-sm:min-w-11">Email Link</button> tab instead.</p>
                   {state?.error && (
-                    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{state.error}</p>
                     </div>
                   )}
@@ -182,7 +254,7 @@ export default function LoginPage() {
                     />
                   </div>
                   {magicState.error && (
-                    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
                       <p className="text-sm text-[#E8102A]">{magicState.error}</p>
                     </div>
                   )}
@@ -245,7 +317,7 @@ export default function LoginPage() {
                     <Link
                       key={l}
                       href="/auth/signup"
-                      className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all text-center"
+                      className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all text-center max-sm:min-h-11 max-sm:flex max-sm:items-center max-sm:justify-center"
                       style={{ ...os, border: '1px solid #e2e8f0' }}
                     >
                       {l}
