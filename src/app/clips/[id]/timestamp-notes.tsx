@@ -199,12 +199,12 @@ export default function TimestampNotes({
               onKeyDown={e => { if (e.key === 'Enter') addNote() }}
               placeholder="Pause video, type a note, click Add…"
               disabled={voicePhase !== 'idle'}
-              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1.5 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-40"
+              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1.5 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-40 max-sm:min-h-11"
             />
             <button
               onClick={addNote}
               disabled={adding || !draft.trim() || voicePhase !== 'idle'}
-              className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap"
+              className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap max-sm:min-h-11"
               style={oswald}
             >
               {adding ? 'Saving…' : '+ Add'}
@@ -216,7 +216,7 @@ export default function TimestampNotes({
             {voicePhase === 'idle' && (
               <button
                 onClick={startVoice}
-                className="flex items-center gap-1.5 text-xs border border-[#DDE4ED] hover:border-[#C8102E] text-[#3D5166] hover:text-[#C8102E] px-3 py-1.5 rounded-md transition-colors"
+                className="flex items-center gap-1.5 text-xs border border-[#DDE4ED] hover:border-[#C8102E] text-[#3D5166] hover:text-[#C8102E] px-3 py-1.5 rounded-md transition-colors max-sm:min-h-11"
                 style={oswald}
               >
                 <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -234,7 +234,7 @@ export default function TimestampNotes({
                 </span>
                 <button
                   onClick={stopVoice}
-                  className="text-xs bg-[#0F1F33] text-white px-3 py-1.5 rounded-md"
+                  className="text-xs bg-[#0F1F33] text-white px-3 py-1.5 rounded-md max-sm:min-h-11"
                   style={oswald}
                 >
                   Stop & Save
@@ -272,7 +272,7 @@ export default function TimestampNotes({
               <li key={n.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                 <button
                   onClick={() => seekAndShow(n)}
-                  className="shrink-0 flex items-center gap-1 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED]"
+                  className="shrink-0 flex items-center gap-1 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED] max-sm:min-h-11"
                 >
                   {n.drawing_data?.length ? (
                     <svg className="w-3 h-3 text-[#C8102E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,7 +296,7 @@ export default function TimestampNotes({
                 {isCoach && (
                   <button
                     onClick={() => removeNote(n.id)}
-                    className="text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none"
+                    className="text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none max-sm:min-h-11 max-sm:min-w-11"
                   >
                     ✕
                   </button>
