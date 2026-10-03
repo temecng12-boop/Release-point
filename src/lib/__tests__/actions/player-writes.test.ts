@@ -16,19 +16,58 @@ function avatarForm() {
   return fd
 }
 
+const ME = { id: '11111111-1111-4111-8111-111111111111', email: 'me@example.com' }
+const AVATAR = `avatars/${ME.id}.jpg`
+const seedMe = () => resetFake({ user: ME, tables: { profiles: [{ id: ME.id, avatar_url: 'https://old.example/x.jpg' }] } })
+
 test('uploadAvatar: profile update fails -> error, no avatarUrl returned', async () => {
-  resetFake({ user: COACH, tables: { profiles: [{ id: COACH.id, avatar_url: null }] } })
+  seedMe()
   fail({ table: 'profiles', action: 'update', error: { message: 'boom' } })
   const r = await uploadAvatar(avatarForm())
   assert.ok('error' in r && r.error)
   assert.equal('avatarUrl' in r, false)
+  assert.doesNotMatch(r.error, /boom/)
 })
 
-test('uploadAvatar: success saves the URL on the profile', async () => {
-  resetFake({ user: COACH, tables: { profiles: [{ id: COACH.id, avatar_url: null }] } })
+test('uploadAvatar: success stores the object path (not a URL) and returns a 1-hour signed URL', async () => {
+  seedMe()
   const r = await uploadAvatar(avatarForm())
+  assert.ok(!('error' in r))
   assert.equal(r.success, true)
-  assert.match(String(state.tables.profiles[0].avatar_url), /avatars\/coach\.jpg/)
+  assert.equal(state.tables.profiles[0].avatar_url, AVATAR)
+  assert.deepEqual(state.storage.clips, [AVATAR])
+  assert.equal(r.avatarUrl, `https://storage.test/clips/${AVATAR}?token=t`)
+  assert.deepEqual(state.signed, [{ bucket: 'clips', path: AVATAR, expiresIn: 3600 }])
+})
+
+test('uploadAvatar: storage upload fails -> friendly error, profile unchanged, no raw storage message', async () => {
+  seedMe()
+  fail({ bucket: 'clips', storageOp: 'upload', error: { message: 'new row violates row-level security policy' } })
+  const r = await uploadAvatar(avatarForm())
+  assert.ok('error' in r)
+  assert.doesNotMatch(r.error, /row-level|policy/)
+  assert.equal(state.tables.profiles[0].avatar_url, 'https://old.example/x.jpg')
+})
+
+test('uploadAvatar: saved but signing fails -> success with no URL and a notice (not an error, not a fake image)', async () => {
+  seedMe()
+  fail({ bucket: 'clips', storageOp: 'sign', error: { message: 'down' } })
+  const r = await uploadAvatar(avatarForm())
+  assert.ok(!('error' in r))
+  assert.equal(r.avatarUrl, null)
+  assert.match(String(r.notice), /saved/i)
+  assert.equal(state.tables.profiles[0].avatar_url, AVATAR)
+})
+
+test('uploadAvatar: not signed in, no file, or a non-image -> error, nothing written', async () => {
+  resetFake({ user: null, tables: { profiles: [] } })
+  assert.ok('error' in (await uploadAvatar(avatarForm())))
+  seedMe()
+  assert.ok('error' in (await uploadAvatar(new FormData())))
+  const fd = new FormData(); fd.append('file', new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' }))
+  assert.ok('error' in (await uploadAvatar(fd)))
+  assert.equal(state.storage.clips, undefined)
+  assert.equal(state.tables.profiles[0].avatar_url, 'https://old.example/x.jpg')
 })
 
 const seedRoster = () => resetFake({

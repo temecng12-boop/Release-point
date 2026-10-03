@@ -9,7 +9,8 @@
 //   * 26 legacy policies no migration creates, verbatim from the 2026-10-03 pg_policies dump
 //     (prod-policies-2026-10-03.json). "profiles: own row" (the 27th) was dropped by 034.
 //   * storage.objects has RLS on and Supabase's table grants.
-// freshDb() is every migration before `upTo` plus the same Supabase storage setup.
+// freshDb() is every migration before `upTo` (default: all, through 036) plus the same Supabase storage setup.
+// Migrations 035 and 036 are applied by the tests on top of prodShapeDb().
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
@@ -57,7 +58,7 @@ export async function supabaseStorage(db: PGlite) {
 }
 
 /** Fresh database: every migration before `upTo`, plus Supabase storage setup. */
-export async function freshDb(upTo = '036') {
+export async function freshDb(upTo = '037') {
   const { db, unexpected } = await migratedDb(upTo)
   await supabaseStorage(db)
   return { db, unexpected }

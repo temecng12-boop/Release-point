@@ -172,15 +172,17 @@ function CropModal({ file, onCancel, onConfirm }: {
 
           <div className="flex gap-3 pt-1">
             <button
+              type="button"
               onClick={onCancel}
-              className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 transition-all border border-slate-200 hover:bg-slate-50"
+              className="flex-1 min-h-[44px] py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 transition-all border border-slate-200 hover:bg-slate-50"
               style={oswald}
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleConfirm}
-              className="flex-1 py-2.5 rounded-lg text-xs bg-[#E8102A] hover:bg-[#C80E24] text-white transition-all"
+              className="flex-1 min-h-[44px] py-2.5 rounded-lg text-xs bg-[#E8102A] hover:bg-[#C80E24] text-white transition-all"
               style={oswald}
             >
               Save Photo
@@ -196,13 +198,17 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(currentAvatarUrl)
+  // A missing, expired or unreadable photo falls back to initials.
+  const [imgFailed, setImgFailed] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   function handleRawFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Please select an image file'); return }
     if (file.size > 20 * 1024 * 1024) { setError('Image must be under 20 MB'); return }
     setError(null)
+    setNotice(null)
     setPendingFile(file)
   }
 
@@ -210,16 +216,27 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
     setPendingFile(null)
     setUploading(true)
     setError(null)
+    setNotice(null)
     const fd = new FormData()
     fd.append('file', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
-    const result = await uploadAvatar(fd)
-    if (result?.error) {
-      setError(result.error)
-    } else if (result?.avatarUrl) {
-      setAvatarUrl(result.avatarUrl + `?t=${Date.now()}`)
+    try {
+      const result = await uploadAvatar(fd)
+      if ('error' in result) {
+        setError(result.error)
+      } else if (result.avatarUrl) {
+        setImgFailed(false)
+        setAvatarUrl(result.avatarUrl)
+      } else {
+        setNotice(result.notice ?? 'Photo saved. Refresh the page to see it.')
+      }
+    } catch {
+      setError('Your photo couldn\'t be uploaded. Check your connection and try again.')
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
+
+  const showImage = !!avatarUrl && !imgFailed
 
   return (
     <>
@@ -231,7 +248,7 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
         />
       )}
 
-      <div className="relative group cursor-pointer shrink-0" onClick={() => !uploading && inputRef.current?.click()}>
+      <div className="shrink-0 flex flex-col items-center">
         <input
           ref={inputRef}
           type="file"
@@ -240,27 +257,49 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
           onChange={e => { const f = e.target.files?.[0]; if (f) handleRawFile(f); e.target.value = '' }}
         />
 
-        <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-[#1C3A5C] to-[#456080] flex items-center justify-center relative">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-xl text-white" style={oswald}>{initials(displayName)}</span>
-          )}
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            {uploading ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          aria-label={uploading ? 'Uploading photo' : showImage ? 'Change profile photo' : 'Add profile photo'}
+          aria-busy={uploading}
+          className="relative group w-16 h-16 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8102A] focus-visible:ring-offset-2 disabled:cursor-wait"
+        >
+          <span className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-[#1C3A5C] to-[#456080] flex items-center justify-center relative">
+            {showImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl!} alt={displayName} className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
             ) : (
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <span className="text-xl text-white" style={oswald} aria-hidden="true">{initials(displayName)}</span>
             )}
-          </div>
-        </div>
+            <span className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'}`}>
+              {uploading ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <CameraIcon className="w-5 h-5 text-white" />
+              )}
+            </span>
+          </span>
+          {/* Always-visible badge: touch screens have no hover */}
+          {!uploading && (
+            <span className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-white border border-[#DDE4ED] shadow-sm flex items-center justify-center" aria-hidden="true">
+              <CameraIcon className="w-3.5 h-3.5 text-[#456080]" />
+            </span>
+          )}
+        </button>
 
-        {error && <p className="text-xs text-[#E8102A] mt-1 max-w-[80px] text-center leading-tight">{error}</p>}
+        {error && <p role="alert" className="text-xs text-[#E8102A] mt-1.5 w-28 text-center leading-tight">{error}</p>}
+        {notice && !error && <p role="status" className="text-xs text-[#3D5166] mt-1.5 w-28 text-center leading-tight">{notice}</p>}
       </div>
     </>
+  )
+}
+
+function CameraIcon({ className }: { className: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
   )
 }

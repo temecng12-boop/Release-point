@@ -7,6 +7,7 @@ import DeleteAccountButton from './delete-account-button'
 import AvatarUpload from './avatar-upload'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
+import { signAvatarUrl } from '@/lib/avatar'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -56,6 +57,7 @@ export default async function ProfilePage() {
 
   const isCoach = (profile?.role ?? user.user_metadata?.role) === 'coach'
   const displayName = profile?.full_name ?? user.email ?? ''
+  const avatarUrl = await signAvatarUrl(supabaseAdmin.storage, profile?.avatar_url, user.id)
 
   let myClips: { id: string; title: string; created_at: string }[] = []
   let rosterCount = 0
@@ -91,7 +93,7 @@ export default async function ProfilePage() {
           <div className="h-1 bg-[#C8102E]" />
           <div className="p-6">
             <div className="flex items-start gap-5">
-              <AvatarUpload userId={user.id} currentAvatarUrl={profile?.avatar_url ?? null} displayName={displayName} />
+              <AvatarUpload userId={user.id} currentAvatarUrl={avatarUrl} displayName={displayName} />
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl text-[#0F1F33] truncate" style={oswald}>{displayName}</h1>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">

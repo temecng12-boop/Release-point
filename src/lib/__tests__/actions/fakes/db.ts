@@ -10,9 +10,9 @@ export type Op = { table: string; action: Action; values?: unknown; filters: Fil
 type Via = 'admin' | 'session'
 /** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
 export type RlsRule = (row: Row, action: Action, userId: string | null) => boolean
-// Storage failures: { bucket } fails removes; { bucket, storageOp: 'list' } fails listings.
+// Storage failures: { bucket } fails removes; { bucket, storageOp: 'list' | 'upload' | 'sign' } fails that call.
 // `when` (optional) makes the failure apply only while it returns true.
-type Failure = { table?: string; action?: Action; bucket?: string; storageOp?: 'list' | 'remove'; error: DbError; times?: number; when?: () => boolean }
+type Failure = { table?: string; action?: Action; bucket?: string; storageOp?: 'list' | 'remove' | 'upload' | 'sign'; error: DbError; times?: number; when?: () => boolean }
 
 export const state = {
   tables: {} as Record<string, Row[]>,
@@ -21,6 +21,7 @@ export const state = {
   failures: [] as Failure[],
   ops: [] as Op[],
   storageOps: [] as { bucket: string; paths: string[] }[],
+  signed: [] as { bucket: string; path: string; expiresIn?: number }[],
   revalidated: [] as string[],
   rls: {} as Record<string, RlsRule>,
 }
@@ -34,6 +35,7 @@ export function resetFake(init: { tables?: Record<string, Row[]>; storage?: Reco
   state.failures = []
   state.ops = []
   state.storageOps = []
+  state.signed = []
   state.revalidated = []
   state.rls = {}
 }
@@ -173,6 +175,8 @@ export const fakeClient = {
   storage: {
     from: (bucket: string) => ({
       async upload(path: string) {
+        const error = takeFailure(f => f.bucket === bucket && f.storageOp === 'upload')
+        if (error) return { data: null, error }
         state.storage[bucket] = [...(state.storage[bucket] ?? []), path]
         return { data: { path }, error: null }
       },
@@ -180,7 +184,10 @@ export const fakeClient = {
         state.storageOps.push({ bucket, paths: [`sign:${path}`] })
         return { data: { signedUrl: `https://storage.test/upload/${bucket}/${path}?token=t`, token: 't', path }, error: null }
       },
-      async createSignedUrl(path: string) {
+      async createSignedUrl(path: string, expiresIn?: number) {
+        const error = takeFailure(f => f.bucket === bucket && f.storageOp === 'sign')
+        if (error) return { data: null, error }
+        state.signed.push({ bucket, path, expiresIn })
         return { data: { signedUrl: `https://storage.test/${bucket}/${path}?token=t` }, error: null }
       },
       async list(folder: string, opts: { limit?: number; offset?: number; search?: string } = {}) {
@@ -197,7 +204,7 @@ export const fakeClient = {
       },
       async remove(paths: string[]) {
         state.storageOps.push({ bucket, paths })
-        const error = takeFailure(f => f.bucket === bucket && f.storageOp !== 'list')
+        const error = takeFailure(f => f.bucket === bucket && (f.storageOp === undefined || f.storageOp === 'remove'))
         if (error) return { data: null, error }
         state.storage[bucket] = (state.storage[bucket] ?? []).filter(p => !paths.includes(p))
         return { data: paths.map(name => ({ name })), error: null }

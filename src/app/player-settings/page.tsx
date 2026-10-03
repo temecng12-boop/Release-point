@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import PlayerSettingsForm from './player-settings-form'
 import AvatarUpload from '@/app/profile/avatar-upload'
 import AppHeader from '@/components/app-header'
+import { signAvatarUrl } from '@/lib/avatar'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -19,6 +20,7 @@ export default async function PlayerSettingsPage() {
     .single()
 
   if (profile?.role === 'coach') redirect('/dashboard')
+  const avatarUrl = await signAvatarUrl(supabaseAdmin.storage, (profile as { avatar_url?: string | null } | null)?.avatar_url, user.id)
 
   const { data: player } = await supabaseAdmin
     .from('players')
@@ -37,7 +39,7 @@ export default async function PlayerSettingsPage() {
         <div className="flex items-center gap-4 mb-6">
           <AvatarUpload
             userId={user.id}
-            currentAvatarUrl={(profile as { avatar_url?: string | null })?.avatar_url ?? null}
+            currentAvatarUrl={avatarUrl}
             displayName={(profile as { full_name?: string | null })?.full_name ?? player?.full_name ?? 'P'}
           />
           <div>
