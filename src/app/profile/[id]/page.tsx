@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
+import MarkAdultButton from '@/app/dashboard/mark-adult-button'
+import { canUploadVideo } from '@/lib/consent'
+import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 
@@ -15,6 +18,19 @@ function initials(name: string) {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+type ProfilePlayer = {
+  id: string
+  full_name: string
+  email: string | null
+  accepted_at: string | null
+  age_group: string | null
+  position: string | null
+  coach_id: string | null
+  consent_given_at: string | null
+  adult_confirmed_at: string | null
+  consent_rules_pending_migration?: boolean
 }
 
 export default async function PlayerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,17 +48,19 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   if (profile?.role !== 'coach') redirect('/dashboard')
 
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('id, full_name, email, accepted_at, age_group, position, coach_id, consent_given_at')
-    .eq('id', id)
-    .single()
+  const { data: player } = await selectPlayersWithConsent<ProfilePlayer>(
+    'id, full_name, email, accepted_at, age_group, position, coach_id',
+    (cols) => supabaseAdmin.from('players').select(cols).eq('id', id).single(),
+  )
 
   // Only the player's own coach may view this page. Other coaches, including
   // for a player with no coach, get a 404 so the player's existence isn't revealed.
   const access = profilePageAccess(user.id, profile?.role, player)
   if (access === 'redirect-dashboard') redirect('/dashboard')
   if (access !== 'view' || !player) notFound()
+
+  // Offer "Mark as 18+" only when uploads are blocked and this coach may change the player's age status.
+  const showMarkAdult = !canUploadVideo(player) && (await canManagePlayerAge(supabaseAdmin, user.id, player.id))
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -164,8 +182,18 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   </span>
                 </div>
               </div>
-              {/* Upload button for coach */}
-              <UploadButton playerId={player.id} playerName={player.full_name} maxFiles={50} />
+              {/* Upload button for the player's own coach only */}
+              {player.coach_id === user.id ? (
+              <UploadButton
+                playerId={player.id}
+                playerName={player.full_name}
+                consent={player}
+                maxFiles={50}
+                blockedAction={showMarkAdult ? <MarkAdultButton playerId={player.id} playerName={player.full_name} /> : undefined}
+              />
+              ) : (
+                <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">

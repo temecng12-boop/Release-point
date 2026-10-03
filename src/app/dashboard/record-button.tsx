@@ -4,17 +4,23 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
+import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 type Phase = 'idle' | 'preview' | 'recording' | 'naming' | 'uploading'
 
+// When recording is blocked this renders nothing; render it next to an
+// UploadButton or an UploadBlockedNotice so the reason is visible.
 export default function RecordButton({
   playerId,
   playerName,
+  consent,
 }: {
   playerId: string
   playerName: string
+  /** The player's stored consent status (see src/lib/consent.ts). Required. */
+  consent: PlayerConsentFields
 }) {
   const [phase, setPhase]     = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
@@ -135,6 +141,8 @@ export default function RecordButton({
     const sec = s % 60
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
+
+  if (!canUploadVideo(consent)) return null
 
   // ── Naming overlay ─────────────────────────────────────────────────────────
   if (phase === 'naming') {

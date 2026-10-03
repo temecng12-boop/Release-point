@@ -131,6 +131,12 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="your@email.com" className={inputCls} />
         <p className="text-[11px] text-slate-400 mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
       </div>
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="adult_confirmed" value="yes" required className="mt-0.5 w-4 h-4 accent-[#E8102A] shrink-0" />
+        <span className="text-xs text-slate-500 leading-relaxed">
+          I am 18 or older. Players under 18 join through their coach.
+        </span>
+      </label>
       {state?.error && (
         <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
           <p className="text-sm text-[#E8102A]">{state.error}</p>

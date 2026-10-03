@@ -12,9 +12,10 @@ import { emailFake } from './fakes/email'
 import { invitePlayer } from '../../../app/actions/invite'
 
 const COACH = { id: 'coach-1', email: 'coach@example.com' }
+// The 18+ / under-18 choice is required (RP-041); 'minor' unless a test sets it.
 const form = (fields: Record<string, string | string[]>) => {
   const fd = new FormData()
-  for (const [k, v] of Object.entries(fields)) for (const x of [v].flat()) fd.append(k, x)
+  for (const [k, v] of Object.entries({ age_status: 'minor', ...fields })) for (const x of [v].flat()) fd.append(k, x)
   return fd
 }
 const tables = () => ({
@@ -33,7 +34,7 @@ beforeEach(() => {
 test('new email: setup email is sent and the message says so', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'Sam@Example.com' }))
   assert.deepEqual(emailFake.invites, [{ toEmail: 'sam@example.com' }])
-  assert.match(r.success ?? '', /Sam New will receive an email to set up their account/)
+  assert.equal(r.success, "Invite sent to sam@example.com. Sam New is marked under 18: video can't be added until guardian consent is on file.")
   assert.equal(r.error, undefined)
   assert.equal(state.tables.players.length, 1)
 })
@@ -106,6 +107,31 @@ test('team invite form note no longer promises an email to existing accounts', a
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../../../app/dashboard/team/[id]/team-invite-form.tsx', import.meta.url), 'utf8')
   assert.match(src, /already have an account are added without an email/)
+})
+
+test('18+ invite: the confirmation is saved and the message says so', async () => {
+  const r = await invitePlayer(undefined, form({ full_name: 'Al Adult', player_email: 'al@example.com', age_status: 'adult' }))
+  assert.equal(r.success, 'Invite sent to al@example.com. Al Adult is marked 18+.')
+  assert.equal(state.tables.players[0].adult_confirmed_by, COACH.id)
+  assert.ok(state.tables.players[0].adult_confirmed_at)
+})
+
+test('no 18+ / under-18 choice: error before anything is written', async () => {
+  const fd = new FormData(); fd.append('player_email', 'x@example.com')
+  const r = await invitePlayer(undefined, fd)
+  assert.match(r.error ?? '', /18 or older, or under 18/)
+  assert.equal(state.tables.players.length, 0)
+  assert.equal(emailFake.invites.length, 0)
+})
+
+test('existing roster player marked 18+ but the confirmation write fails: error, not a success', async () => {
+  state.tables.players.push({ id: 'p1', coach_id: COACH.id, email: 'kid@example.com', user_id: null, full_name: 'Kid', adult_confirmed_at: null })
+  fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
+  fail({ table: 'players', action: 'update', error: { code: '57014', message: 'timeout' } })
+  const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com', age_status: 'adult' }))
+  assert.match(r.error ?? '', /18\+ confirmation could not be saved/)
+  assert.equal(r.success, undefined)
+  assert.equal(emailFake.invites.length, 0)
 })
 
 test('already on the roster: partial failures say so instead of "Player added"', async () => {

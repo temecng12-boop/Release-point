@@ -3,7 +3,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
+import { canUploadVideo, canSelfConfirmAdult, type PlayerConsentFields } from '@/lib/consent'
+import ConfirmAdultButton from './confirm-adult-button'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -125,11 +128,10 @@ export default async function DashboardPage() {
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, full_name, position')
-        .eq('user_id', user.id)
-        .single()
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null; guardian_id: string | null } & PlayerConsentFields>(
+        'id, full_name, position, coach_id, guardian_id',
+        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).single(),
+      )
     : { data: null }
 
   if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
@@ -413,7 +415,14 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 {playerRow && (
-                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
+                  <UploadButton
+                    playerId={playerRow.id}
+                    playerName={playerRow.full_name ?? 'Player'}
+                    consent={playerRow}
+                    viewer="player"
+                    selfConfirm={canSelfConfirmAdult(playerRow)}
+                    blockedAction={canSelfConfirmAdult(playerRow) ? <ConfirmAdultButton /> : undefined}
+                  />
                 )}
               </div>
 
@@ -446,11 +455,11 @@ export default async function DashboardPage() {
                   ))}
                 </div>
 
-                {playerRow && (
+                {playerRow && canUploadVideo(playerRow) && (
                   <div className="rounded-xl px-6 py-10 text-center" style={{ background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
                     <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
                     <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
-                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
+                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} viewer="player" />
                   </div>
                 )}
               </div>

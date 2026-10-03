@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { getSignedUploadUrl, saveVoicePath, deleteVoicePath } from '@/app/actions/clips'
 import { createClient } from '@/lib/supabase/client'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -11,11 +12,14 @@ export default function VoiceNote({
   playerId,
   role,
   initialVoiceUrl,
+  canAddMedia,
 }: {
   clipId: string
   playerId: string
   role: 'coach' | 'player'
   initialVoiceUrl: string | null
+  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
+  canAddMedia: boolean
 }) {
   const isCoach = role === 'coach'
   const [voiceUrl, setVoiceUrl] = useState<string | null>(initialVoiceUrl)
@@ -65,7 +69,7 @@ export default function VoiceNote({
     // Get a signed upload URL from the server (bypasses RLS)
     const urlResult = await getSignedUploadUrl(storagePath)
     if (urlResult.error || !urlResult.signedUrl) {
-      setRecordError('Failed to prepare upload. Please try again.')
+      setRecordError(urlResult.error ?? 'Failed to prepare upload. Please try again.')
       setUploading(false)
       return
     }
@@ -107,6 +111,8 @@ export default function VoiceNote({
         Coach Voice Note
       </p>
 
+      {isCoach && !canAddMedia && <UploadBlockedNotice viewer="coach" />}
+
       {isCoach && (
         <div className="flex items-center gap-3 flex-wrap">
           {recording ? (
@@ -118,7 +124,7 @@ export default function VoiceNote({
               <span className="w-2 h-2 rounded-full bg-[#E8102A] animate-pulse inline-block" />
               Stop Recording
             </button>
-          ) : (
+          ) : canAddMedia && (
             <button
               onClick={startRecording}
               disabled={uploading || deleting}
@@ -155,7 +161,7 @@ export default function VoiceNote({
         <audio controls src={voiceUrl} className="w-full" style={{ height: 40 }} />
       ) : (
         <p className="text-sm text-slate-400">
-          {isCoach ? 'No voice note yet. Hit Record above.' : 'No voice note from your coach yet.'}
+          {isCoach ? (canAddMedia ? 'No voice note yet. Hit Record above.' : 'No voice note yet.') : 'No voice note from your coach yet.'}
         </p>
       )}
     </div>

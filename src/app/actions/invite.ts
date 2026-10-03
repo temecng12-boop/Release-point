@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { isMissingConsentColumn, writeWithAdultFields } from '@/lib/consent-server'
 import { sendPlayerInviteEmail } from '@/lib/email'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
@@ -29,6 +30,16 @@ export async function invitePlayer(
 
   if (!playerEmail) return { error: 'Player email is required' }
 
+  // Age status is captured once, here (RP-041). 'adult' records the coach's
+  // 18+ confirmation; 'minor' leaves the player pending guardian consent.
+  const ageStatus = formData.get('age_status')
+  if (ageStatus !== 'adult' && ageStatus !== 'minor') {
+    return { error: 'Choose whether the player is 18 or older, or under 18.' }
+  }
+  const adultFields = ageStatus === 'adult'
+    ? { adult_confirmed_at: new Date().toISOString(), adult_confirmed_by: user.id }
+    : {}
+
   // Every team in the invite must belong to this coach. Checked before any
   // player row is created or claimed.
   if (teamIds.length > 0) {
@@ -43,11 +54,16 @@ export async function invitePlayer(
   }
 
   // Create player row
-  const { data: player, error: playerError } = await supabaseAdmin
-    .from('players')
-    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail })
-    .select('id')
-    .single()
+  // Before migration 023 the adult columns don't exist; the player is then
+  // added without them (see writeWithAdultFields).
+  const { data: player, error: playerError } = await writeWithAdultFields(
+    adultFields,
+    (fields) => supabaseAdmin
+      .from('players')
+      .insert({ coach_id: user.id, full_name: playerName, email: playerEmail, ...fields })
+      .select('id')
+      .single(),
+  )
 
   if (playerError && playerError.code !== '23505') return { error: playerError.message }
 
@@ -74,6 +90,22 @@ export async function invitePlayer(
       } else {
         return { error: 'This player is already linked to another coach.' }
       }
+    }
+  }
+
+  // Existing player now on this coach's roster: record the 18+ confirmation if
+  // it isn't already on file. (A 'minor' choice never clears an existing one.)
+  // Skipped quietly before migration 023 (no adult columns yet).
+  if (playerError?.code === '23505' && playerId && ageStatus === 'adult') {
+    const { error: adultError } = await supabaseAdmin
+      .from('players')
+      .update(adultFields)
+      .eq('id', playerId)
+      .eq('coach_id', user.id)
+      .is('adult_confirmed_at', null)
+    if (adultError && !isMissingConsentColumn(adultError)) {
+      console.error('[invitePlayer] could not record 18+ confirmation', playerId, adultError.message)
+      return { error: 'This player is on your roster, but the 18+ confirmation could not be saved. Please try again.' }
     }
   }
 
@@ -114,6 +146,9 @@ export async function invitePlayer(
   if (!inviteUrl) return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be created. Please try again.` }
   const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
   const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'
+  // TODO(Compliance): guardian email wording. This invite goes to the address
+  // the coach entered, which may be a guardian's. Wording is in
+  // sendPlayerInviteEmail (src/lib/email.ts).
   let sent: { error?: string }
   try {
     sent = await sendPlayerInviteEmail({
@@ -131,8 +166,11 @@ export async function invitePlayer(
     return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be sent (${sent.error}). Please try again.` }
   }
 
+  const who = playerName || 'The player'
   return {
-    success: `Invite sent to ${playerEmail}! ${playerName ? `${playerName} will` : 'They will'} receive an email to set up their account.`,
+    success: ageStatus === 'adult'
+      ? `Invite sent to ${playerEmail}. ${who} is marked 18+.`
+      : `Invite sent to ${playerEmail}. ${who} is marked under 18: video can't be added until guardian consent is on file.`,
   }
 }
 

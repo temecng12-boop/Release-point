@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
+import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
@@ -118,6 +119,34 @@ export async function updatePlayer(playerId: string, data: {
   return { success: true }
 }
 
+// Coach confirms (or un-confirms) that a player is 18 or older (RP-041).
+// Authorization is checked in setAdultConfirmation.
+export async function setPlayerAdultConfirmed(playerId: string, confirmed: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof playerId !== 'string' || !playerId) return { error: 'Invalid player' }
+
+  const result = await setAdultConfirmation(supabaseAdmin, user.id, playerId, confirmed === true)
+  if ('error' in result) return { error: result.error }
+
+  revalidatePath('/dashboard', 'layout')
+  revalidatePath(`/profile/${playerId}`)
+  return { success: true }
+}
+
+// A player without a coach confirms they are 18 or older, once (RP-041).
+// Rules in confirmOwnAdult; players with a coach are refused.
+export async function confirmMyAdultStatus() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  const result = await confirmOwnAdult(supabaseAdmin, user.id)
+  if ('error' in result) return { error: result.error }
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
 export async function deletePlayer(playerId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -185,7 +214,7 @@ export async function savePlayerPosition(position: 'pitcher' | 'hitter') {
 
   const { error } = await supabaseAdmin
     .from('players')
-    .update({ position, consent_given_at: new Date().toISOString() })
+    .update({ position })
     .eq('user_id', user.id)
 
   if (error) return { error: error.message }

@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { writeWithAdultFields } from '@/lib/consent-server'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
@@ -47,6 +48,11 @@ export async function signUpPlayer(
 ) {
   const supabase = await createClient()
 
+  // Self-signup is for players 18 and older; younger players join through their coach.
+  if (formData.get('adult_confirmed') !== 'yes') {
+    return { error: 'You must be 18 or older to sign up yourself. Players under 18 join through their coach.' }
+  }
+
   const email = formData.get('email') as string
   let fullName = formData.get('full_name') as string
   if (fullName) fullName = toTitleCase(fullName)
@@ -55,7 +61,7 @@ export async function signUpPlayer(
     email,
     options: {
       shouldCreateUser: true,
-      data: { role: 'player', full_name: fullName },
+      data: { role: 'player', full_name: fullName, adult_confirmed: true },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
@@ -115,10 +121,11 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
 
   if (role !== 'player') return { success: true }
 
-  // Link to an existing invited player record
+  // Link to an existing invited player record. Accepting an invite is not
+  // guardian consent, and the coach's age choice from the invite stands.
   const { data: linked, error: linkError } = await supabaseAdmin
     .from('players')
-    .update({ user_id: user.id, accepted_at: now, consent_given_at: now })
+    .update({ user_id: user.id, accepted_at: now })
     .eq('email', user.email)
     .is('user_id', null)
     .select('id')
@@ -140,13 +147,21 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
 
     if (!existing || existing.length === 0) {
-      const { error: insertError } = await supabaseAdmin.from('players').insert({
-        user_id:          user.id,
-        full_name:        fullName,
-        email:            user.email,
-        accepted_at:      now,
-        consent_given_at: now,
-      })
+      // 18+ confirmation from the self-signup form (RP-041). No guardian
+      // consent is recorded here.
+      // Before migration 023 the adult columns don't exist; the row is then
+      // created without them (see writeWithAdultFields).
+      const adultConfirmed = user.user_metadata?.adult_confirmed === true
+      const { error: insertError } = await writeWithAdultFields(
+        adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {},
+        (adultFields) => supabaseAdmin.from('players').insert({
+          user_id:     user.id,
+          full_name:   fullName,
+          email:       user.email,
+          accepted_at: now,
+          ...adultFields,
+        }),
+      )
       if (insertError) {
         console.error('[linkPlayerRow] player insert failed', { code: insertError.code, message: insertError.message })
         return { error: LINK_FAILED }

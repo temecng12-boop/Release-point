@@ -4,24 +4,14 @@
 //
 // Only import this from Server Components, Server Actions, or Route Handlers.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { canUploadForPlayerWith } from './upload-access'
 
 /**
  * True if `userId` may UPLOAD media for this player: only the player's own
- * coach (players.coach_id) or the player themself (players.user_id). The same
- * rule as signed upload links (src/lib/storage-access.ts); team coaches can
- * read but not upload.
+ * coach or the player themself. See ./upload-access.ts.
  */
 export async function canUploadForPlayer(userId: string, playerId: string): Promise<boolean> {
-  if (!userId || !playerId) return false
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('coach_id, user_id')
-    .eq('id', playerId)
-    .maybeSingle()
-  if (!player) return false
-  if (player.coach_id !== null && player.coach_id === userId) return true
-  if (player.user_id !== null && player.user_id === userId) return true
-  return false
+  return canUploadForPlayerWith(supabaseAdmin, userId, playerId)
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

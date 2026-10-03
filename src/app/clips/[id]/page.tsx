@@ -3,7 +3,9 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import { canViewPlayerContent, canDeleteSavedMetrics } from '@/lib/clip-access'
+import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
@@ -93,11 +95,12 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
   // Role comes from profiles only; user_metadata is set by the client at signup.
   const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
-  const { data: playerRow } = await supabaseAdmin
-    .from('players')
-    .select('full_name, age_group, position')
-    .eq('id', clip.player_id)
-    .single()
+  const { data: playerRow } = await selectPlayersWithConsent<
+    { full_name: string | null; age_group: string | null; position: string | null } & PlayerConsentFields
+  >(
+    'full_name, age_group, position',
+    (cols) => supabaseAdmin.from('players').select(cols).eq('id', clip.player_id).single(),
+  )
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')
@@ -282,6 +285,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
           role={role}
           initialAnnotations={rawAnnotations ?? []}
           initialReframe={initialReframe}
+          canAddMedia={canUploadVideo(playerRow)}
           canRecordLesson={canManage}
         />
 
@@ -310,6 +314,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
             aiCoachAvailable={aiCoachAvailable}
+            canAddMedia={canUploadVideo(playerRow)}
           />
         </div>
       </main>

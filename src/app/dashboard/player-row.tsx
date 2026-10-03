@@ -4,6 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import UploadButton from './upload-button'
 import RecordButton from './record-button'
+import MarkAdultButton from './mark-adult-button'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
+import { canUploadVideo } from '@/lib/consent'
 import EditPlayerModal from './edit-player-modal'
 import BullpenModal from './bullpen-modal'
 import type { BullpenSession } from './bullpen-modal'
@@ -27,6 +30,7 @@ interface Player {
   age_group: string | null
   position: string | null
   consent_given_at: string | null
+  adult_confirmed_at: string | null
   teamIds: string[]
 }
 
@@ -35,6 +39,8 @@ interface Props {
   clips: Clip[]
   teams: Team[]
   sessions: BullpenSession[]
+  /** True if the viewer is this player's coach. Only the coach can add video. */
+  isOwnPlayer?: boolean
 }
 
 function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
@@ -42,12 +48,13 @@ function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
   return new Date(iso + (sessionDate ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function PlayerRow({ player, clips, teams, sessions }: Props) {
+export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer = true }: Props) {
   const [editOpen, setEditOpen]         = useState(false)
   const [bullpenOpen, setBullpenOpen]   = useState(false)
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
+  const uploadAllowed = canUploadVideo(player)
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null)
 
   async function handleDeleteClip(clipId: string) {
@@ -120,10 +127,27 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
                 <span className="text-[9px] bg-[#1C3A5C] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">{sessions.length}</span>
               )}
             </button>
-            <RecordButton playerId={player.id} playerName={player.full_name} />
-            <UploadButton playerId={player.id} playerName={player.full_name} maxFiles={50} />
+            {isOwnPlayer && (
+              <>
+                <RecordButton playerId={player.id} playerName={player.full_name} consent={player} />
+                <UploadButton playerId={player.id} playerName={player.full_name} consent={player} showBlockedNotice={false} maxFiles={50} />
+              </>
+            )}
           </div>
         </div>
+
+        {!isOwnPlayer && (
+          <p className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#3D5166]">Only this player&apos;s coach can add video.</p>
+        )}
+
+        {isOwnPlayer && !uploadAllowed && (
+          <div className="px-4 py-2 border-b border-[#DDE4ED]">
+            <UploadBlockedNotice
+              viewer="coach"
+              action={<MarkAdultButton playerId={player.id} playerName={player.full_name} />}
+            />
+          </div>
+        )}
 
         {deleteWarning && (
           <p role="status" className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#8A5A00] bg-[#FFF8E6]">

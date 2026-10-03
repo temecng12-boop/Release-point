@@ -34,6 +34,20 @@ export default function InviteForm({ teams }: Props) {
             </div>
           </div>
 
+          <fieldset>
+            <legend className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Age</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="age_status" value="adult" required className="accent-[#C8102E]" />
+                <span className="text-xs text-[#456080]">18 or older</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="age_status" value="minor" required className="accent-[#C8102E]" />
+                <span className="text-xs text-[#456080]">Under 18 (guardian consent pending)</span>
+              </label>
+            </div>
+          </fieldset>
+
           {(teams?.length ?? 0) > 0 && (
             <div>
               <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Assign to Teams</label>
@@ -70,6 +84,9 @@ export default function InviteForm({ teams }: Props) {
             {pending ? 'Adding…' : 'Add Player'}
           </button>
         </form>
+        <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
+          This email gets an invite to set up the player&apos;s account. For players under 18, video can&apos;t be added until guardian consent is on file.
+        </p>
       </div>
     </div>
   )

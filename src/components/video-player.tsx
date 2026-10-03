@@ -10,6 +10,7 @@ import { formatSeconds, watchMediaDuration } from '@/lib/media-duration'
 import { runAction } from '@/lib/action-result'
 import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -304,6 +305,7 @@ export default function VideoPlayer({
   role,
   initialAnnotations = [],
   initialReframe = null,
+  canAddMedia,
   canRecordLesson,
 }: {
   src: string
@@ -312,6 +314,8 @@ export default function VideoPlayer({
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
+  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
+  canAddMedia: boolean
   /** Lesson recording is for the player's direct coach only (defaults to role === 'coach'). */
   canRecordLesson?: boolean
 }) {
@@ -1012,7 +1016,7 @@ export default function VideoPlayer({
     const urlResult = await getSignedUploadUrl(path, 'lessons')
     if ('error' in urlResult) {
       console.error('[lesson] signed upload URL failed', { path, error: urlResult.error })
-      setLessonError(`Upload failed: ${urlResult.error}`); setLessonPhase('idle'); return
+      setLessonError(urlResult.error ?? 'Upload failed'); setLessonPhase('idle'); return
     }
 
     const res = await fetch(urlResult.signedUrl, {
@@ -1374,6 +1378,10 @@ export default function VideoPlayer({
           >
             {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
           </button>
+        </div>
+      ) : canRecord && !canAddMedia ? (
+        <div className="mt-2 pt-2" style={divider}>
+          <UploadBlockedNotice viewer="coach" />
         </div>
       ) : canRecord && (
         <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>

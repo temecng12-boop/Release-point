@@ -10,7 +10,7 @@ import { otpCalls } from './fakes/supabase-server'
 import { signUpPlayer } from '../../../app/actions/auth'
 
 const saved = process.env.NEXT_PUBLIC_SITE_URL
-const form = () => { const fd = new FormData(); fd.set('email', 'p@example.com'); fd.set('full_name', 'Pat'); return fd }
+const form = () => { const fd = new FormData(); fd.set('email', 'p@example.com'); fd.set('full_name', 'Pat'); fd.set('adult_confirmed', 'yes'); return fd }
 
 beforeEach(() => { resetFake(); otpCalls.length = 0 })
 after(() => { if (saved === undefined) delete process.env.NEXT_PUBLIC_SITE_URL; else process.env.NEXT_PUBLIC_SITE_URL = saved })

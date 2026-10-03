@@ -142,6 +142,10 @@ export const fakeClient = {
         state.storage[bucket] = [...(state.storage[bucket] ?? []), path]
         return { data: { path }, error: null }
       },
+      async createSignedUploadUrl(path: string) {
+        state.storageOps.push({ bucket, paths: [`sign:${path}`] })
+        return { data: { signedUrl: `https://storage.test/upload/${bucket}/${path}?token=t`, token: 't', path }, error: null }
+      },
       async createSignedUrl(path: string) {
         return { data: { signedUrl: `https://storage.test/${bucket}/${path}?token=t` }, error: null }
       },
