@@ -151,6 +151,8 @@ test('the page shows stray-quote warnings and clears the skipped-rows note after
   const tab = readFileSync(new URL('../../app/clips/[id]/metrics-tab.tsx', import.meta.url), 'utf8')
   assert.match(tab, /warningsSummary\(result\.warnings\)/)
   const save = tab.slice(tab.indexOf('async function handleSave'), tab.indexOf('function handlePdfFile'))
-  const ok = save.slice(save.indexOf('if (error) throw error'), save.indexOf('} catch'))
+  // Cleared only on the success path, after the server confirmed the import.
+  const ok = save.slice(save.indexOf('updateMetrics(prev => [...prev, ...saved])'))
+  assert.ok(save.indexOf('if (!result.ok)') < save.indexOf('updateMetrics(prev => [...prev, ...saved])'))
   assert.match(ok, /setCsvSkipped\(null\)/)
 })

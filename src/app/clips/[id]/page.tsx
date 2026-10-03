@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { canViewPlayerContent, canDeleteSavedMetrics } from '@/lib/clip-access'
+import { canViewPlayerContent, canDeleteSavedMetrics, canAddPitchData } from '@/lib/clip-access'
 import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
@@ -42,7 +42,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   // the skeleton.
   return (
     <Suspense fallback={<ClipSkeleton />}>
-      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} />
+      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} canAddMetrics={canAddPitchData(access)} />
     </Suspense>
   )
 }
@@ -58,7 +58,7 @@ type ClipRow = {
   voice_path: string | null
 }
 
-async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics }: {
+async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics, canAddMetrics }: {
   id: string
   clip: ClipRow
   userId: string
@@ -66,6 +66,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
   aiCoachAvailable: boolean
   /** Only the player's direct coach may delete saved pitch rows / hitting data (same rule as RLS). */
   canDeleteMetrics: boolean
+  canAddMetrics: boolean
 }) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
@@ -308,6 +309,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
             initialTsNotes={tsNotes ?? []}
             initialMetrics={(rawMetrics ?? []) as Metric[]}
             canDeleteMetrics={canDeleteMetrics}
+            canAddMetrics={canAddMetrics}
             initialChecklist={phaseChecklist}
             initialHittingMetrics={hittingMetrics}
             playerName={playerRow?.full_name ?? 'Player'}
