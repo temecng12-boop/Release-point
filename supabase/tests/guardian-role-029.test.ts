@@ -55,7 +55,8 @@ before(async () => {
   await runFile(db, MIGRATION) // safe to re-run
   await q(`INSERT INTO auth.users (id, email) VALUES ($1, 'coach@x.test')`, [COACH])
   await q(`UPDATE profiles SET role = 'coach' WHERE id = $1`, [COACH])
-  kid = (await q(`INSERT INTO players (coach_id, full_name) VALUES ($1, 'Kid') RETURNING id`, [COACH])).rows[0].id as string
+  // Consent on file, so 023's clips_require_video_consent trigger lets the test clips in.
+  kid = (await q(`INSERT INTO players (coach_id, full_name, consent_given_at) VALUES ($1, 'Kid', now()) RETURNING id`, [COACH])).rows[0].id as string
   kidClip = (await q(`INSERT INTO clips (player_id, uploaded_by, storage_path, title) VALUES ($1, $2, 'p/1', 't') RETURNING id`, [kid, COACH])).rows[0].id as string
 })
 after(async () => { await db?.close() })
@@ -118,8 +119,8 @@ const withData: [string, (id: string) => Promise<unknown>][] = [
   ['guardians.created_by', id => q(`INSERT INTO guardians (email, created_by) VALUES ('g@x.test', $1)`, [id])],
   ['storage.objects.owner', id => q(`INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('lessons', 'a/b', $1)`, [id])],
   ['storage.objects.owner_id', id => q(`INSERT INTO storage.objects (bucket_id, name, owner_id) VALUES ('lessons', 'a/c', $1)`, [id])],
-  ['lessons', id => q(`INSERT INTO lessons (coach_id) VALUES ($1)`, [id])],
-  ['feedback_reports', id => q(`INSERT INTO feedback_reports (user_id) VALUES ($1)`, [id])],
+  ['lessons', id => q(`INSERT INTO lessons (clip_id, player_id, coach_id, media_path) VALUES ($1, $2, $3, 'l/' || gen_random_uuid())`, [kidClip, kid, id])],
+  ['feedback_reports', id => q(`INSERT INTO feedback_reports (user_id, message) VALUES ($1, 'm')`, [id])],
   ['a filled-in profile field', id => q(`UPDATE profiles SET avatar_url = 'a.png' WHERE id = $1`, [id])],
 ]
 for (const [label, seed] of withData) {

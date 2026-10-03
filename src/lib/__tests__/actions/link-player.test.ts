@@ -65,8 +65,24 @@ test('no session: error, not a silent no-op', async () => {
   assert.ok('error' in await linkPlayerRow())
 })
 
-test('coach (non-player) sign-in: only the profile is ensured', async () => {
-  resetFake({ tables: invited(), user: { ...PLAYER, user_metadata: { role: 'coach', full_name: 'C' } } })
+test('coach sign-in (coach profile already exists): profile untouched, no player row linked', async () => {
+  resetFake({ tables: { ...invited(), profiles: [{ id: PLAYER.id, role: 'coach', full_name: 'C' }] }, user: { ...PLAYER, user_metadata: { role: 'coach', full_name: 'C' } } })
   assert.deepEqual(await linkPlayerRow(), { success: true })
+  assert.equal(state.tables.players[0].user_id, null)
+  assert.equal(state.tables.profiles[0].role, 'coach')
+})
+
+test('forged metadata: role coach/guardian in user_metadata never creates a coach/guardian profile', async () => {
+  for (const forged of ['coach', 'guardian']) {
+    resetFake({ tables: { players: [], profiles: [] }, user: { ...PLAYER, user_metadata: { role: forged, full_name: 'X' } } })
+    assert.deepEqual(await linkPlayerRow(), { success: true })
+    assert.equal(state.tables.profiles.length, 1)
+    assert.equal(state.tables.profiles[0].role, 'player', `metadata role ${forged} -> profile stays player`)
+  }
+})
+
+test('profile role lookup fails: error, nothing linked', async () => {
+  fail({ table: 'profiles', action: 'select', error: { message: 'boom' } })
+  assert.ok('error' in await linkPlayerRow())
   assert.equal(state.tables.players[0].user_id, null)
 })
