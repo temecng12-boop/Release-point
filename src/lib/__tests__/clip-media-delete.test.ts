@@ -44,3 +44,13 @@ test('lesson: direct coach only, lessons bucket; a path outside the clip folder 
   assert.deepEqual(g.removed, [])
   assert.deepEqual(await removeClipMediaAsOwnCoach(fake({}).client, 'coach', 'nope', 'voice'), { error: 'Clip not found' })
 })
+
+test('storage remove fails: column is NOT cleared and an error is returned (voice and lesson)', async () => {
+  for (const [kind, col, path] of [['voice', 'voice_path', `${P}/${C}/voice.webm`], ['lesson', 'lesson_path', `${P}/${C}/lesson-1-a.webm`]] as const) {
+    const f = fake({ [col]: path })
+    ;(f.client.storage as { from: unknown }).from = () => ({ remove: async () => ({ error: { message: 'boom' } }) })
+    const r = await removeClipMediaAsOwnCoach(f.client, 'coach', C, kind)
+    assert.ok('error' in r && /Could not delete/.test(r.error!), kind)
+    assert.deepEqual(f.updates, [], kind)
+  }
+})

@@ -140,7 +140,8 @@ export default function VoiceNote({
               onClick={async () => {
                 setDeleting(true)
                 const res = await deleteVoicePath(clipId)
-                if (!res?.error) setVoiceUrl(null)
+                if (res?.error) setRecordError(res.error)
+                else setVoiceUrl(null)
                 setDeleting(false)
               }}
               disabled={deleting}
