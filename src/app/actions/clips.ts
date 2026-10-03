@@ -197,16 +197,20 @@ type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_ang
 export async function saveHittingMetrics(clipId: string, metrics: HittingMetrics) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  if (!user) return { error: 'Please sign in again to save hitting data.' }
 
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
+  // Same rule as pitch data (pitchMetricWriteAccess): direct coach or the player.
+  const access = await pitchMetricWriteAccess(user.id, clipId)
+  if (access === 'error') return { error: 'Couldn\'t check access to this clip. Please try again.' }
+  if (access === 'no-clip') return { error: 'This clip no longer exists.' }
+  if (access === 'denied') return { error: 'Only the player\'s coach or the player can edit hitting data for this clip.' }
 
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
-  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
-
-  const { error } = await supabaseAdmin.from('clips').update({ hitting_metrics: metrics }).eq('id', clipId)
-  if (error) return { error: error.message }
+  const { data: changed, error } = await supabaseAdmin.from('clips').update({ hitting_metrics: metrics }).eq('id', clipId).select('id')
+  if (error) return { error: describeDbError('saveHittingMetrics', error, 'Couldn\'t save the hitting data.') }
+  if (!changed || changed.length === 0) {
+    console.error('[saveHittingMetrics] update changed 0 rows', clipId)
+    return { error: 'Couldn\'t save the hitting data. Refresh the page and try again.' }
+  }
 
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
