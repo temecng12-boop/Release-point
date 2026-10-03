@@ -6,24 +6,34 @@ import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/l
 import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
+import { pickFields, OWN_PROFILE_FIELDS, ATHLETE_PROFILE_FIELDS, PLAYER_SELF_FIELDS } from '@/lib/action-fields'
+import { describeDbError } from '@/lib/db-errors'
+import { avatarFileProblem, avatarBytesMatchType, AVATAR_TYPES, AVATAR_TOO_BIG, AVATAR_NOT_IMAGE, MAX_AVATAR_BYTES } from '@/lib/avatar-rules'
 
 export async function uploadAvatar(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  if (!user) return { error: 'Please sign in again to change your photo.' }
 
-  const file = formData.get('file') as File | null
-  if (!file) return { error: 'No file provided' }
-
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-  const path = `avatars/${user.id}.${ext}`
+  const file = formData.get('file')
+  if (!file || typeof file === 'string') return { error: 'No photo was received. Please try again.' }
+  // Same rule as the browser: JPEG/PNG/WebP, at most 2 MB, and the bytes must
+  // match the type. The file name is ignored; the extension comes from the type.
+  const problem = avatarFileProblem(file)
+  if (problem) return { error: problem }
   const buffer = Buffer.from(await file.arrayBuffer())
+  if (buffer.length > MAX_AVATAR_BYTES) return { error: AVATAR_TOO_BIG }
+  if (!avatarBytesMatchType(buffer, file.type)) return { error: AVATAR_NOT_IMAGE }
 
+  const path = `avatars/${user.id}.${AVATAR_TYPES[file.type]}`
   const { error: uploadErr } = await supabaseAdmin.storage
     .from('clips')
     .upload(path, buffer, { contentType: file.type, upsert: true })
 
-  if (uploadErr) return { error: uploadErr.message }
+  if (uploadErr) {
+    console.error('[uploadAvatar] upload failed', user.id, uploadErr.message)
+    return { error: 'Couldn\'t upload your photo. Please try again.' }
+  }
 
   const { data: signed } = await supabaseAdmin.storage
     .from('clips')
@@ -240,14 +250,21 @@ export async function updatePlayerSelfProfile(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  if (data.full_name) data.full_name = toTitleCase(data.full_name)
+  // Only the player's own profile columns; never coach, guardian, consent or 18+ columns.
+  const picked = pickFields(data, PLAYER_SELF_FIELDS)
+  if (!picked.ok) return { error: picked.error }
+  const fields = picked.fields
+  if (typeof fields.full_name === 'string' && fields.full_name) fields.full_name = toTitleCase(fields.full_name)
+  if (Object.keys(fields).length === 0) return { success: true }
 
-  const { error } = await supabaseAdmin
+  const { data: changed, error } = await supabaseAdmin
     .from('players')
-    .update(data)
+    .update(fields)
     .eq('user_id', user.id)
+    .select('id')
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('updatePlayerSelfProfile', error, 'Couldn\'t save your profile.') }
+  if (!changed || changed.length === 0) return { error: 'Couldn\'t find your player profile. Please refresh and try again.' }
   revalidatePath('/dashboard')
   revalidatePath('/player-settings')
   return { success: true }
@@ -268,8 +285,11 @@ export async function updatePlayerAthleteProfile(playerId: string, data: {
   if (!player) return { error: 'Player not found' }
   if (player.coach_id !== user.id && player.user_id !== user.id) return { error: 'Not authorized' }
 
-  const { error } = await supabaseAdmin.from('players').update(data).eq('id', playerId)
-  if (error) return { error: error.message }
+  const picked = pickFields(data, ATHLETE_PROFILE_FIELDS)
+  if (!picked.ok) return { error: picked.error }
+  if (Object.keys(picked.fields).length === 0) return { success: true }
+  const { error } = await supabaseAdmin.from('players').update(picked.fields).eq('id', playerId)
+  if (error) return { error: describeDbError('updatePlayerAthleteProfile', error, 'Couldn\'t save the profile.') }
 
   revalidatePath(`/profile/${playerId}`)
   revalidatePath('/player-settings')
@@ -293,20 +313,24 @@ export async function updateProfile(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { schools, ...rest } = data
-
+  // Only the profile's own text columns: never role, avatar_url or id.
+  const picked = pickFields(data, OWN_PROFILE_FIELDS)
+  if (!picked.ok) return { error: picked.error }
+  const payload: Record<string, unknown> = picked.fields
   // Store schools array as JSON in the existing `college` text column
-  const payload: Record<string, unknown> = { ...rest }
+  const schools = (data as { schools?: unknown } | null)?.schools
   if (schools !== undefined) {
+    if (!Array.isArray(schools) || !schools.every(x => typeof x === 'string')) return { error: 'Some of these details couldn\'t be saved. Check the fields and try again.' }
     payload.college = schools.length > 0 ? JSON.stringify(schools) : null
   }
+  if (Object.keys(payload).length === 0) return { success: true }
 
   const { error } = await supabaseAdmin
     .from('profiles')
     .update(payload)
     .eq('id', user.id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: describeDbError('updateProfile', error, 'Couldn\'t save your profile.') }
   revalidatePath('/dashboard')
   revalidatePath('/profile')
   return { success: true }

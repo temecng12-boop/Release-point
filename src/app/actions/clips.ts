@@ -4,7 +4,8 @@ import { normalizeClipNotes } from '@/lib/clip-notes'
 import { writeClipNotesAtomic } from '@/lib/clip-notes-write'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock, roundAxisForIntegerColumn } from '@/lib/spin-axis'
-import { pitchAxisError, validatePitchImport, type PitchImport } from '@/lib/pitch-import'
+import { validateManualPitch, validatePitchImport, type PitchImport } from '@/lib/pitch-import'
+import { pitchMetricWriteAccess } from '@/lib/pitch-access'
 import { readClipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
 import { loadLessonReplay } from '@/lib/lessons'
 import { isVoicePathFor, timestampVoicePathFor } from '@/lib/voice-path'
@@ -715,21 +716,24 @@ export async function addPitchMetric(clipId: string, data: {
   if (access === 'no-clip') return { error: 'Clip not found' }
   if (access !== 'ok') return { error: 'Not authorized' }
 
-  // spin_axis is degrees clockwise from 12:00 (see src/lib/spin-axis.ts).
-  const axisError = pitchAxisError(data.spin_axis)
-  if (axisError) return { error: axisError }
+  // Only the known pitch columns are kept, checked as for imports (spin_axis is
+  // degrees clockwise from 12:00, see src/lib/spin-axis.ts). clip_id and
+  // created_by are set last, so client data can never replace them.
+  const checked = validateManualPitch(data)
+  if (!checked.ok) return { error: checked.error }
+  const fields = checked.row
 
   // extension and vaa are new columns — insert fault-tolerantly
-  const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
+  const baseInsert = { ...fields, clip_id: clipId, created_by: user.id }
   let { row, error: insertError } = await addPitchMetricRow(baseInsert)
 
   // Until migration 020 makes spin_axis numeric, the column is integer and
   // half-degree values (any odd minute, e.g. 8:45 = 262.5°) are rejected with
   // 22P02. Save the nearest whole degree instead and say so.
   let warning: string | undefined
-  if (insertError && data.spin_axis != null && !Number.isInteger(data.spin_axis) && isIntegerSyntaxError(insertError)) {
+  if (insertError && fields.spin_axis != null && !Number.isInteger(fields.spin_axis) && isIntegerSyntaxError(insertError)) {
     console.error('[addPitchMetric] pitch_metrics.spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', insertError)
-    const rounded = Math.round(data.spin_axis) % 360
+    const rounded = Math.round(fields.spin_axis) % 360
     const retry = await addPitchMetricRow({ ...baseInsert, spin_axis: rounded })
     row = retry.row
     insertError = retry.error
@@ -738,22 +742,6 @@ export async function addPitchMetric(clipId: string, data: {
 
   if (insertError) return { error: describeDbError('addPitchMetric', insertError, 'Could not save this pitch.') }
   return { metric: row, warning }
-}
-
-/**
- * Who may add pitch rows to a clip: the direct coach of the clip's player
- * (players.coach_id) or the player themself (players.user_id). Team coaches
- * (read-only under 031), guardians and everyone else may not. The rows are
- * then written with the service role, so this check is the only gate.
- */
-async function pitchMetricWriteAccess(userId: string, clipId: string): Promise<'ok' | 'no-clip' | 'denied' | 'error'> {
-  const { data: clip, error: clipError } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
-  if (clipError) { console.error('[pitchMetricWriteAccess] clip lookup failed', clipId, clipError); return 'error' }
-  if (!clip?.player_id) return 'no-clip'
-  const { data: player, error: playerError } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).maybeSingle()
-  if (playerError) { console.error('[pitchMetricWriteAccess] player lookup failed', clip.player_id, playerError); return 'error' }
-  if (!player) return 'no-clip'
-  return player.coach_id === userId || player.user_id === userId ? 'ok' : 'denied'
 }
 
 const IMPORT_COLUMNS = 'id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa'
@@ -780,7 +768,7 @@ export async function importPitchMetrics(clipId: string, input: PitchImport): Pr
 
   const checked = validatePitchImport(input)
   if (!checked.ok) return { error: checked.error }
-  const inserts = checked.rows.map(r => ({ clip_id: clipId, created_by: user.id, ...r }))
+  const inserts = checked.rows.map(r => ({ ...r, clip_id: clipId, created_by: user.id }))
   const total = inserts.length
   const run = (rows: typeof inserts) => supabaseAdmin.from('pitch_metrics').insert(rows)
     .select(rows.some(r => 'extension' in r || 'vaa' in r) ? IMPORT_COLUMNS : IMPORT_COLUMNS_CORE)
