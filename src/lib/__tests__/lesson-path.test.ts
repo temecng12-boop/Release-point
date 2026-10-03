@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isLessonPathFor, lessonExtension, newLessonPath } from '../lesson-path'
+import { isLessonPathFor, lessonBaseMime, lessonExtension, lessonMimeMatchesPath, newLessonPath } from '../lesson-path'
 import { parseStoragePath } from '../storage-access'
 
 const P = '11111111-1111-4111-8111-111111111111'
@@ -40,6 +40,21 @@ test('isLessonPathFor accepts old and new names for this clip only', () => {
     `${OTHER}/${C}/lesson.webm`, `${P}/${OTHER}/lesson.webm`, `${P}/${C}/voice.webm`, `${P}/${C}/lesson.exe`,
     `${P}/${C}/../lesson.webm`, `${P}/${C}/x/lesson.webm`, `${P}/lesson.webm`, '', null, 42,
   ]) assert.equal(isLessonPathFor(bad, P, C), false, String(bad))
+})
+
+test('audio lesson types: base type, extension and path match', () => {
+  assert.equal(lessonBaseMime('audio/mp4;codecs=mp4a.40.2'), 'audio/mp4')
+  assert.equal(lessonBaseMime('Audio/WebM; codecs=opus'), 'audio/webm')
+  assert.equal(lessonBaseMime('video/webm'), 'video/webm')
+  assert.equal(lessonBaseMime('audio/mpeg'), null)
+  assert.equal(lessonBaseMime(null), null)
+  assert.equal(lessonExtension('audio/mp4'), 'mp4')
+  assert.equal(lessonExtension('audio/aac'), 'mp4')
+  assert.equal(lessonExtension('audio/webm;codecs=opus'), 'webm')
+  assert.equal(lessonMimeMatchesPath('audio/mp4', 'p/c/lesson-1-a.mp4'), true)
+  assert.equal(lessonMimeMatchesPath('audio/webm', 'p/c/lesson-1-a.webm'), true)
+  assert.equal(lessonMimeMatchesPath('audio/webm', 'p/c/lesson-1-a.mp4'), false)
+  assert.equal(lessonMimeMatchesPath('video/mp4', 'p/c/lesson.mp4'), true)
 })
 
 test('deleteClip removes the lesson recording from the lessons bucket, not clips', async () => {

@@ -34,3 +34,9 @@ test('total length for the progress bar: stored duration, then a finite media du
   assert.equal(lessonTotalMs(null, Infinity, 9_500.4), 9_500)
   assert.equal(lessonTotalMs(0, NaN), null)
 })
+
+test('replay total prefers stored, then timeline, then audio; a 0 stored length is skipped', () => {
+  assert.equal(lessonTotalMs(0, 5000, 4900), 5000)
+  assert.equal(lessonTotalMs(null, 0, Infinity), null)
+  assert.equal(lessonTotalMs(null, null, 3000.2), 3000)
+})
