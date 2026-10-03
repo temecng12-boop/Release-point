@@ -86,7 +86,10 @@ export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 
     .from(bucket)
     .createSignedUploadUrl(storagePath)
 
-  if (error || !data) return { error: error?.message ?? 'Failed to create upload URL' }
+  if (error || !data) {
+    console.error('[getSignedUploadUrl] could not create upload URL', { bucket, path: storagePath, message: error?.message ?? 'no data' })
+    return { error: 'Couldn\'t start the upload. Please try again.' }
+  }
   return { signedUrl: data.signedUrl, token: data.token, path: data.path }
 }
 

@@ -93,10 +93,12 @@ export function uploadBlockedText(viewer: UploadBlockedViewer, opts: { selfConfi
 /**
  * A player who signed up without a coach can confirm they are 18+ themself,
  * once: no coach can do it for them (only the player's own coach may mark a
- * player 18+). Players with a coach keep the coach's age choice.
+ * player 18+). Players with a coach keep the coach's age choice; players with
+ * a guardian on file are refused (guardian_id is read, so it must be selected).
  */
 export function canSelfConfirmAdult(
-  player: (PlayerConsentFields & { coach_id?: string | null }) | null | undefined,
+  player: (PlayerConsentFields & { coach_id?: string | null; guardian_id?: string | null }) | null | undefined,
 ): boolean {
-  return !!player && !player.coach_id && uploadConsentStatus(player) === 'pending'
+  // A guardian on file means a minor: they need guardian consent, never a self-confirm.
+  return !!player && !player.coach_id && !player.guardian_id && uploadConsentStatus(player) === 'pending'
 }

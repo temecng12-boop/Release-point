@@ -128,8 +128,8 @@ export default async function DashboardPage() {
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
-    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null } & PlayerConsentFields>(
-        'id, full_name, position, coach_id',
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null; guardian_id: string | null } & PlayerConsentFields>(
+        'id, full_name, position, coach_id, guardian_id',
         (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).single(),
       )
     : { data: null }

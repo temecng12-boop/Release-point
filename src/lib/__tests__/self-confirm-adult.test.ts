@@ -18,6 +18,10 @@ test('canSelfConfirmAdult: only a pending player with no coach', () => {
   assert.equal(canSelfConfirmAdult({ coach_id: null, consent_given_at: T }), false, 'guardian consent on file')
   assert.equal(canSelfConfirmAdult({ coach_id: null, consent_rules_pending_migration: true }), false, 'before 023 nothing is blocked')
   assert.equal(canSelfConfirmAdult(null), false)
+  // A guardian on file (e.g. the coach deleted their account, which clears
+  // coach_id) means a minor: the prompt is hidden.
+  assert.equal(canSelfConfirmAdult({ coach_id: null, guardian_id: 'g1', adult_confirmed_at: null, consent_given_at: null }), false, 'guardian on file: hidden')
+  assert.equal(canSelfConfirmAdult({ coach_id: null, guardian_id: null, adult_confirmed_at: null, consent_given_at: null }), true, 'no coach, no guardian: shown')
 })
 
 test('isConsentPendingError: only 023\'s trigger error', () => {
@@ -37,7 +41,7 @@ test('blocked copy says what to do next', () => {
 
 test('dashboard shows the 18+ prompt in the blocked notice only for players who can self-confirm', () => {
   const page = read('app/dashboard/page.tsx')
-  assert.match(page, /'id, full_name, position, coach_id'/)
+  assert.match(page, /'id, full_name, position, coach_id, guardian_id'/)
   assert.match(page, /selfConfirm=\{canSelfConfirmAdult\(playerRow\)\}/)
   assert.match(page, /blockedAction=\{canSelfConfirmAdult\(playerRow\) \? <ConfirmAdultButton \/> : undefined\}/)
   const btn = read('app/dashboard/confirm-adult-button.tsx')

@@ -218,7 +218,7 @@ async function main() {
       players: (q) => (hasOp(q, 'update') ? { data: null, error: { message: 'boom' } } : { data: { coach_id: COACH }, error: null }),
     })
     const r = await setAdultConfirmation(db, COACH, PLAYER, true)
-    assert('error' in r && r.error === 'boom', 'update errors are returned')
+    assert('error' in r && /Couldn't save the player's 18\+ status/.test(r.error) && !r.error.includes('boom'), 'update errors are refused with friendly copy (raw error logged, not shown)', JSON.stringify(r))
   }
 
   // ───────────────────────────────────────────────────────────────────────────

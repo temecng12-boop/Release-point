@@ -135,7 +135,10 @@ export async function setAdultConfirmation(
   if (isMissingConsentColumn(error)) {
     return { error: "Marking players 18+ isn't available yet: a database update still needs to be applied." }
   }
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[setAdultConfirmation] update failed', { playerId, code: error.code ?? null, message: error.message })
+    return { error: "Couldn't save the player's 18+ status. Please try again." }
+  }
   return { success: true }
 }
 
@@ -145,9 +148,9 @@ export async function setAdultConfirmation(
  * coach's otherwise.
  */
 export async function uploadBlockedMessageFor(db: Db, playerId: string, userId: string): Promise<string> {
-  const { data } = await db.from('players').select('user_id, coach_id').eq('id', playerId).maybeSingle()
-  const row = data as { user_id: string | null; coach_id: string | null } | null
-  if (row?.user_id && row.user_id === userId) return uploadBlockedText('player', { selfConfirm: !row.coach_id })
+  const { data } = await db.from('players').select('user_id, coach_id, guardian_id').eq('id', playerId).maybeSingle()
+  const row = data as { user_id: string | null; coach_id: string | null; guardian_id: string | null } | null
+  if (row?.user_id && row.user_id === userId) return uploadBlockedText('player', { selfConfirm: !row.coach_id && !row.guardian_id })
   return uploadBlockedText('coach')
 }
 
@@ -155,14 +158,15 @@ export const SELF_CONFIRM_FAILED = 'We couldn\'t save your confirmation. Please 
 
 /**
  * One-time 18+ confirmation by the player themself (RP-041), for a player who
- * signed up without a coach: their own row, no coach, not yet confirmed.
- * Players with a coach are refused (their coach records age). Success only
- * after exactly that row was updated.
+ * signed up without a coach: their own row, no coach, no guardian, not yet
+ * confirmed. Players with a coach are refused (their coach records age), and
+ * so are players with a guardian on file (a minor whose coach left keeps
+ * needing guardian consent). Success only after exactly that row was updated.
  */
 export async function confirmOwnAdult(db: Db, userId: string): Promise<{ success: true } | { error: string }> {
   const { data, error } = await db
     .from('players')
-    .select('id, coach_id, adult_confirmed_at')
+    .select('id, coach_id, guardian_id, adult_confirmed_at')
     .eq('user_id', userId)
     .maybeSingle()
   if (isMissingConsentColumn(error)) return { error: "Confirming 18+ isn't available yet: a database update still needs to be applied." }
@@ -170,10 +174,11 @@ export async function confirmOwnAdult(db: Db, userId: string): Promise<{ success
     console.error('[confirmOwnAdult] read failed', { userId, message: error.message })
     return { error: SELF_CONFIRM_FAILED }
   }
-  const row = data as { id: string; coach_id: string | null; adult_confirmed_at: string | null } | null
+  const row = data as { id: string; coach_id: string | null; guardian_id: string | null; adult_confirmed_at: string | null } | null
   if (!row) return { error: 'Player profile not found.' }
   if (row.adult_confirmed_at) return { success: true }
   if (row.coach_id) return { error: 'Your coach records your age. Ask them to mark you as 18+.' }
+  if (row.guardian_id) return { error: 'A guardian is on file for your account, so video needs their consent.' }
 
   const { data: updated, error: updateError } = await db
     .from('players')
@@ -181,6 +186,7 @@ export async function confirmOwnAdult(db: Db, userId: string): Promise<{ success
     .eq('id', row.id)
     .eq('user_id', userId)
     .is('coach_id', null)
+    .is('guardian_id', null)
     .is('adult_confirmed_at', null)
     .select('id')
   if (updateError || !Array.isArray(updated) || updated.length !== 1) {

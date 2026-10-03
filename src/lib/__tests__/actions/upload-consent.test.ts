@@ -21,12 +21,12 @@ const COACH = { id: 'coach', email: 'coach@example.com' }
 const VIDEO = `${P}/1700000000000.mp4`
 const T = '2026-10-01T00:00:00.000Z'
 
-function seed(opts: { coach?: boolean; adult?: boolean; user?: typeof PLAYER_USER } = {}) {
+function seed(opts: { coach?: boolean; adult?: boolean; guardian?: boolean; user?: typeof PLAYER_USER } = {}) {
   resetFake({
     user: opts.user ?? PLAYER_USER,
     tables: {
       profiles: [{ id: PLAYER_USER.id, role: 'player' }, { id: COACH.id, role: 'coach' }],
-      players: [{ id: P, user_id: PLAYER_USER.id, coach_id: opts.coach ? COACH.id : null, guardian_id: null, team_id: null,
+      players: [{ id: P, user_id: PLAYER_USER.id, coach_id: opts.coach ? COACH.id : null, guardian_id: opts.guardian ? 'g1' : null, team_id: null,
         adult_confirmed_at: opts.adult ? T : null, adult_confirmed_by: null, consent_given_at: null }],
       clips: [],
     },
@@ -136,6 +136,29 @@ test('confirmMyAdultStatus: a player with a coach is refused (the coach records 
   seed({ coach: true })
   const r = await confirmMyAdultStatus() as { error?: string }
   assert.match(String(r.error), /Ask them to mark you as 18\+/)
+  assert.equal(state.tables.players[0].adult_confirmed_at, null)
+})
+
+test('confirmMyAdultStatus: guardian on file and no coach (coach deleted their account) -> refused, nothing written', async () => {
+  seed({ guardian: true })
+  const r = await confirmMyAdultStatus() as { error?: string }
+  assert.match(String(r.error), /guardian/)
+  assert.equal(state.tables.players[0].adult_confirmed_at, null)
+  assert.equal(state.tables.players[0].adult_confirmed_by, null)
+  assert.ok(!state.ops.some(o => o.table === 'players' && o.action === 'update'), 'no update attempted')
+  // The upload error doesn't point them to a self-confirm either.
+  assert.doesNotMatch(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /confirm it/)
+})
+
+test('confirmMyAdultStatus: guardian added between read and write -> the guarded update changes 0 rows -> refused', async () => {
+  seed()
+  // Simulate guardian_id appearing right after the read: the update's
+  // .is('guardian_id', null) filter then matches nothing.
+  const row = state.tables.players[0]
+  let reads = 0
+  Object.defineProperty(row, 'guardian_id', { configurable: true, enumerable: true, get: () => (reads++ === 0 ? null : 'g1') })
+  const r = await quiet(() => confirmMyAdultStatus()) as { error?: string }
+  assert.match(String(r.error), /couldn't save your confirmation/)
   assert.equal(state.tables.players[0].adult_confirmed_at, null)
 })
 
