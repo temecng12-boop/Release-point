@@ -106,20 +106,32 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
   }
   if (!user.email) return { success: true }
 
-  const role     = (user.user_metadata?.role ?? 'player') as string
   const fullName = (user.user_metadata?.full_name ?? '') as string
   const now      = new Date().toISOString()
 
-  // Ensure profile row exists
+  // Ensure profile row exists. user_metadata is client-controlled (anyone can
+  // call auth.signUp with any metadata), so a missing profile is always
+  // created as 'player'; coach and guardian roles are only set server-side.
+  // An existing profile is never changed.
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: user.id, full_name: fullName, role }, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert({ id: user.id, full_name: fullName, role: 'player' }, { onConflict: 'id', ignoreDuplicates: true })
   if (profileError) {
     console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
     return { error: LINK_FAILED }
   }
 
-  if (role !== 'player') return { success: true }
+  // Only player accounts are linked to a player row; go by the stored role.
+  const { data: profile, error: roleError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (roleError || !profile) {
+    console.error('[linkPlayerRow] profile role lookup failed', { code: roleError?.code, message: roleError?.message })
+    return { error: LINK_FAILED }
+  }
+  if (profile.role !== 'player') return { success: true }
 
   // Link to an existing invited player record. Accepting an invite is not
   // guardian consent, and the coach's age choice from the invite stands.
