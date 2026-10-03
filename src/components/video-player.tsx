@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
 import { browserRecordingEnv, micErrorMessage, recordedDurationMs, recordingSupportError } from '@/lib/lesson-recording'
+import { pickAudioMime, TimelineRecorder, type PxPoint } from '@/lib/lesson-timeline/recorder'
+import type { Crop as TimelineCrop, Timeline } from '@/lib/lesson-timeline/schema'
 import { useRouter } from 'next/navigation'
 import { formatSeconds, watchMediaDuration } from '@/lib/media-duration'
 import { runAction } from '@/lib/action-result'
@@ -247,6 +249,32 @@ function dbToShape(a: DbAnnotation): Shape {
   return shape
 }
 
+// ── lesson timeline helpers ────────────────────────────────────────────────
+// Stable ids for marks inside one lesson timeline (DB ids arrive later or never).
+class ShapeIds {
+  private ids = new WeakMap<object, string>()
+  private n = 0
+  of(s: object): string {
+    let id = this.ids.get(s)
+    if (!id) { id = `s${++this.n}`; this.ids.set(s, id) }
+    return id
+  }
+}
+function trackOffsets(shapes: Shape[], ids: ShapeIds): Record<string, PxPoint> {
+  const out: Record<string, PxPoint> = {}
+  for (const s of shapes) if (s.anchor && s.currentAnchor) out[ids.of(s)] = { x: s.currentAnchor.x - s.anchor.x, y: s.currentAnchor.y - s.anchor.y }
+  return out
+}
+/** Records clip position and tracked-mark movement (both throttled by the recorder). */
+function sampleTimeline(rec: TimelineRecorder | null, video: HTMLVideoElement | null, shapes: Shape[], ids: ShapeIds) {
+  if (!rec) return
+  if (video && !video.paused) rec.pos(video.currentTime)
+  rec.track(trackOffsets(shapes, ids))
+}
+function viewCrop(reframeMode: boolean, c: { left: number; top: number; right: number; bottom: number }): TimelineCrop {
+  return reframeMode ? { l: 0, t: 0, r: 1, b: 1 } : { l: c.left / 100, t: c.top / 100, r: c.right / 100, b: c.bottom / 100 }
+}
+
 // ── style helpers ──────────────────────────────────────────────────────────
 const TOOLS = [
   { id: 'pointer',  label: 'Pointer' },
@@ -361,6 +389,11 @@ export default function VideoPlayer({
   const lessonRafRef     = useRef<number | null>(null)
   const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const lessonTicksRef   = useRef(0)   // whole seconds recorded (duration fallback)
+  // timeline lessons: audio + every action, replayed over the original clip
+  const tlRecRef         = useRef<TimelineRecorder | null>(null)
+  const shapeIdsRef      = useRef(new ShapeIds())
+  const stepFlagRef      = useRef(false)
+  const penDownRef       = useRef(0)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -532,6 +565,7 @@ export default function VideoPlayer({
       if (toolRef.current === 'pointer') return
       e.preventDefault()
       videoRef.current?.pause()
+      penDownRef.current = tlRecRef.current?.penDown() ?? 0
       const p = canvasPoint(e)
       draftRef.current = toolRef.current === 'freehand'
         ? { type: 'freehand', color: inkColorRef.current, points: [p] }
@@ -562,6 +596,7 @@ export default function VideoPlayer({
         const frame = grabFrame()
         if (frame) d.template = extractPatch(frame.imgData, anchor.x, anchor.y, frame.w, frame.h)
         annotationsRef.current = [...annotationsRef.current, d]
+        tlRecRef.current?.stroke(shapeIdsRef.current.of(d), d, penDownRef.current)
         setMarkerCount(c => c + 1)
         const item = { ref: d, type: d.type, color: d.color, time: d.originTime ?? 0 }
         setMarkList(prev => [...prev, item])
@@ -624,11 +659,14 @@ export default function VideoPlayer({
     function onTimeUpdate() {
       if (!scrubbingRef.current) scrub!.value = String(Math.floor(video!.currentTime * 1000))
       setCurrentTime(video!.currentTime)
-      if (video!.paused) { updateTracking(); drawFrame() }
+      if (video!.paused) { updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
     }
-    function onPlay()  { setPlaying(true) }
-    function onPause() { setPlaying(false); updateTracking(); drawFrame() }
+    function onPlay()  { setPlaying(true); tlRecRef.current?.play(video!.currentTime) }
+    function onPause() { setPlaying(false); tlRecRef.current?.pause(video!.currentTime); updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
     function onEnded() { setPlaying(false) }
+    // Scrubs, jumps and frame steps (stepFlagRef marks the frame buttons).
+    function onSeeking() { tlRecRef.current?.seek(video!.currentTime, stepFlagRef.current); stepFlagRef.current = false }
+    function onRateChange() { tlRecRef.current?.rate(video!.playbackRate) }
 
     video.addEventListener('loadedmetadata', onLoadedMetadata)
     video.addEventListener('durationchange', onLoadedMetadata)
@@ -638,6 +676,8 @@ export default function VideoPlayer({
     video.addEventListener('play',           onPlay)
     video.addEventListener('pause',          onPause)
     video.addEventListener('ended',          onEnded)
+    video.addEventListener('seeking',        onSeeking)
+    video.addEventListener('ratechange',     onRateChange)
     window.addEventListener('resize',        resizeCanvas)
     // Duration (QA-007): webm clips can report Infinity until resolved, and it
     // can change later (durationchange). Shared with the lesson player.
@@ -657,6 +697,8 @@ export default function VideoPlayer({
       video.removeEventListener('play',           onPlay)
       video.removeEventListener('pause',          onPause)
       video.removeEventListener('ended',          onEnded)
+      video.removeEventListener('seeking',        onSeeking)
+      video.removeEventListener('ratechange',     onRateChange)
       window.removeEventListener('resize',        resizeCanvas)
     }
   }, [src, drawFrame, resizeCanvas])
@@ -683,7 +725,12 @@ export default function VideoPlayer({
   useEffect(() => {
     if (!playing) return
     let raf: number
-    function loop() { updateTracking(); drawFrame(); raf = requestAnimationFrame(loop) }
+    function loop() {
+      updateTracking()
+      sampleTimeline(tlRecRef.current, videoRef.current, annotationsRef.current, shapeIdsRef.current)
+      drawFrame()
+      raf = requestAnimationFrame(loop)
+    }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [playing, drawFrame])
@@ -695,11 +742,11 @@ export default function VideoPlayer({
   }
   function stepBack() {
     const v = videoRef.current; if (!v) return
-    v.pause(); v.currentTime = Math.max(0, v.currentTime - FRAME)
+    v.pause(); stepFlagRef.current = true; v.currentTime = Math.max(0, v.currentTime - FRAME)
   }
   function stepFwd() {
     const v = videoRef.current; if (!v) return
-    v.pause(); v.currentTime = Math.min(v.duration || 0, v.currentTime + FRAME)
+    v.pause(); stepFlagRef.current = true; v.currentTime = Math.min(v.duration || 0, v.currentTime + FRAME)
   }
   function clearStampOverlay() {
     if (stampTimerRef.current) clearTimeout(stampTimerRef.current)
@@ -719,18 +766,25 @@ export default function VideoPlayer({
   function selectTool(t: string)  { toolRef.current = t;     setTool(t) }
   function selectColor(c: string) { inkColorRef.current = c; setInkColor(c) }
   // Marks leave the screen only after the server removed them; on failure
-  // they stay and the error is shown.
-  async function removeAnnotation(shape: Shape) {
+  // they stay and the error is shown. The lesson timeline records the removal
+  // only once it really happened.
+  async function removeAnnotation(shape: Shape, why: 'undo' | 'delete' = 'delete') {
     // Still saving: removing it now would let the save land afterwards.
     if (!shape.id) return
     const id = shape.id
     const result = await runAction(() => deleteAnnotation(id))
     if (!result.ok) { setMarkError(`Mark not removed: ${result.error}`); return }
     setMarkError(null)
+    tlRecRef.current?.remove(shapeIdsRef.current.of(shape), why)
     annotationsRef.current = annotationsRef.current.filter(s => s !== shape)
     setMarkList(prev => prev.filter(m => m.ref !== shape))
     setMarkerCount(c => c - 1)
     drawFrame()
+  }
+
+  function undoLastMark() {
+    const last = annotationsRef.current[annotationsRef.current.length - 1]
+    if (last) void removeAnnotation(last, 'undo')
   }
 
   async function clearMarks() {
@@ -739,6 +793,9 @@ export default function VideoPlayer({
     // Only the marks the server deleted (this coach's saved marks) leave the screen.
     const removedIds = (result.value && 'removedIds' in result.value ? result.value.removedIds : undefined) ?? []
     const { kept, removed } = marksAfterClear(annotationsRef.current, removedIds)
+    // Lesson timeline: a full clear when nothing is left, otherwise one removal per deleted mark.
+    if (kept.length === 0) tlRecRef.current?.clear()
+    else for (const shape of annotationsRef.current) if (!kept.includes(shape)) tlRecRef.current?.remove(shapeIdsRef.current.of(shape), 'delete')
     annotationsRef.current = kept; draftRef.current = null
     setMarkList(prev => prev.filter(m => kept.includes(m.ref)))
     setMarkerCount(c => c - removed)
@@ -779,6 +836,8 @@ export default function VideoPlayer({
     }
   }
 
+  // Timeline lessons (audio + actions) where MediaRecorder can record audio;
+  // otherwise the older screen-style video recorder below.
   async function startLessonRecording() {
     setLessonError(null)
     setLessonNotice(null)
@@ -786,7 +845,9 @@ export default function VideoPlayer({
     const unsupported = recordingSupportError(browserRecordingEnv())
     if (unsupported) { setLessonError(unsupported); return }
     try {
-      await startVideoLessonRecording()
+      const audioMime = pickAudioMime(m => MediaRecorder.isTypeSupported(m))
+      if (audioMime) await startTimelineRecording(audioMime)
+      else await startVideoLessonRecording()
     } catch (err) {
       console.error('[lesson] could not start recording', err)
       setLessonError('Couldn\'t start recording in this browser. Try again, or use the latest Safari or Chrome.')
@@ -794,6 +855,71 @@ export default function VideoPlayer({
     }
   }
 
+  async function startTimelineRecording(mimeType: string) {
+    const video = videoRef.current
+    const overlay = overlayRef.current
+    if (!video || !overlay) return
+    let micStream: MediaStream
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err) {
+      setLessonError(micErrorMessage(err))
+      return
+    }
+    const ids = shapeIdsRef.current
+    const rec = new TimelineRecorder(
+      () => performance.now(),
+      overlay.width || video.videoWidth || 1280, overlay.height || video.videoHeight || 720,
+      Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : null,
+    )
+    rec.begin({
+      videoSec: video.currentTime, playing: !video.paused, rate: video.playbackRate,
+      crop: viewCrop(reframeModeRef.current, crop),
+      shapes: annotationsRef.current.map(s => ({ id: ids.of(s), shape: s })),
+      offsets: trackOffsets(annotationsRef.current, ids),
+    })
+    let recorder: MediaRecorder
+    try {
+      recorder = new MediaRecorder(micStream, { mimeType })
+    } catch (err) {
+      console.warn('[lesson] audio recorder unavailable, using video recorder', err)
+      micStream.getTracks().forEach(t => t.stop())
+      return startVideoLessonRecording()
+    }
+    lessonChunksRef.current = []
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) lessonChunksRef.current.push(e.data) }
+    // The audio clock starts here; timeline times are measured from it.
+    lessonStartRef.current = 0
+    lessonTicksRef.current = 0
+    recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp; rec.setOrigin(ev.timeStamp) }
+    recorder.onstop = (ev) => {
+      micStream.getTracks().forEach(t => t.stop())
+      tlRecRef.current = null
+      lessonRecRef.current = null
+      const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
+      const done = rec.finish(durationMs ?? 0)
+      if (!done.ok) console.warn('[lesson] timeline not saved', done.error)
+      uploadLesson(mimeType, durationMs, done.ok ? done.timeline : null, done.ok ? null : done.error)
+    }
+    recorder.onerror = (ev) => {
+      console.error('[lesson] recorder error', ev)
+      if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+      micStream.getTracks().forEach(t => t.stop())
+      tlRecRef.current = null
+      lessonRecRef.current = null
+      setLessonError('Recording stopped unexpectedly. Try again.')
+      setLessonPhase('idle')
+    }
+    tlRecRef.current = rec
+    recorder.start(250)
+    lessonRecRef.current = recorder
+    setLessonSecs(0)
+    setLessonNotice(null)
+    setLessonPhase('recording')
+    lessonTimerRef.current = setInterval(() => { lessonTicksRef.current += 1; setLessonSecs(s => s + 1) }, 1000)
+  }
+
+  // Fallback: composites video + drawings into a video file (format 1).
   async function startVideoLessonRecording() {
     const video = videoRef.current
     const overlay = overlayRef.current
@@ -848,7 +974,7 @@ export default function VideoPlayer({
       releaseStreams()
       lessonRecRef.current = null
       const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
-      uploadLesson(mimeType, durationMs)
+      uploadLesson(mimeType, durationMs, null, null)
     }
     recorder.onerror = (ev) => {
       console.error('[lesson] recorder error', ev)
@@ -873,13 +999,17 @@ export default function VideoPlayer({
     setLessonPhase('saving')
   }
 
-  async function uploadLesson(mimeType: string, durationMs: number | null) {
+  async function uploadLesson(mimeType: string, durationMs: number | null, timeline: Timeline | null, timelineError: string | null) {
     // A fresh object per recording: re-recording used to reuse lesson.<ext>,
     // which already existed, so the non-upsert signed upload was rejected.
     const path = newLessonPath(playerId, clipId, mimeType)
     // Strip codec parameters — Supabase MIME check only matches the base type
     const baseMime = mimeType.split(';')[0].trim()
-    const blob = new Blob(lessonChunksRef.current, { type: baseMime })
+    const isAudio = baseMime.startsWith('audio/')
+    // The real type (audio/mp4, audio/webm, or video/* for the fallback recorder):
+    // the same value goes to the upload, the file and the lessons row (026 allows audio/*).
+    const uploadType = baseMime
+    const blob = new Blob(lessonChunksRef.current, { type: uploadType })
     lessonChunksRef.current = []
     if (blob.size === 0) { setLessonError('Nothing was recorded. Try again.'); setLessonPhase('idle'); return }
 
@@ -890,7 +1020,7 @@ export default function VideoPlayer({
     }
 
     const res = await fetch(urlResult.signedUrl, {
-      method: 'PUT', body: blob, headers: { 'Content-Type': baseMime },
+      method: 'PUT', body: blob, headers: { 'Content-Type': uploadType },
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
@@ -898,18 +1028,20 @@ export default function VideoPlayer({
       setLessonError(`Upload failed (${res.status}). Try again.`); setLessonPhase('idle'); return
     }
 
-    const saveResult = await saveLessonPath(clipId, path, { mime: baseMime, durationMs })
+    const saveResult = await saveLessonPath(clipId, path, { mime: baseMime, durationMs, ...(timeline ? { timeline } : {}) })
     if ('error' in saveResult) {
       console.error('[lesson] save failed', { path, error: saveResult.error })
       setLessonError(`Uploaded, but the lesson wasn't saved: ${saveResult.error}`); setLessonPhase('idle'); return
     }
-    setLessonNotice(saveResult.warning ?? 'Lesson saved')
+    setLessonNotice(saveResult.warning ?? (isAudio && !timeline ? `Voice saved without the drawing replay: ${timelineError ?? 'unknown error'}` : 'Lesson saved'))
     setLessonPhase('idle')
     router.refresh()   // reload the lesson list for this clip
   }
 
   // ── reframe helpers ──────────────────────────────────────────────────────
   useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
+  // Zoom/reframe as the viewer sees it (full frame while the crop box is being edited).
+  useEffect(() => { tlRecRef.current?.crop(viewCrop(reframeMode, crop)) }, [reframeMode, crop])
 
   function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -1161,6 +1293,9 @@ export default function VideoPlayer({
               title="Stamp current drawings as a timestamp note"
             >
               ✦ Stamp
+            </button>
+            <button onClick={undoLastMark} disabled={markerCount === 0} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle} disabled:opacity-40`} style={oswald} title="Remove the last mark">
+              Undo
             </button>
             <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
               Clear marks

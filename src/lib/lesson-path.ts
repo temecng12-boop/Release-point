@@ -9,8 +9,32 @@
 
 export type LessonExt = 'mp4' | 'webm'
 
+const MP4_FAMILY = ['video/mp4', 'video/x-m4v', 'audio/mp4', 'audio/aac', 'audio/x-m4a']
+
+/** Media types the lessons bucket accepts (016 video types + 026 audio types), as base types. */
+export const LESSON_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/webm', 'audio/ogg'] as const
+
+/** "audio/mp4;codecs=mp4a.40.2" -> "audio/mp4" if the lessons bucket accepts it, else null. */
+export function lessonBaseMime(mime: unknown): string | null {
+  if (typeof mime !== 'string') return null
+  const base = mime.split(';')[0].trim().toLowerCase()
+  return (LESSON_MIME_TYPES as readonly string[]).includes(base) ? base : null
+}
+
 export function lessonExtension(mimeType: string): LessonExt {
-  return mimeType.toLowerCase().includes('mp4') ? 'mp4' : 'webm'
+  const base = mimeType.split(';')[0].trim().toLowerCase()
+  return MP4_FAMILY.includes(base) || base.includes('mp4') ? 'mp4' : 'webm'
+}
+
+/** The file extension matches the media type's container (e.g. audio/mp4 -> .mp4, audio/webm -> .webm). */
+export function lessonMimeMatchesPath(mime: string, path: string): boolean {
+  const base = lessonBaseMime(mime)
+  const ext = path.split('.').pop()?.toLowerCase()
+  if (!base || !ext) return false
+  if (MP4_FAMILY.includes(base)) return ext === 'mp4' || ext === 'm4v'
+  if (base === 'video/webm' || base === 'audio/webm') return ext === 'webm'
+  if (base === 'video/quicktime') return ext === 'mov'
+  return false
 }
 
 export function newLessonPath(

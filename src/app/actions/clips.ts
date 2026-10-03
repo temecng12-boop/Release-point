@@ -4,6 +4,7 @@ import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } 
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
 import { readClipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
+import { loadLessonReplay } from '@/lib/lessons'
 import { isVoicePathFor, timestampVoicePathFor } from '@/lib/voice-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -505,7 +506,7 @@ export async function deleteTimestampNote(noteId: string) {
 
 // A new lesson recording: adds a lessons row (never deletes older lessons) and
 // points clips.lesson_path at it. Coach-only; see src/lib/lessons-write.ts.
-export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null } = {}) {
+export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null; timeline?: unknown } = {}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   // No new lesson for a player without 18+ confirmation or guardian consent
@@ -524,6 +525,21 @@ export async function saveLessonPath(clipId: string, lessonPath: string, meta: {
   const result = await saveLessonRecord(supabaseAdmin, user?.id, clipId, lessonPath, meta)
   if ('success' in result) revalidatePath(`/clips/${clipId}`)
   return result
+}
+
+// Playback for one lesson: signed URLs for the lesson file and, for timeline
+// lessons, the original clip video (both through the storage ownership check).
+export async function getLessonReplay(lessonId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const src = await loadLessonReplay(supabaseAdmin, user?.id, lessonId)
+  if ('error' in src) return { error: src.error }
+  const { data: media } = await supabaseAdmin.storage.from('lessons').createSignedUrl(src.mediaPath, 3600)
+  if (!media?.signedUrl) return { error: 'Could not load this lesson.' }
+  if (src.format === 1) return { format: 1 as const, mediaUrl: media.signedUrl }
+  const { data: clip } = await supabaseAdmin.storage.from('clips').createSignedUrl(src.clipPath, 3600)
+  if (!clip?.signedUrl) return { error: 'Could not load the clip video for this lesson.' }
+  return { format: 2 as const, mediaUrl: media.signedUrl, videoUrl: clip.signedUrl, timeline: src.timeline, durationMs: src.durationMs }
 }
 
 export async function deleteLesson(lessonId: string) {

@@ -55,9 +55,9 @@ test('video player: the mark error line shows each message as written (not alway
 
 test('video player: a lesson save warning is shown instead of "Lesson saved"', () => {
   const src = read('components/video-player.tsx')
-  // Lessons phase 1 (#13) shows the save result as lessonNotice: the warning
-  // text when there is one, otherwise "Lesson saved".
-  assert.match(src, /setLessonNotice\(saveResult\.warning \?\? 'Lesson saved'\)/)
+  // Lessons (#13/#20) show the save result as lessonNotice: the server's
+  // warning first when there is one; "Lesson saved" only otherwise.
+  assert.match(src, /setLessonNotice\(saveResult\.warning \?\? /)
   assert.match(src, /: <span role="status"[^>]*>\{lessonNotice\}<\/span>/)
 })
 

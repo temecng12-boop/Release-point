@@ -159,9 +159,10 @@ test('cleanup removes every listener and the timer', () => {
 test('lesson list: the lesson player goes through the watcher (video-player only records)', async () => {
   const { readFileSync } = await import('node:fs')
   const list = readFileSync(new URL('../../components/lessons/lesson-list.tsx', import.meta.url), 'utf8')
-  assert.match(list, /watchMediaDuration\(v, setMediaSec\)/)
-  assert.match(list, /<video ref=\{videoRef\} src=\{url\} controls autoPlay playsInline className/)
-  assert.match(list, /lessonRowDuration\(lesson\.duration_ms, mediaSec, open && !!url\)/)
+  assert.match(list, /watchMediaDuration\(el, setMediaSec\)/)
+  assert.match(list, /<audio ref=\{el => \{ mediaRef\.current = el \}\} src=\{media\.url\}/)
+  assert.match(list, /<video ref=\{el => \{ mediaRef\.current = el \}\} src=\{media\.url\}/)
+  assert.match(list, /lessonRowDuration\(lesson\.duration_ms, mediaSec, open && !!fileUrl\)/)
   assert.doesNotMatch(list, /fixInfiniteDuration|1e101/, 'no second, timeout-less seek-to-end')
 })
 
