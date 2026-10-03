@@ -1,14 +1,20 @@
-// Server-side checks for the player video consent rule (RP-041, age bands 035).
+// Server-side checks for the player video rule and age bands (RP-041,
+// migration 037). See ./consent.ts for the rule and ./age-band.ts for bands.
 //
 // The Supabase client is passed in (the service-role client in app code) so
-// these functions can be unit tested with a mocked client. Only call them from
+// these functions can be unit tested with a fake client. Only call them from
 // Server Actions, Route Handlers or Server Components.
+//
+// Age answers are written only here, with the service role, after the
+// caller's authorization is checked: 037's players_restrict_update /
+// players_restrict_insert refuse them from end users (coaches included).
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isPlayersOwnCoach } from './auth/roster-access'
 import { isMissingColumnError, type DbErrorLike } from './db-errors'
-import { maskEmail } from './guardian-email'
+import { effectiveAgeBand, type AgeBandSource } from './age-band'
 import {
   AGE_BAND_MIGRATION_COLUMNS,
+  canSelfConfirmAgeBand,
   canUploadVideo,
   CONSENT_MIGRATION_COLUMNS,
   isAgeBand,
@@ -18,7 +24,6 @@ import {
   UPLOAD_BLOCKED_MESSAGE,
   uploadBlockedText,
   type AgeBand,
-  type GuardianNotice,
   type PlayerConsentFields,
 } from './consent'
 
@@ -26,32 +31,31 @@ type Db = Pick<SupabaseClient, 'from'>
 
 export type ConsentCheck = { ok: true } | { ok: false; error: string }
 
-// ── Before migrations 023 / 035 ──────────────────────────────────────────────
+// ── Before migrations 023 / 037 ──────────────────────────────────────────────
 // Until 023 runs, players.adult_confirmed_at / adult_confirmed_by don't exist
 // and any query naming them fails (Postgres 42703, PostgREST PGRST204). The
 // code then falls back to how the app behaved before the consent rule:
 // uploads are not gated, and no player counts as confirmed 18+.
-// Until 035 runs, the age band columns don't exist: the code then uses 023's
-// rule (18+ confirmation or guardian consent), the same as 023's trigger.
-// Once a migration is applied its columns exist and its rule applies.
+// Until 037 runs, the age columns don't exist: the code then uses 023's rule
+// (18+ confirmation or consent_given_at), the same as 023's trigger.
 
 /** True if `error` is "column does not exist" for one of 023's columns. */
 export function isMissingConsentColumn(error: DbErrorLike | null | undefined): boolean {
   return CONSENT_MIGRATION_COLUMNS.some((c) => isMissingColumnError(error, c))
 }
 
-/** True if `error` is "column does not exist" for one of 035's columns. */
+/** True if `error` is "column does not exist" for one of 037's columns. */
 export function isMissingAgeBandColumn(error: DbErrorLike | null | undefined): boolean {
   return AGE_BAND_MIGRATION_COLUMNS.some((c) => isMissingColumnError(error, c))
 }
 
 const warned = new Set<string>()
-function warnOnce(context: string, migration: '023' | '035') {
+function warnOnce(context: string, migration: '023' | '037') {
   if (warned.has(migration)) return
   warned.add(migration)
   console.warn(migration === '023'
     ? `[${context}] players.adult_confirmed_at not found: migration 023 not applied yet, so the video consent rule is off`
-    : `[${context}] players.age_band not found: migration 035 not applied yet, so 023's 18+/consent rule applies`)
+    : `[${context}] players.age_band not found: migration 037 not applied yet, so 023's 18+/consent rule applies`)
 }
 
 type QueryResult = { data: unknown; error: DbErrorLike | null }
@@ -62,8 +66,10 @@ function markRows(data: unknown, flags: Record<string, unknown>) {
   return Array.isArray(data) ? data.map(mark) : mark(data)
 }
 
+const NO_AGE = { age_band: null, age_confirmed_at: null, age_band_coach: null, age_band_self: null, age_screen_at: null }
+
 /**
- * Runs a players select with `columns` plus the consent columns. If 035's
+ * Runs a players select with `columns` plus the consent columns. If 037's
  * columns are missing, runs it again with 023's (rows marked
  * `age_band_pending_migration`); if 023's are missing too, with only
  * consent_given_at (rows marked `consent_rules_pending_migration`).
@@ -78,11 +84,11 @@ export async function selectPlayersWithConsent<T>(
     return first as { data: T | null; error: DbErrorLike | null }
   }
   if (isMissingAgeBandColumn(first.error)) {
-    warnOnce('selectPlayersWithConsent', '035')
+    warnOnce('selectPlayersWithConsent', '037')
     const second = await run(`${columns}, ${PLAYER_CONSENT_COLUMNS_023}`)
     if (!isMissingConsentColumn(second.error)) {
       if (second.error) return second as { data: T | null; error: DbErrorLike | null }
-      return { data: markRows(second.data, { age_band: null, age_confirmed_at: null, age_band_pending_migration: true }) as T | null, error: null }
+      return { data: markRows(second.data, { ...NO_AGE, age_band_pending_migration: true }) as T | null, error: null }
     }
   }
   warnOnce('selectPlayersWithConsent', '023')
@@ -90,7 +96,7 @@ export async function selectPlayersWithConsent<T>(
   if (retry.error) return retry as { data: T | null; error: DbErrorLike | null }
   return {
     data: markRows(retry.data, {
-      adult_confirmed_at: null, age_band: null, age_confirmed_at: null,
+      adult_confirmed_at: null, ...NO_AGE,
       consent_rules_pending_migration: true, age_band_pending_migration: true,
     }) as T | null,
     error: null,
@@ -113,9 +119,9 @@ export async function writeWithAdultFields<R extends QueryResult>(
 }
 
 /**
- * Runs a players write with 035's age fields and 023's adult fields. Before
- * 035 it runs again with only the adult fields; before 023 with neither.
- * `bandSaved` says whether the age band was stored.
+ * Runs a players write with 037's age fields and 023's adult fields. Before
+ * 037 it runs again with only the adult fields; before 023 with neither.
+ * `bandSaved` says whether the age answer was stored.
  */
 export async function writeWithAgeFields<R extends QueryResult>(
   ageFields: Record<string, unknown>,
@@ -125,7 +131,7 @@ export async function writeWithAgeFields<R extends QueryResult>(
   const hasAge = Object.keys(ageFields).length > 0
   const first = await run({ ...ageFields, ...adultFields })
   if (hasAge && isMissingAgeBandColumn(first.error)) {
-    warnOnce('writeWithAgeFields', '035')
+    warnOnce('writeWithAgeFields', '037')
     return { result: await writeWithAdultFields(adultFields, run), bandSaved: false }
   }
   if (isMissingConsentColumn(first.error)) {
@@ -135,20 +141,55 @@ export async function writeWithAgeFields<R extends QueryResult>(
   return { result: first, bandSaved: hasAge && !first.error }
 }
 
-/** The fields that record `band` as confirmed by `userId` now (adult_confirmed_* kept in step). */
-export function ageBandFields(band: AgeBand | null, userId: string, now = new Date().toISOString()) {
-  if (band === null) {
-    return {
-      age: { age_band: null, age_confirmed_at: null, age_confirmed_by: null },
-      adult: { adult_confirmed_at: null, adult_confirmed_by: null },
-    }
+export type AgeAnswers = { coach?: string | null; self?: string | null; ageGroups?: (string | null | undefined)[] }
+
+/**
+ * The players fields for a new coach or player answer, with the effective
+ * band worked out the same way as 037's trigger (which recomputes it anyway):
+ *   age: age_band_coach | age_band_self (+ age_screen_at for the player),
+ *        age_band, age_band_source, age_confirmed_at/by
+ *   adult: 023's adult_confirmed_at/by, kept in step (set for 18_plus only)
+ */
+export function ageAnswerFields(
+  who: 'coach' | 'self',
+  band: AgeBand | null,
+  actorId: string,
+  current: AgeAnswers & { coachId?: string | null; userId?: string | null } = {},
+  now = new Date().toISOString(),
+): { age: Record<string, unknown>; adult: Record<string, unknown>; band: AgeBand | null; source: AgeBandSource | null } {
+  const answers = { coach: current.coach ?? null, self: current.self ?? null, ageGroups: current.ageGroups ?? [] }
+  if (who === 'coach') answers.coach = band
+  else answers.self = band
+  const eff = effectiveAgeBand(answers)
+  const deciderId = eff.source === 'coach' ? (who === 'coach' ? actorId : current.coachId ?? null)
+    : eff.source === 'self' ? (who === 'self' ? actorId : current.userId ?? null)
+    : null
+  const age: Record<string, unknown> = {
+    ...(who === 'coach' ? { age_band_coach: band } : { age_band_self: band, age_screen_at: now }),
+    age_band: eff.band,
+    age_band_source: eff.source,
+    age_confirmed_at: eff.band ? now : null,
+    age_confirmed_by: eff.band ? deciderId : null,
   }
-  return {
-    age: { age_band: band, age_confirmed_at: now, age_confirmed_by: userId },
-    adult: band === '18_plus'
-      ? { adult_confirmed_at: now, adult_confirmed_by: userId }
-      : { adult_confirmed_at: null, adult_confirmed_by: null },
-  }
+  const adult = eff.band === '18_plus'
+    ? { adult_confirmed_at: now, adult_confirmed_by: deciderId }
+    : { adult_confirmed_at: null, adult_confirmed_by: null }
+  return { age, adult, band: eff.band, source: eff.source }
+}
+
+/** Age groups of the teams with these ids (players.team_id and player_teams). */
+export async function teamAgeGroups(db: Db, teamIds: (string | null | undefined)[]): Promise<(string | null)[]> {
+  const ids = [...new Set(teamIds.filter((t): t is string => !!t))]
+  if (ids.length === 0) return []
+  const { data } = await db.from('teams').select('age_group').in('id', ids)
+  return ((data as { age_group: string | null }[] | null) ?? []).map((t) => t.age_group)
+}
+
+/** The player's own and team age groups (younger-band rule input). */
+export async function playerAgeGroups(db: Db, player: { id: string; age_group?: string | null; team_id?: string | null }): Promise<(string | null)[]> {
+  const { data: links } = await db.from('player_teams').select('team_id').eq('player_id', player.id)
+  const teamIds = [player.team_id, ...(((links as { team_id: string }[] | null) ?? []).map((l) => l.team_id))]
+  return [player.age_group ?? null, ...(await teamAgeGroups(db, teamIds))]
 }
 
 /**
@@ -184,71 +225,60 @@ export async function canManagePlayerAge(db: Db, userId: string, playerId: strin
 }
 
 const NOT_AVAILABLE_BAND = "Setting an age band isn't available yet: a database update still needs to be applied."
+const NOT_AVAILABLE_ADULT = "Marking players 18+ isn't available yet: a database update still needs to be applied."
+
+export type SetBandResult = { success: true; band: AgeBand | null; youngerKept?: boolean } | { error: string }
 
 /**
- * The player's coach records the player's age band (or clears it with null).
- * '18_plus' also sets adult_confirmed_at/by; any other band clears them, so
- * 023's column always agrees with the band. Authorization first.
+ * The player's coach records their band answer (null clears it). The stored
+ * band is the younger of the coach's and the player's answers and any
+ * under-13 age group; `youngerKept` says a younger answer won over the
+ * coach's. Only the player's own coach (players.coach_id); checked first.
  */
-export async function setAgeBand(
-  db: Db,
-  userId: string,
-  playerId: string,
-  band: AgeBand | null,
-): Promise<{ success: true } | { error: string }> {
+export async function setCoachAgeBand(db: Db, userId: string, playerId: string, band: AgeBand | null): Promise<SetBandResult> {
   if (band !== null && !isAgeBand(band)) return { error: 'Choose an age band.' }
   if (!(await canManagePlayerAge(db, userId, playerId))) return { error: 'Not authorized' }
-
   const what = band === null || band === '18_plus' ? "the player's 18+ status" : "the player's age band"
-  const { age, adult } = ageBandFields(band, userId)
-  let { error } = await db.from('players').update({ ...age, ...adult }).eq('id', playerId).eq('coach_id', userId)
-  if (isMissingAgeBandColumn(error)) {
-    // Before 035: only 18+ (or clearing it) can be stored, in 023's columns.
-    warnOnce('setAgeBand', '035')
+
+  type Row = { id: string; coach_id: string | null; user_id: string | null; age_group: string | null; team_id: string | null; age_band_self?: string | null }
+  const read = await db.from('players').select('id, coach_id, user_id, age_group, team_id, age_band_self').eq('id', playerId).maybeSingle()
+  if (isMissingAgeBandColumn(read.error)) {
+    // Before 037: only 18+ (or clearing it) can be stored, in 023's columns.
+    warnOnce('setCoachAgeBand', '037')
     if (band !== null && band !== '18_plus') return { error: NOT_AVAILABLE_BAND }
-    ;({ error } = await db.from('players').update(adult).eq('id', playerId).eq('coach_id', userId))
+    const now = new Date().toISOString()
+    const adult = band ? { adult_confirmed_at: now, adult_confirmed_by: userId } : { adult_confirmed_at: null, adult_confirmed_by: null }
+    const { error } = await db.from('players').update(adult).eq('id', playerId).eq('coach_id', userId)
+    if (isMissingConsentColumn(error)) return { error: NOT_AVAILABLE_ADULT }
+    if (error) {
+      console.error('[setCoachAgeBand] update failed', { playerId, code: error.code ?? null, message: error.message })
+      return { error: `Couldn't save ${what}. Please try again.` }
+    }
+    return { success: true, band }
   }
-  if (isMissingConsentColumn(error)) {
-    return { error: "Marking players 18+ isn't available yet: a database update still needs to be applied." }
-  }
-  if (error) {
-    console.error('[setAgeBand] update failed', { playerId, code: error.code ?? null, message: error.message })
+  if (read.error || !read.data) {
+    if (read.error) console.error('[setCoachAgeBand] read failed', { playerId, code: read.error.code ?? null, message: read.error.message })
     return { error: `Couldn't save ${what}. Please try again.` }
   }
-  return { success: true }
+  const row = read.data as Row
+  const fields = ageAnswerFields('coach', band, userId, {
+    self: row.age_band_self ?? null,
+    ageGroups: await playerAgeGroups(db, row),
+    userId: row.user_id,
+  })
+  const { data: saved, error } = await db.from('players').update({ ...fields.age, ...fields.adult })
+    .eq('id', playerId).eq('coach_id', userId).select('age_band')
+  if (error || !Array.isArray(saved) || saved.length !== 1) {
+    console.error('[setCoachAgeBand] update failed', { playerId, code: error?.code ?? null, message: error?.message ?? 'no row updated' })
+    return { error: `Couldn't save ${what}. Please try again.` }
+  }
+  const stored = ((saved[0] as { age_band?: string | null }).age_band ?? fields.band) as AgeBand | null
+  return { success: true, band: stored, youngerKept: band !== null && stored !== band }
 }
 
-/** Marks (or unmarks) a player as a confirmed adult: the '18_plus' band (or none). */
-export async function setAdultConfirmation(
-  db: Db,
-  userId: string,
-  playerId: string,
-  confirmed: boolean,
-): Promise<{ success: true } | { error: string }> {
-  return setAgeBand(db, userId, playerId, confirmed ? '18_plus' : null)
-}
-
-/**
- * What an under-13 player's own notice says about their guardian: on file or
- * not, and whether the consent email went out (masked address only).
- */
-export async function guardianNoticeFor(
-  db: Db,
-  player: { guardian_id?: string | null; guardian_invite_sent_at?: string | null } | null | undefined,
-): Promise<GuardianNotice> {
-  if (!player?.guardian_id) return { onFile: false }
-  const emailed = !!player.guardian_invite_sent_at
-  if (!emailed) return { onFile: true, emailed: false }
-  const { data } = await db.from('guardians').select('email').eq('id', player.guardian_id).maybeSingle()
-  const email = (data as { email?: string | null } | null)?.email
-  return { onFile: true, emailed: true, maskedEmail: email ? maskEmail(email) : null }
-}
-
-/** guardian_invite_sent_at for a player, or null (also before 035). */
-export async function guardianInviteSentAt(db: Db, playerId: string): Promise<string | null> {
-  const { data, error } = await db.from('players').select('guardian_invite_sent_at').eq('id', playerId).maybeSingle()
-  if (error) return null
-  return ((data as { guardian_invite_sent_at?: string | null } | null)?.guardian_invite_sent_at) ?? null
+/** Marks (or unmarks) a player as 18+: the coach's '18_plus' answer (or none). */
+export async function setAdultConfirmation(db: Db, userId: string, playerId: string, confirmed: boolean): Promise<SetBandResult> {
+  return setCoachAgeBand(db, userId, playerId, confirmed ? '18_plus' : null)
 }
 
 /**
@@ -264,85 +294,75 @@ export async function uploadBlockedMessageFor(db: Db, playerId: string, userId: 
   )
   const reason = pendingReason(row) ?? 'age_band'
   if (row?.user_id && row.user_id === userId) {
-    const guardian = reason === 'guardian_consent'
-      ? await guardianNoticeFor(db, { guardian_id: row.guardian_id, guardian_invite_sent_at: await guardianInviteSentAt(db, playerId) })
-      : null
-    return uploadBlockedText('player', { reason, selfConfirm: !row.coach_id && !row.guardian_id && (row.age_band ?? null) === null, guardian })
+    return uploadBlockedText('player', { reason, selfConfirm: canSelfConfirmAgeBand(row) })
   }
   return uploadBlockedText('coach', { reason })
 }
 
-export const SELF_CONFIRM_FAILED = 'We couldn\'t save your confirmation. Please try again.'
+export const SELF_CONFIRM_FAILED = 'We couldn\'t save your answer. Please try again.'
+export const ALREADY_ANSWERED = "You've already answered. Only your coach can change your age."
+const NOT_AVAILABLE_SELF = "Confirming your age isn't available yet: a database update still needs to be applied."
+
+export type OwnAnswerResult = { success: true; band: AgeBand | null } | { error: string }
 
 /**
- * One-time age band confirmation by the player themself, for a player who
- * signed up without a coach: their own row, no coach, no guardian, no band yet
- * and not confirmed 18+. Players with a coach are refused (their coach records
- * age), and so are players with a guardian on file (a minor whose coach left
- * keeps needing guardian consent). Once a band is on file only a coach can
- * change it. Success only after exactly that row was updated.
+ * Stores the signed-in player's own age answer (from the birth month/year
+ * screen; the month and year are not passed here and never stored). One
+ * answer per player:
+ *   * a coach-invited player: their first-sign-in age screen;
+ *   * a player with no coach: the one-time confirm, only while no band is on
+ *     file and no guardian is on file (see canSelfConfirmAgeBand).
+ * The stored band is the younger of this answer, the coach's and any
+ * under-13 age group. Success only after exactly that row was updated.
+ * Before 037 only a coachless 18+ answer can be stored (023's columns).
  */
-export async function confirmOwnAgeBand(db: Db, userId: string, band: AgeBand): Promise<{ success: true } | { error: string }> {
-  if (!isAgeBand(band)) return { error: 'Choose your age.' }
-  type Row = { id: string; coach_id: string | null; guardian_id: string | null; adult_confirmed_at: string | null; age_band?: string | null }
-  let row: Row | null
-  let hasBandColumns = true
-  {
-    const { data, error } = await db
-      .from('players')
-      .select('id, coach_id, guardian_id, adult_confirmed_at, age_band')
-      .eq('user_id', userId)
-      .maybeSingle()
-    if (isMissingAgeBandColumn(error)) {
-      hasBandColumns = false
-      if (band !== '18_plus') return { error: "Confirming your age isn't available yet: a database update still needs to be applied." }
-      const legacy = await db
-        .from('players')
-        .select('id, coach_id, guardian_id, adult_confirmed_at')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (isMissingConsentColumn(legacy.error)) return { error: "Confirming 18+ isn't available yet: a database update still needs to be applied." }
-      if (legacy.error) {
-        console.error('[confirmOwnAgeBand] read failed', { userId, message: legacy.error.message })
-        return { error: SELF_CONFIRM_FAILED }
-      }
-      row = legacy.data as Row | null
-    } else if (isMissingConsentColumn(error)) {
-      return { error: "Confirming 18+ isn't available yet: a database update still needs to be applied." }
-    } else if (error) {
-      console.error('[confirmOwnAgeBand] read failed', { userId, message: error.message })
-      return { error: SELF_CONFIRM_FAILED }
-    } else {
-      row = data as Row | null
-    }
-  }
-  if (!row) return { error: 'Player profile not found.' }
-  const current = row.age_band ?? (row.adult_confirmed_at ? '18_plus' : null)
-  if (current !== null) {
-    return current === band ? { success: true } : { error: 'Your age is already confirmed. Only a coach can change it.' }
-  }
-  if (row.coach_id) return { error: 'Your coach records your age. Ask them to confirm it.' }
-  if (row.guardian_id) return { error: 'A guardian is on file for your account, so video needs their consent.' }
-
-  const { age, adult } = ageBandFields(band, userId)
-  let q = db
-    .from('players')
-    .update(hasBandColumns ? { ...age, ...adult } : adult)
-    .eq('id', row.id)
-    .eq('user_id', userId)
-    .is('coach_id', null)
-    .is('guardian_id', null)
-    .is('adult_confirmed_at', null)
-  if (hasBandColumns) q = q.is('age_band', null)
-  const { data: updated, error: updateError } = await q.select('id')
-  if (updateError || !Array.isArray(updated) || updated.length !== 1) {
-    console.error('[confirmOwnAgeBand] update failed', { userId, playerId: row.id, message: updateError?.message ?? 'no row updated' })
+export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand): Promise<OwnAnswerResult> {
+  if (!isAgeBand(band)) return { error: 'Enter your birth month and year.' }
+  type Row = PlayerConsentFields & { id: string; user_id: string | null; coach_id: string | null; guardian_id: string | null; age_group: string | null; team_id: string | null }
+  const { data, error } = await selectPlayersWithConsent<Row>(
+    'id, user_id, coach_id, guardian_id, age_group, team_id',
+    (cols) => db.from('players').select(cols).eq('user_id', userId).maybeSingle(),
+  )
+  if (error) {
+    console.error('[recordOwnAgeAnswer] read failed', { userId, message: error.message })
     return { error: SELF_CONFIRM_FAILED }
   }
-  return { success: true }
-}
+  const row = data
+  if (!row) return { error: 'Player profile not found.' }
 
-/** The 18+ self-confirm (the '18_plus' band). */
-export async function confirmOwnAdult(db: Db, userId: string): Promise<{ success: true } | { error: string }> {
-  return confirmOwnAgeBand(db, userId, '18_plus')
+  if (row.age_band_pending_migration) {
+    if (row.consent_rules_pending_migration || band !== '18_plus' || row.coach_id || row.guardian_id) return { error: NOT_AVAILABLE_SELF }
+    if (row.adult_confirmed_at) return { success: true, band: '18_plus' }
+    const now = new Date().toISOString()
+    const { data: updated, error: updateError } = await db.from('players')
+      .update({ adult_confirmed_at: now, adult_confirmed_by: userId })
+      .eq('id', row.id).eq('user_id', userId).is('coach_id', null).is('guardian_id', null).is('adult_confirmed_at', null)
+      .select('id')
+    if (updateError || !Array.isArray(updated) || updated.length !== 1) {
+      console.error('[recordOwnAgeAnswer] 023 update failed', { userId, message: updateError?.message ?? 'no row updated' })
+      return { error: SELF_CONFIRM_FAILED }
+    }
+    return { success: true, band: '18_plus' }
+  }
+
+  if (row.age_screen_at || row.age_band_self) return { error: ALREADY_ANSWERED }
+  if (!row.coach_id) {
+    if (row.guardian_id) return { error: 'A guardian is on file for your account. Ask your coach.' }
+    if (!canSelfConfirmAgeBand(row)) return { error: ALREADY_ANSWERED }
+  }
+
+  const fields = ageAnswerFields('self', band, userId, {
+    coach: row.age_band_coach ?? null,
+    ageGroups: await playerAgeGroups(db, row),
+    coachId: row.coach_id,
+  })
+  let q = db.from('players').update({ ...fields.age, ...fields.adult })
+    .eq('id', row.id).eq('user_id', userId).is('age_screen_at', null).is('age_band_self', null)
+  if (!row.coach_id) q = q.is('coach_id', null).is('guardian_id', null).is('age_band', null)
+  const { data: updated, error: updateError } = await q.select('age_band')
+  if (updateError || !Array.isArray(updated) || updated.length !== 1) {
+    console.error('[recordOwnAgeAnswer] update failed', { userId, playerId: row.id, message: updateError?.message ?? 'no row updated' })
+    return { error: SELF_CONFIRM_FAILED }
+  }
+  return { success: true, band: ((updated[0] as { age_band?: string | null }).age_band ?? fields.band) as AgeBand | null }
 }

@@ -3,9 +3,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { ageBandFields, isMissingAgeBandColumn, writeWithAgeFields } from '@/lib/consent-server'
-import { isAgeBand, type AgeBand } from '@/lib/consent'
-import { safeRedirectPath } from '@/lib/safe-redirect'
+import { cookies } from 'next/headers'
+import { ageAnswerFields, isMissingAgeBandColumn, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/consent-server'
+import { AGE_STOP_COOKIE, bandFromBirth, isAgeBand, type AgeBand } from '@/lib/age-band'
+import { parentConsentFlowEnabled } from '@/lib/under13-mode'
+import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
@@ -46,27 +48,57 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   redirect('/dashboard')
 }
 
+/**
+ * Step 1 of player self-signup: the neutral birth month/year screen, before
+ * any other field (spec T1). Nothing is stored. Under 13: the stop message
+ * and the session cookie that blocks another answer (hard stop). signUpPlayer
+ * checks the same answer again.
+ */
+export async function checkSignupAge(
+  _prevState: { error?: string; ok?: boolean; stopped?: boolean; month?: string; year?: string } | undefined,
+  formData: FormData,
+) {
+  const jar = await cookies()
+  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
+  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!parsed.ok) return { error: parsed.error }
+  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
+    setAgeStopCookie(jar)
+    return { stopped: true }
+  }
+  return { ok: true, month: String(formData.get('birth_month')), year: String(formData.get('birth_year')).trim() }
+}
+
 export async function signUpPlayer(
-  _prevState: { error?: string; sent?: boolean; email?: string } | undefined,
+  _prevState: { error?: string; sent?: boolean; email?: string; stopped?: boolean } | undefined,
   formData: FormData
 ) {
-  const supabase = await createClient()
-
-  // The player picks an age band and accepts the Terms (RP-041, 035).
-  const band = formData.get('age_band')
-  if (!isAgeBand(band)) return { error: 'Choose your age: under 13, 13 to 17, or 18 or older.' }
+  // Neutral age screen (spec T1): birth month and year, turned into a band
+  // here; the month and year are never stored. Under 13 is a hard stop for
+  // now (src/lib/under13-mode.ts): no account, nothing stored, and a session
+  // cookie blocks trying again with another age.
+  const jar = await cookies()
+  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
+  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!parsed.ok) return { error: parsed.error }
+  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
+    setAgeStopCookie(jar)
+    return { stopped: true }
+  }
   if (formData.get('tos') !== 'yes') return { error: 'You must accept the Terms of Service to continue.' }
 
   const email = formData.get('email') as string
   let fullName = formData.get('full_name') as string
   if (fullName) fullName = toTitleCase(fullName)
 
+  const supabase = await createClient()
+  const now = new Date().toISOString()
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: true,
-      // adult_confirmed stays for 023's backfill and older code; age_band is 035's.
-      data: { role: 'player', full_name: fullName, age_band: band, adult_confirmed: band === '18_plus', tos_accepted_at: new Date().toISOString() },
+      // Only the band and when it was answered (037); linkPlayerRow stores them.
+      data: { role: 'player', full_name: fullName, age_band: parsed.band, age_screen_at: now, tos_accepted_at: now },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
@@ -87,8 +119,7 @@ export async function signIn(_prevState: { error?: string } | undefined, formDat
 
   if (error) return { error: error.message }
 
-  // ?next= from the login URL (e.g. a guardian's consent link); same-site paths only.
-  redirect(safeRedirectPath(formData.get('next'), '/dashboard'))
+  redirect('/dashboard')
 }
 
 export async function signOut() {
@@ -156,19 +187,13 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     return { error: LINK_FAILED }
   }
 
-  // No invite: a parent who signed in with an email link (no role chosen at
-  // signup) and whose email a coach entered as a guardian is not a player.
-  if ((!linked || linked.length === 0) && !meta.role) {
-    const { data: asGuardian, error: guardianError } = await supabaseAdmin
-      .from('guardians')
-      .select('id')
-      .eq('email', user.email.toLowerCase())
-      .limit(1)
-    if (guardianError) {
-      console.error('[linkPlayerRow] guardian lookup failed', { code: guardianError.code, message: guardianError.message })
-      return { error: LINK_FAILED }
-    }
-    if (asGuardian && asGuardian.length > 0) return { success: true }
+  // The self-signup age answer (band only) for an invited email: stored as the
+  // player's answer; the younger of it and the coach's wins (037). If it
+  // can't be stored, the age screen asks again at the next page load.
+  const selfBand: AgeBand | null = isAgeBand(meta.age_band) ? meta.age_band : null
+  if (linked && linked.length > 0 && selfBand) {
+    const answered = await recordOwnAgeAnswer(supabaseAdmin, user.id, selfBand)
+    if ('error' in answered) console.warn('[linkPlayerRow] signup age answer not stored', { userId: user.id, error: answered.error })
   }
 
   // No invite — create a standalone player row
@@ -184,12 +209,14 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
 
     if (!existing || existing.length === 0) {
-      // Age band from the self-signup form (RP-041, 035); older signups only
-      // carry adult_confirmed = true (18+). No guardian consent is recorded
-      // here. Before 035/023 the row is created with the columns that exist
-      // (see writeWithAgeFields).
-      const band: AgeBand | null = isAgeBand(meta.age_band) ? meta.age_band : meta.adult_confirmed === true ? '18_plus' : null
-      const fields = band ? ageBandFields(band, user.id, now) : null
+      // The self-signup age answer (band only; RP-041, 037); older signups
+      // only carry adult_confirmed = true (18+). Before 037/023 the row is
+      // created with the columns that exist (see writeWithAgeFields).
+      const band: AgeBand | null = selfBand ?? (meta.adult_confirmed === true ? '18_plus' : null)
+      const answeredAt = typeof meta.age_screen_at === 'string' && !Number.isNaN(Date.parse(meta.age_screen_at)) ? meta.age_screen_at : now
+      const fields = band ? ageAnswerFields('self', band, user.id, {}, now) : null
+      if (fields && selfBand) fields.age.age_screen_at = answeredAt
+      if (fields && !selfBand) delete fields.age.age_screen_at
       const { result: { error: insertError } } = await writeWithAgeFields(
         fields?.age ?? {},
         band === '18_plus' && fields ? fields.adult : {},

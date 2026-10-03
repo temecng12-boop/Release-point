@@ -3,11 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { ageBandFields, isMissingAgeBandColumn, isMissingConsentColumn, writeWithAgeFields } from '@/lib/consent-server'
-import { isAgeBand, type AgeBand } from '@/lib/consent'
-import { isValidEmail, normalizeEmail } from '@/lib/guardian-email'
-import { GUARDIAN_ONLY_UNDER_13 } from '@/lib/guardian-invite'
-import { saveGuardianForPlayer } from './guardian'
+import { ageAnswerFields, isMissingAgeBandColumn, isMissingConsentColumn, setCoachAgeBand, writeWithAgeFields } from '@/lib/consent-server'
+import { ageGroupIsUnder13, isAgeBand, type AgeBand } from '@/lib/age-band'
+import { parentConsentFlowEnabled, UNDER_13_INVITE_REFUSED, UNDER_13_TEAM_REFUSED } from '@/lib/under13-mode'
 import { sendPlayerInviteEmail } from '@/lib/email'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
@@ -34,36 +32,34 @@ export async function invitePlayer(
 
   if (!playerEmail) return { error: 'Player email is required' }
 
-  // Age band is captured once, here (RP-041, 035): under 13, 13 to 17, or 18+.
-  // '18_plus' also records the coach's 18+ confirmation (023's columns).
-  // The older form's age_status=adult still means 18+.
+  // The coach's age answer (RP-041, 037): under 13, 13 to 17, or 18+. The
+  // older form's age_status=adult still means 18+. Under 13 is a hard stop
+  // for now (src/lib/under13-mode.ts): no child is added and no email sent.
   const rawBand = formData.get('age_band') ?? (formData.get('age_status') === 'adult' ? '18_plus' : null)
   if (!isAgeBand(rawBand)) {
     return { error: 'Choose the player\'s age: under 13, 13 to 17, or 18 or older.' }
   }
   const band: AgeBand = rawBand
-  const { age: ageFields, adult: adultFields } = ageBandFields(band, user.id)
-  const adultOnly = band === '18_plus' ? adultFields : {}
-
-  // Optional parent or guardian for a player under 13 (emailed after the invite).
-  const guardianEmail = normalizeEmail(formData.get('guardian_email'))
-  const guardianName = ((formData.get('guardian_name') as string | null) ?? '').trim()
-  if (guardianEmail && band !== 'under_13') return { error: GUARDIAN_ONLY_UNDER_13 }
-  if (guardianEmail && !isValidEmail(guardianEmail)) return { error: 'Enter a valid email address for the parent or guardian.' }
-  if (guardianEmail && guardianEmail === playerEmail) return { error: 'Use the parent or guardian\'s own email, not the player\'s.' }
+  if (band === 'under_13' && !parentConsentFlowEnabled()) return { error: UNDER_13_INVITE_REFUSED }
 
   // Every team in the invite must belong to this coach. Checked before any
-  // player row is created or claimed.
+  // player row is created or claimed. A team with an under-13 age group
+  // ("Youth 10-12") makes the player under 13 (younger band wins).
+  let teamGroups: (string | null)[] = []
   if (teamIds.length > 0) {
     const { data: ownedTeams, error: teamsError } = await supabaseAdmin
       .from('teams')
-      .select('id')
+      .select('id, age_group')
       .eq('coach_id', user.id)
       .in('id', teamIds)
     if (teamsError) return { error: 'Could not check teams. Please try again.' }
-    const owned = ((ownedTeams ?? []) as { id: string }[]).map((t) => t.id)
-    if (teamIdsNotOwned(teamIds, owned).length > 0) return { error: 'Invalid team' }
+    const owned = (ownedTeams ?? []) as { id: string; age_group?: string | null }[]
+    if (teamIdsNotOwned(teamIds, owned.map((t) => t.id)).length > 0) return { error: 'Invalid team' }
+    teamGroups = owned.map((t) => t.age_group ?? null)
+    if (teamGroups.some(ageGroupIsUnder13) && !parentConsentFlowEnabled()) return { error: UNDER_13_TEAM_REFUSED }
   }
+  const { age: ageFields, adult: adultFields } = ageAnswerFields('coach', band, user.id, { ageGroups: teamGroups })
+  const adultOnly = band === '18_plus' ? adultFields : {}
 
   // Create player row
   // Before migration 023 the adult columns don't exist; the player is then
@@ -109,19 +105,17 @@ export async function invitePlayer(
     }
   }
 
-  // Existing player now on this coach's roster: record the chosen band only if
-  // no age is on file yet (an existing band or 18+ confirmation is never
-  // overwritten from here; Edit Player changes it).
+  // Existing player now on this coach's roster: record the coach's answer only
+  // if the coach hasn't given one yet (and no 18+ confirmation is on file);
+  // Edit Player changes an existing one. The younger-band rule applies.
   if (playerError?.code === '23505' && playerId) {
-    const { error: ageError } = await supabaseAdmin
+    const { data: onFile, error: ageError } = await supabaseAdmin
       .from('players')
-      .update({ ...ageFields, ...adultOnly })
+      .select('age_band_coach, adult_confirmed_at')
       .eq('id', playerId)
-      .eq('coach_id', user.id)
-      .is('age_band', null)
-      .is('adult_confirmed_at', null)
+      .maybeSingle()
     if (isMissingAgeBandColumn(ageError) || isMissingConsentColumn(ageError)) {
-      // Before 035 (or 023): as before, only an 18+ confirmation is recorded.
+      // Before 037 (or 023): as before, only an 18+ confirmation is recorded.
       if (band === '18_plus' && !isMissingConsentColumn(ageError)) {
         const { error: adultError } = await supabaseAdmin
           .from('players')
@@ -134,11 +128,17 @@ export async function invitePlayer(
           return { error: 'This player is on your roster, but the 18+ confirmation could not be saved. Please try again.' }
         }
       }
-    } else if (ageError) {
-      console.error('[invitePlayer] could not record age band', playerId, ageError.message)
-      return { error: band === '18_plus'
-        ? 'This player is on your roster, but the 18+ confirmation could not be saved. Please try again.'
-        : 'This player is on your roster, but their age could not be saved. Please try again.' }
+    } else {
+      const known = onFile as { age_band_coach?: string | null; adult_confirmed_at?: string | null } | null
+      const saved = ageError || !known
+        ? { error: 'read failed' }
+        : known.age_band_coach || known.adult_confirmed_at ? { success: true } : await setCoachAgeBand(supabaseAdmin, user.id, playerId, band)
+      if ('error' in saved) {
+        console.error('[invitePlayer] could not record age band', playerId, ageError?.message ?? saved.error)
+        return { error: band === '18_plus'
+          ? 'This player is on your roster, but the 18+ confirmation could not be saved. Please try again.'
+          : 'This player is on your roster, but their age could not be saved. Please try again.' }
+      }
     }
   }
 
@@ -173,7 +173,7 @@ export async function invitePlayer(
 
   if (hasAccount) {
     revalidatePath('/', 'layout')
-    return withGuardian(playerId, guardianEmail, guardianName, { success: existingAccountMessage(playerEmail, alreadyOnRoster, teamIds.length) })
+    return { success: existingAccountMessage(playerEmail, alreadyOnRoster, teamIds.length) }
   }
 
   const inviteUrl = linkData?.properties?.action_link
@@ -204,25 +204,8 @@ export async function invitePlayer(
   const bandNote = !bandSaved && band !== '18_plus' && !alreadyOnRoster
     ? ` Their age couldn't be recorded yet (a database update is pending), so video can't be added until it is.`
     : ''
-  const bandText = band === '18_plus'
-    ? `${who} is marked 18+.`
-    : band === '13_17'
-      ? `${who} is marked 13 to 17.`
-      : `${who} is marked under 13: video can't be added until a parent or guardian gives consent.`
-  return withGuardian(playerId, guardianEmail, guardianName, { success: `Invite sent to ${playerEmail}. ${bandText}${bandNote}` })
-}
-
-/** After the player invite: attach and email the optional under-13 guardian. */
-async function withGuardian(
-  playerId: string,
-  guardianEmail: string,
-  guardianName: string,
-  result: { success: string },
-): Promise<{ success?: string; error?: string }> {
-  if (!guardianEmail) return result
-  const saved = await saveGuardianForPlayer(playerId, { email: guardianEmail, full_name: guardianName })
-  if ('error' in saved) return { error: `${result.success} ${saved.error}` }
-  return { success: `${result.success} ${saved.success}` }
+  const bandText = band === '18_plus' ? `${who} is marked 18+.` : `${who} is marked 13 to 17.`
+  return { success: `Invite sent to ${playerEmail}. ${bandText}${bandNote}` }
 }
 
 /** Start of a partial-failure message: "Player added, but" or, for a player already on the roster, says so. */
