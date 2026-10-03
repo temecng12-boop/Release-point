@@ -12,15 +12,16 @@ import { emailFake } from './fakes/email'
 import { invitePlayer } from '../../../app/actions/invite'
 
 const COACH = { id: 'coach-1', email: 'coach@example.com' }
-// The 18+ / under-18 choice is required (RP-041); 'minor' unless a test sets it.
+// The age band is required (RP-041, 037); '13_17' unless a test sets it.
 const form = (fields: Record<string, string | string[]>) => {
   const fd = new FormData()
-  for (const [k, v] of Object.entries({ age_status: 'minor', ...fields })) for (const x of [v].flat()) fd.append(k, x)
+  const all = { ...('age_status' in fields ? {} : { age_band: '13_17' }), ...fields }
+  for (const [k, v] of Object.entries(all)) for (const x of [v].flat()) fd.append(k, x)
   return fd
 }
 const tables = () => ({
   profiles: [{ id: COACH.id, role: 'coach' }],
-  teams: [{ id: 't1', coach_id: COACH.id }],
+  teams: [{ id: 't1', coach_id: COACH.id, age_group: 'High School' }, { id: 't12', coach_id: COACH.id, age_group: 'Youth 10-12' }],
   players: [] as Record<string, unknown>[],
   player_teams: [] as Record<string, unknown>[],
 })
@@ -34,7 +35,7 @@ beforeEach(() => {
 test('new email: setup email is sent and the message says so', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'Sam@Example.com' }))
   assert.deepEqual(emailFake.invites, [{ toEmail: 'sam@example.com' }])
-  assert.equal(r.success, "Invite sent to sam@example.com. Sam New is marked under 18: video can't be added until guardian consent is on file.")
+  assert.equal(r.success, "Invite sent to sam@example.com. Sam New is marked 13 to 17.")
   assert.equal(r.error, undefined)
   assert.equal(state.tables.players.length, 1)
 })
@@ -60,7 +61,8 @@ test('already on this coach\'s roster with an account (the QA-016 case): says so
 test('failed invite link: error, never a success', async () => {
   authAdmin.linkError = { code: 'unexpected_failure', message: 'boom' }
   const r = await invitePlayer(undefined, form({ player_email: 'x@example.com' }))
-  assert.match(r.error ?? '', /invite link failed: boom/)
+  assert.match(r.error ?? '', /invite link could not be created/)
+  assert.doesNotMatch(r.error ?? '', /boom/, 'no raw provider text')
   assert.equal(r.success, undefined)
 })
 
@@ -86,7 +88,7 @@ test('team assignment fails: error, no email, no success', async () => {
 
 test('player insert or duplicate lookup fails: error', async () => {
   fail({ table: 'players', action: 'insert', error: { message: 'boom' } })
-  assert.equal((await invitePlayer(undefined, form({ player_email: 'x@example.com' }))).error, 'boom')
+  assert.equal((await invitePlayer(undefined, form({ player_email: 'x@example.com' }))).error, 'Could not add this player. Please try again.')
 
   resetFake({ tables: tables(), user: COACH })
   fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
@@ -114,12 +116,47 @@ test('18+ invite: the confirmation is saved and the message says so', async () =
   assert.equal(r.success, 'Invite sent to al@example.com. Al Adult is marked 18+.')
   assert.equal(state.tables.players[0].adult_confirmed_by, COACH.id)
   assert.ok(state.tables.players[0].adult_confirmed_at)
+  assert.equal(state.tables.players[0].age_band_coach, '18_plus')
+  assert.equal(state.tables.players[0].age_band, '18_plus')
+  assert.equal(state.tables.players[0].age_band_source, 'coach')
+})
+
+test('13 to 17 invite: the coach\'s band is stored, no 18+ confirmation', async () => {
+  await invitePlayer(undefined, form({ full_name: 'Tia Teen', player_email: 'tia@example.com', age_band: '13_17' }))
+  const row = state.tables.players[0]
+  assert.equal(row.age_band_coach, '13_17'); assert.equal(row.age_band, '13_17'); assert.ok(row.age_confirmed_at)
+  assert.equal(row.age_band_self ?? null, null, 'the player answers at first sign-in')
+  assert.equal(row.age_screen_at ?? null, null)
+  assert.equal(row.adult_confirmed_at ?? null, null)
+})
+
+test('under 13 is a hard stop: refused before anything is written or sent', async () => {
+  const r = await invitePlayer(undefined, form({ full_name: 'Kid', player_email: 'kid@example.com', age_band: 'under_13', team_ids: ['t1'] }))
+  assert.equal(r.error, "Players under 13 can't be added yet. Parent consent for players under 13 is coming soon.")
+  assert.equal(state.tables.players.length, 0)
+  assert.equal(state.tables.player_teams.length, 0)
+  assert.equal(emailFake.invites.length, 0)
+  assert.equal(authAdmin.links.length, 0)
+})
+
+test('a team with an under-13 age group ("Youth 10-12") counts as under 13: refused', async () => {
+  const r = await invitePlayer(undefined, form({ full_name: 'Kid', player_email: 'kid@example.com', age_band: '18_plus', team_ids: ['t12'] }))
+  assert.match(r.error ?? '', /age group is for players under 13/)
+  assert.equal(state.tables.players.length, 0)
+  assert.equal(emailFake.invites.length, 0)
+})
+
+test('the invite form has no guardian fields', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../../app/dashboard/age-band-fields.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(src, /guardian_email|guardian_name/)
+  assert.match(src, /UNDER_13_INVITE_REFUSED/)
 })
 
 test('no 18+ / under-18 choice: error before anything is written', async () => {
   const fd = new FormData(); fd.append('player_email', 'x@example.com')
   const r = await invitePlayer(undefined, fd)
-  assert.match(r.error ?? '', /18 or older, or under 18/)
+  assert.match(r.error ?? '', /under 13, 13 to 17, or 18 or older/)
   assert.equal(state.tables.players.length, 0)
   assert.equal(emailFake.invites.length, 0)
 })
