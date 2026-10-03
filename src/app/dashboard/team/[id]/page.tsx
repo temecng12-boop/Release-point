@@ -7,6 +7,7 @@ import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
 import AddCoachForm from './add-coach-form'
+import DeleteTeamButton from './delete-team-button'
 import { loadTeamCoaches } from '@/lib/team-coaches'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
@@ -242,6 +243,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
           )}
+        </div>
+
+        <div className="flex justify-end">
+          <DeleteTeamButton teamId={id} teamName={team.name} />
         </div>
       </main>
       <SiteFooter variant="app" />
