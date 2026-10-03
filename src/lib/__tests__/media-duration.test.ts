@@ -156,14 +156,13 @@ test('cleanup removes every listener and the timer', () => {
   assert.deepEqual(w.seen, [null], 'nothing reported after cleanup')
 })
 
-test('video-player: the lesson length goes through formatClock and the watcher', async () => {
+test('lesson list: the lesson player goes through the watcher (video-player only records)', async () => {
   const { readFileSync } = await import('node:fs')
-  const src = readFileSync(new URL('../../components/video-player.tsx', import.meta.url), 'utf8')
-  assert.match(src, /formatClock\(lessonLengthSeconds\(lessonRecordedSec, lessonMediaSec\)\)/)
-  assert.match(src, /watchMediaDuration\(v, setLessonMediaSec\)/)
-  assert.match(src, /<video ref=\{lessonVideoRef\} src=\{lessonUrl\} controls playsInline className/)
-  // The measured length is kept only when the new lesson URL is set.
-  assert.match(src, /setLessonRecordedSec\(recordedSec\); setLessonUrl\(/)
+  const list = readFileSync(new URL('../../components/lessons/lesson-list.tsx', import.meta.url), 'utf8')
+  assert.match(list, /watchMediaDuration\(v, setMediaSec\)/)
+  assert.match(list, /<video ref=\{videoRef\} src=\{url\} controls autoPlay playsInline className/)
+  assert.match(list, /lessonRowDuration\(lesson\.duration_ms, mediaSec, open && !!url\)/)
+  assert.doesNotMatch(list, /fixInfiniteDuration|1e101/, 'no second, timeout-less seek-to-end')
 })
 
 // ── QA-007: the clip player's own time readout ─────────────────────────────
