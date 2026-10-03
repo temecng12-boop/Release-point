@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // Pitch imports (importPitchMetrics) send the whole file's rows in one
+      // action call. Default is 1mb; Vercel's function body limit is 4.5 MB.
+      // Keep in sync with IMPORT_BODY_LIMIT_BYTES in src/lib/pitch-import.ts.
+      bodySizeLimit: '4mb',
+    },
+  },
   async headers() {
     return [
       {

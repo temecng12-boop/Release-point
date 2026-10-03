@@ -39,17 +39,21 @@ export default function HittingMetricsTab({
   role,
   initial,
   canDelete = false,
+  canEdit = false,
 }: {
   clipId: string
   role: 'coach' | 'player'
   initial: HittingMetrics | null
   /** Only the player's direct coach may delete saved hitting data. */
   canDelete?: boolean
+  /** canAddPitchData: the direct coach or the player (team coaches are read-only, 031). */
+  canEdit?: boolean
 }) {
   const [metrics,   setMetrics]   = useState<HittingMetrics>(initial ?? empty())
   const [saveState, setSaveState] = useState<SaveState>(initial ? 'saved' : 'idle')
   const [error,     setError]     = useState<string | null>(null)
-  const isCoach = role === 'coach'
+  // The edit form is for the player's direct coach (a team coach is read-only).
+  const isCoach = role === 'coach' && canEdit
   // Deleting saved values: they leave the screen only after the server
   // confirmed the delete; on failure they stay and the error shows.
   const [saved,       setSaved]       = useState<HittingMetrics>(initial ?? empty())
@@ -69,8 +73,8 @@ export default function HittingMetricsTab({
   async function handleSave() {
     setSaveState('saving')
     setError(null)
-    const result = await saveHittingMetrics(clipId, metrics)
-    if (result?.error) {
+    const result = await runAction(() => saveHittingMetrics(clipId, metrics))
+    if (!result.ok) {
       setError(result.error)
       setSaveState('error')
     } else {
@@ -122,7 +126,7 @@ export default function HittingMetricsTab({
           <button
             onClick={handleSave}
             disabled={saveState === 'saving'}
-            className="text-[10px] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors disabled:opacity-40"
+            className="max-sm:min-h-11 text-[10px] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors disabled:opacity-40"
             style={{
               ...os,
               background: saveState === 'saved' ? '#ECFDF5' : '#F0F4F8',
@@ -190,14 +194,14 @@ export default function HittingMetricsTab({
         ))}
       </div>
 
-      {error && <p className="text-xs text-[#C8102E]">{error}</p>}
+      {error && <p role="alert" className="text-xs text-[#C8102E]">{error}</p>}
 
       {isCoach && (
         <div className="flex justify-end">
           <button
             onClick={handleSave}
             disabled={saveState === 'saving' || !hasAny}
-            className="text-[10px] px-4 py-2 rounded-md border border-[#DDE4ED] transition-colors disabled:opacity-40"
+            className="max-sm:min-h-11 text-[10px] px-4 py-2 rounded-md border border-[#DDE4ED] transition-colors disabled:opacity-40"
             style={{
               ...os,
               background: saveState === 'saved' ? '#ECFDF5' : '#1C3A5C',

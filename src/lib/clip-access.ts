@@ -44,6 +44,16 @@ export function canDeleteSavedMetrics(access: ClipAccess): boolean {
   return access.allowed && access.via === 'coach'
 }
 
+/**
+ * Adding pitch data (manual entry, CSV and TrackMan PDF import): the player's
+ * direct coach or the player themself, the rule importPitchMetrics and
+ * addPitchMetric check on the server. Team coaches are read-only (031) and
+ * guardians only view.
+ */
+export function canAddPitchData(access: ClipAccess): boolean {
+  return access.allowed && (access.via === 'coach' || access.via === 'player')
+}
+
 /** Pure decision for the direct relationships (no team lookup). */
 export function directAccess(userId: string, player: AccessPlayer, guardianUserId: string | null): 'player' | 'coach' | 'guardian' | null {
   if (!userId) return null
