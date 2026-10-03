@@ -112,8 +112,8 @@ export default function PositionPicker({ playerName }: { playerId: string; playe
               className="mt-0.5 w-4 h-4 accent-[#C8102E] shrink-0 cursor-pointer"
             />
             <span className="text-xs text-[#456080] leading-relaxed">
-              I agree to Release Point&apos;s use of video, analytics, and coaching data for player development.
-              If I am under 18, I confirm I have parental or guardian consent to use this platform.
+              I agree to Release Point&apos;s use of video, analytics, and coaching data for my pitching or hitting development.
+              If I am 13 to 17, I&apos;ve read this with a parent or guardian.
             </span>
           </label>
 

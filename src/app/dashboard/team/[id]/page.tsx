@@ -2,6 +2,8 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
+import { loadPendingPlayers } from '@/lib/pending-players'
+import PendingPlayersBanner from '@/components/pending-players-banner'
 import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
@@ -24,7 +26,12 @@ type TeamRosterPlayer = {
   coach_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
+  age_band?: string | null
+  age_confirmed_at?: string | null
+  age_band_coach?: string | null
+  age_band_self?: string | null
   consent_rules_pending_migration?: boolean
+  age_band_pending_migration?: boolean
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -94,6 +101,9 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const rosterCount = (players?.length ?? 0) + (otherPlayers?.length ?? 0)
 
   const playerIds = players?.map((p) => p.id) ?? []
+
+  // Banner of this coach's own players who can't have video yet.
+  const pendingPlayers = await loadPendingPlayers(supabaseAdmin, user.id, ownPlayerIds)
 
   // The edit form saves the player's full set of this coach's teams, so give
   // it all of the coach's teams and every one of them the player is on.
@@ -188,6 +198,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
         </div>
+
+        <PendingPlayersBanner players={pendingPlayers} />
 
         <TeamInviteForm teamId={id} />
 

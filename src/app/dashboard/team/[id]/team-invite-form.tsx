@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
+import AgeBandFields from '@/app/dashboard/age-band-fields'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] max-sm:min-h-11'
@@ -25,19 +26,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Name</label>
             <input type="text" name="full_name" placeholder="Player's full name" className={inputClass} />
           </div>
-          <fieldset>
-            <legend className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Age</legend>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="age_status" value="adult" required className="accent-[#C8102E]" />
-                <span className="text-xs text-[#456080]">18 or older</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="age_status" value="minor" required className="accent-[#C8102E]" />
-                <span className="text-xs text-[#456080]">Under 18 (guardian consent pending)</span>
-              </label>
-            </div>
-          </fieldset>
+          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} />
 
           <div>
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Email</label>
@@ -67,7 +56,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
           )}
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          New players get an email to set up their account. Players who already have an account are added without an email. For players under 18, video can&apos;t be added until guardian consent is on file.
+          New players get an email to set up their account. Players who already have an account are added without an email. Video can be added once the player&apos;s age is confirmed; players under 13 also need consent from a parent or guardian.
         </p>
       </div>
     </div>

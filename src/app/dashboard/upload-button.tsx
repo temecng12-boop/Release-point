@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
 import BulkUploadModal from './bulk-upload-modal'
-import { canUploadVideo, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
+import { canUploadVideo, pendingReason, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 const COMPRESS_THRESHOLD_MB = 30
@@ -154,7 +154,7 @@ export default function UploadButton({
   // ── consent gate ──────────────────────────────────────────────────────────
   if (!canUploadVideo(consent)) {
     if (!showBlockedNotice) return null
-    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} className="max-w-xs" />
+    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} reason={pendingReason(consent) ?? undefined} className="max-w-xs" />
   }
 
   // ── naming overlay ───────────────────────────────────────────────────────

@@ -80,12 +80,13 @@ body {
   }
 }
 
-/* Header items are laid out inline-flex. Left unlayered on purpose: it still
-   overrides display utilities such as `hidden` inside headers, and changing
-   that would change how mobile headers look. */
-header a,
-header button,
-header span {
+/* Header items are laid out inline-flex. Unlayered, so it beats Tailwind's
+   display utilities; items marked `hidden` (e.g. `hidden md:inline`) are left
+   to their utilities, so they really are hidden on phones. Before, this rule
+   showed them anyway and the header overlapped itself on an iPhone. */
+header a:not(.hidden),
+header button:not(.hidden),
+header span:not(.hidden) {
   display: inline-flex;
   align-items: center;
 }

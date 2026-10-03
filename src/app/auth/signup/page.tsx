@@ -3,9 +3,11 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import { signUp, signUpPlayer } from '@/app/actions/auth'
+import { checkSignupAge, signUp, signUpPlayer } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
+import BirthFields from '@/components/birth-fields'
+import Under13Stop from '@/components/under13-stop'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -95,8 +97,43 @@ function CoachForm({ onBack }: { onBack: () => void }) {
   )
 }
 
+// Player self-signup: the birth month/year screen first (checkSignupAge), then
+// name, email and Terms. Under 13 stops at step 1 (nothing stored).
 function PlayerForm({ onBack }: { onBack: () => void }) {
+  const [age, ageAction, agePending] = useActionState(checkSignupAge, undefined)
   const [state, action, pending] = useActionState(signUpPlayer, undefined)
+  const [tosAccepted, setTosAccepted] = useState(false)
+
+  if (age?.stopped || state?.stopped) {
+    return (
+      <div className="space-y-4">
+        <Under13Stop />
+        <button type="button" onClick={onBack} className="text-xs text-slate-400 hover:text-slate-700 transition-colors min-h-11" style={os}>
+          ← Back
+        </button>
+      </div>
+    )
+  }
+
+  if (!age?.ok) {
+    return (
+      <form action={ageAction} className="space-y-4" data-testid="signup-age-screen">
+        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-2 min-h-11" style={os}>
+          ← Back
+        </button>
+        <BirthFields legendClassName="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" legendStyle={os} />
+        {age?.error && (
+          <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+            <p className="text-sm text-[#E8102A]">{age.error}</p>
+          </div>
+        )}
+        <button type="submit" disabled={agePending}
+          className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2 min-h-11" style={os}>
+          {agePending ? 'Checking…' : 'Continue'}
+        </button>
+      </form>
+    )
+  }
 
   if (state?.sent) {
     return (
@@ -131,26 +168,34 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="your@email.com" className={inputCls} />
         <p className="text-[11px] text-slate-400 mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
       </div>
-      <label className="flex items-start gap-3 cursor-pointer">
-        <input type="checkbox" name="adult_confirmed" value="yes" required className="mt-0.5 w-4 h-4 accent-[#E8102A] shrink-0" />
+      <input type="hidden" name="birth_month" value={age.month} />
+      <input type="hidden" name="birth_year" value={age.year} />
+      <label className="flex items-start gap-3 cursor-pointer max-sm:min-h-11">
+        <input
+          type="checkbox"
+          name="tos"
+          value="yes"
+          required
+          checked={tosAccepted}
+          onChange={(e) => setTosAccepted(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-[#E8102A] shrink-0"
+        />
         <span className="text-xs text-slate-500 leading-relaxed">
-          I am 18 or older. Players under 18 join through their coach.
+          I agree to the{' '}
+          <a href="/terms" target="_blank" className="text-slate-700 hover:text-slate-900 hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" target="_blank" className="text-slate-700 hover:text-slate-900 hover:underline">Privacy Policy</a>
         </span>
       </label>
       {state?.error && (
-        <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+        <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
           <p className="text-sm text-[#E8102A]">{state.error}</p>
         </div>
       )}
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        By continuing you agree to our{' '}
-        <a href="/terms" target="_blank" className="text-slate-600 hover:underline">Terms of Service</a>
-        {' '}and consent to video storage for coaching purposes.
-      </p>
       <button
         type="submit"
-        disabled={pending}
-        className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2"
+        disabled={pending || !tosAccepted}
+        className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2 min-h-11"
         style={os}
       >
         {pending ? 'Sending Link…' : 'Send Sign-in Link'}

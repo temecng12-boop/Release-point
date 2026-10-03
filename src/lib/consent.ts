@@ -1,37 +1,59 @@
-// Video consent rule for players (RP-041).
+// Video rule for players (RP-041; age bands from migration 037).
 //
-// Consent status is captured once, when a player signs up or a coach adds
-// them, and stored on the players row:
-//   * players.adult_confirmed_at  set when the player is confirmed 18+
-//                                 (self-signup checkbox, or the coach)
-//   * players.consent_given_at    set when a guardian has given consent
+// With 037: video may be added for a player only when their effective band
+// (players.age_band) is '13_17' or '18_plus' and age_confirmed_at is set.
+//   * Unknown band (NULL): blocked until a coach picks a band, the player
+//     answers the age screen, or a player with no coach confirms once.
+//   * 'under_13': blocked. Under 13 is a hard stop for now (see
+//     ./under13-mode.ts); PR B adds admin-approved parent consent.
+//   * consent_given_at no longer allows video on its own: the old one-click
+//     consent never verified a parent.
+// Same rule as public.player_has_video_consent in migration 037.
 //
-// Video can be added for a player only if one of those is set. Anything else
-// (a minor waiting on consent, or no age status at all) is blocked. There is no
-// age inference from age_group; the stored status is the only source of truth.
+// Fallbacks, as the server reads them (./consent-server.ts):
+//   * 037 not applied (age_band_pending_migration): 023's rule, exactly as
+//     023's trigger enforces it: adult_confirmed_at or consent_given_at.
+//   * 023 not applied (consent_rules_pending_migration): no rule (uploads work
+//     as before this feature).
 //
-// This file is pure so it can be used from client components, server code and
-// tests. Server-side enforcement lives in ./consent-server.ts.
+// Pure, so it can be used from client components, server code and tests.
+
+import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from './age-band'
+import { PARENT_CONSENT_COMING_SOON, UNDER_13_STOP_MESSAGE } from './under13-mode'
+
+export { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand }
 
 export type PlayerConsentFields = {
   adult_confirmed_at?: string | null
   consent_given_at?: string | null
-  /**
-   * Set by the server when the database doesn't have migration 023's columns
-   * yet (see consent-server.ts). The consent rule then isn't enforced, so
-   * uploads work as they did before this feature; the player counts as not
-   * confirmed 18+.
-   */
+  age_band?: string | null
+  age_confirmed_at?: string | null
+  age_band_coach?: string | null
+  age_band_self?: string | null
+  age_screen_at?: string | null
+  /** Set by the server when migration 023's columns don't exist yet. */
   consent_rules_pending_migration?: boolean
+  /** Set by the server when 023 is applied but 037's age columns aren't. */
+  age_band_pending_migration?: boolean
 }
 
-export type UploadConsentStatus = 'adult_confirmed' | 'guardian_consent' | 'pending' | 'rules_not_active'
+export type UploadConsentStatus = 'adult_confirmed' | 'age_confirmed' | 'guardian_consent' | 'pending' | 'rules_not_active'
 
-/** Columns to select from `players` when checking upload consent. */
-export const PLAYER_CONSENT_COLUMNS = 'adult_confirmed_at, consent_given_at'
+/** Why a player is blocked: their band is unknown, or they are under 13. */
+export type PendingReason = 'age_band' | 'under_13'
+
+/** Columns to select from `players` when checking the video rule (037 applied). */
+export const PLAYER_CONSENT_COLUMNS = 'adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at'
+/** The same before migration 037 (023's columns only). */
+export const PLAYER_CONSENT_COLUMNS_023 = 'adult_confirmed_at, consent_given_at'
 
 /** Columns added by migration 023. Before 023 runs, queries naming them fail. */
 export const CONSENT_MIGRATION_COLUMNS = ['adult_confirmed_at', 'adult_confirmed_by'] as const
+/** Columns added by migration 037. Before 037 runs, queries naming them fail. */
+export const AGE_BAND_MIGRATION_COLUMNS = [
+  'age_band', 'age_band_coach', 'age_band_self', 'age_band_source', 'age_screen_at',
+  'age_confirmed_at', 'age_confirmed_by', 'tos_accepted_at', 'tos_version',
+] as const
 
 function isSet(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Date.parse(value))
@@ -40,8 +62,14 @@ function isSet(value: string | null | undefined): boolean {
 export function uploadConsentStatus(player: PlayerConsentFields | null | undefined): UploadConsentStatus {
   if (!player) return 'pending'
   if (player.consent_rules_pending_migration === true) return 'rules_not_active'
-  if (isSet(player.adult_confirmed_at)) return 'adult_confirmed'
-  if (isSet(player.consent_given_at)) return 'guardian_consent'
+  if (player.age_band_pending_migration === true) {
+    // 023's rule, as its trigger enforces it before 037.
+    if (isSet(player.adult_confirmed_at)) return 'adult_confirmed'
+    return isSet(player.consent_given_at) ? 'guardian_consent' : 'pending'
+  }
+  if (!isSet(player.age_confirmed_at)) return 'pending'
+  if (player.age_band === '18_plus') return 'adult_confirmed'
+  if (player.age_band === '13_17') return 'age_confirmed'
   return 'pending'
 }
 
@@ -50,10 +78,44 @@ export function canUploadVideo(player: PlayerConsentFields | null | undefined): 
   return uploadConsentStatus(player) !== 'pending'
 }
 
-export const UPLOAD_BLOCKED_MESSAGE =
-  "Guardian consent for this player is still pending, so video can't be added yet."
+/** The player's confirmed effective band, or null (unknown, or 037 not applied). */
+export function confirmedAgeBand(player: PlayerConsentFields | null | undefined): AgeBand | null {
+  if (!player || player.age_band_pending_migration || player.consent_rules_pending_migration) return null
+  return isAgeBand(player.age_band) && isSet(player.age_confirmed_at) ? player.age_band : null
+}
 
-/** Migration 023's clips trigger: "guardian consent for this player is still pending" (42501). */
+/** True if the player's effective band is under 13. */
+export function isUnder13(player: PlayerConsentFields | null | undefined): boolean {
+  return confirmedAgeBand(player) === 'under_13'
+}
+
+/**
+ * Under 13 only because of an age group, with no answer from the coach or
+ * the player yet. The player still sees the age screen (their answer can
+ * matter, e.g. for "Youth"); they aren't frozen until they've answered.
+ */
+export function under13FromAgeGroupOnly(player: (PlayerConsentFields & { age_band_coach?: string | null; age_band_self?: string | null }) | null | undefined): boolean {
+  return isUnder13(player) && !player?.age_band_coach && !player?.age_band_self
+}
+
+/**
+ * A frozen under-13 account (hard stop): the player sees only the stop
+ * message, on every player page and API route (src/lib/under13-gate.ts).
+ */
+export function isFrozenUnder13(player: (PlayerConsentFields & { age_band_coach?: string | null; age_band_self?: string | null }) | null | undefined): boolean {
+  return isUnder13(player) && !under13FromAgeGroupOnly(player)
+}
+
+/** Why uploads are blocked, or null if they aren't. */
+export function pendingReason(player: PlayerConsentFields | null | undefined): PendingReason | null {
+  if (canUploadVideo(player)) return null
+  return isUnder13(player) ? 'under_13' : 'age_band'
+}
+
+export const UPLOAD_BLOCKED_MESSAGE =
+  "Video can't be added for this player yet: their age isn't confirmed, or they're under 13."
+
+/** The clips trigger's error (023: "guardian consent ... pending", 037: "video consent ... pending"), code 42501. */
 export function isConsentPendingError(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
   return !!error && error.code === '42501' && /consent .*pending/i.test(error.message ?? '')
 }
@@ -62,43 +124,92 @@ export type UploadBlockedViewer = 'coach' | 'player'
 
 /**
  * Plain explanation shown wherever upload or record is blocked.
- * `selfConfirm`: the player has no coach, so they confirm 18+ themself
- * (see canSelfConfirmAdult); `below` when the confirm button is shown under it.
+ * `reason`: from pendingReason (defaults to 'age_band'). `selfConfirm`: the
+ * player has no coach, so they confirm their age themself (see
+ * canSelfConfirmAgeBand); `confirmShownBelow` when the form is shown under it.
  */
 export function uploadBlockedCopy(
   viewer: UploadBlockedViewer,
-  opts: { selfConfirm?: boolean; confirmShownBelow?: boolean } = {},
+  opts: { reason?: PendingReason; selfConfirm?: boolean; confirmShownBelow?: boolean } = {},
 ): { message: string; nextStep: string } {
+  const reason = opts.reason ?? 'age_band'
   if (viewer === 'player') {
-    const adult = opts.selfConfirm
-      ? `If you are 18 or older, confirm it ${opts.confirmShownBelow ? 'below' : 'on your dashboard'}.`
-      : 'If you are 18 or older, ask your coach to mark you as 18+.'
+    if (reason === 'under_13') {
+      return { message: UNDER_13_STOP_MESSAGE, nextStep: "Video can't be added until then." }
+    }
     return {
-      message: "Guardian consent for your account is still pending, so video can't be added yet.",
-      nextStep: `${adult} If you are under 18, a parent or guardian has to give consent first.`,
+      message: "Your age isn't confirmed yet, so video can't be added yet.",
+      nextStep: opts.selfConfirm
+        ? `Confirm your age ${opts.confirmShownBelow ? 'below' : 'at the top of your dashboard'}.`
+        : 'Ask your coach to confirm your age.',
+    }
+  }
+  if (reason === 'under_13') {
+    return {
+      message: "This player is under 13, so video can't be added.",
+      nextStep: `${PARENT_CONSENT_COMING_SOON} If their age is wrong, change it in Edit Player.`,
     }
   }
   return {
-    message: UPLOAD_BLOCKED_MESSAGE,
-    nextStep: 'If the player is 18 or older, mark them as 18+ on their profile or in Edit Player.',
+    message: "This player's age isn't confirmed yet, so video can't be added yet.",
+    nextStep: 'Pick their age (under 13, 13 to 17, or 18 or older) in Edit Player or on their profile.',
   }
 }
 
 /** The blocked copy as one sentence pair, for an upload action's error. */
-export function uploadBlockedText(viewer: UploadBlockedViewer, opts: { selfConfirm?: boolean } = {}): string {
-  const { message, nextStep } = uploadBlockedCopy(viewer, { selfConfirm: opts.selfConfirm })
+export function uploadBlockedText(
+  viewer: UploadBlockedViewer,
+  opts: { reason?: PendingReason; selfConfirm?: boolean } = {},
+): string {
+  const { message, nextStep } = uploadBlockedCopy(viewer, opts)
   return `${message} ${nextStep}`
 }
 
+type RosterFields = PlayerConsentFields & { coach_id?: string | null; guardian_id?: string | null; user_id?: string | null }
+
 /**
- * A player who signed up without a coach can confirm they are 18+ themself,
- * once: no coach can do it for them (only the player's own coach may mark a
- * player 18+). Players with a coach keep the coach's age choice; players with
- * a guardian on file are refused (guardian_id is read, so it must be selected).
+ * A player who signed up without a coach confirms their own age, once: no
+ * coach, no guardian on file, no answer yet, 037 applied. Once a band is on
+ * file only a coach can change it, so a coachless under-13 answer can't be
+ * switched to an older band. (An under-13 band from an age group alone, with
+ * no answer yet, still lets them answer.) guardian_id is read, so it must be selected.
  */
-export function canSelfConfirmAdult(
-  player: (PlayerConsentFields & { coach_id?: string | null; guardian_id?: string | null }) | null | undefined,
-): boolean {
-  // A guardian on file means a minor: they need guardian consent, never a self-confirm.
-  return !!player && !player.coach_id && !player.guardian_id && uploadConsentStatus(player) === 'pending'
+export function canSelfConfirmAgeBand(player: RosterFields | null | undefined): boolean {
+  return !!player && !player.coach_id && !player.guardian_id
+    && !player.age_band_pending_migration && !player.consent_rules_pending_migration
+    && ((player.age_band ?? null) === null || under13FromAgeGroupOnly(player))
+    && (player.age_band_self ?? null) === null
+    && !isSet(player.age_screen_at)
+}
+
+/** Before 037 the self-confirm is 023's 18+ confirmation. */
+export function canSelfConfirmAdult023(player: RosterFields | null | undefined): boolean {
+  return !!player && !player.coach_id && !player.guardian_id && player.age_band_pending_migration === true
+    && uploadConsentStatus(player) === 'pending'
+}
+
+/**
+ * A coach-invited player answers the birth month/year screen at their first
+ * sign-in, before anything else (spec T1). Not for an under-13 player (they
+ * see the stop message instead) or before 037.
+ */
+export function needsAgeScreen(player: RosterFields | null | undefined): boolean {
+  return !!player && !!player.coach_id
+    && !player.age_band_pending_migration && !player.consent_rules_pending_migration
+    && !isSet(player.age_screen_at) && !isFrozenUnder13(player)
+}
+
+/**
+ * A new player account with no coach and no age on file (for example a
+ * Google or Apple sign-up, which skips the signup age screen) answers the
+ * age screen before onboarding. Existing coachless players who already
+ * onboarded answer from the dashboard banner instead.
+ */
+export function needsFirstAgeScreen(player: (RosterFields & { position?: string | null }) | null | undefined): boolean {
+  return needsAgeScreen(player) || (!!player && !player.position && canSelfConfirmAgeBand(player))
+}
+
+/** Coach-side view: a player needs an action (age band) or is under 13. */
+export function needsCoachAction(player: PlayerConsentFields | null | undefined): boolean {
+  return pendingReason(player) !== null
 }
