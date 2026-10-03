@@ -9,7 +9,9 @@ import assert from 'node:assert/strict'
 import type { PGlite } from '@electric-sql/pglite'
 import { prodShapeDb, freshDb, as, tryFile, u, migration } from './prod-fixture'
 import { coreFlows } from './flows'
-import { ageGroupIsUnder13 } from '../../../src/lib/age-band'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { ageGroupIsPlainYouth, ageGroupIsUnder13 } from '../../../src/lib/age-band'
 
 const M035 = migration('035_drop_legacy_policies.sql')
 const M037 = migration('037_age_bands.sql')
@@ -205,4 +207,71 @@ test('SQL age_group_is_under_13 matches ageGroupIsUnder13 in src/lib/age-band.ts
     assert.equal(sql, ageGroupIsUnder13(c), `"${c}"`)
   }
   assert.equal((await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13(NULL) x`)).rows[0].x, ageGroupIsUnder13(null))
+})
+
+test('SQL age_group_is_plain_youth matches ageGroupIsPlainYouth', async () => {
+  const db = await db037('fresh')
+  for (const c of ['Youth', 'youth', ' Youth ', 'Youth League', 'Youth 13-14', 'Youth 10-12', 'Youthful', 'Middle School', '12U', '', 'U-Youth']) {
+    const sql = (await db.query<{ x: boolean }>(`SELECT public.age_group_is_plain_youth($1) x`, [c])).rows[0].x
+    assert.equal(sql, ageGroupIsPlainYouth(c), `"${c}"`)
+  }
+  assert.equal((await db.query(`SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='tos_version'`)).rows.length, 1, 'profiles.tos_version')
+})
+
+for (const shape of ['prod', 'fresh'] as const) {
+  test(`${shape}: plain "Youth" = under 13 only while no band is known`, async () => {
+    const db = await db037(shape)
+    await people(db)
+    const svc = (sql: string, p: unknown[] = []) => as(db, 'service', sql, p)
+    await db.query(`INSERT INTO teams (id, coach_id, name, age_group) VALUES ($1,$2,'Y','Youth'), ($3,$2,'Y2','Youth 13-14')`, [u(404), COACH, u(405)])
+    const P = u(6001)
+    await svc(`INSERT INTO players (id, coach_id, full_name) VALUES ($1,$2,'Y')`, [P, COACH])
+    await svc(`INSERT INTO player_teams (player_id, team_id) VALUES ($1,$2)`, [P, u(404)])
+    assert.equal((await row(db, P)).age_band, 'under_13', 'Youth, no band')
+    assert.equal((await row(db, P)).age_band_source, 'age_group')
+    await svc(`UPDATE players SET age_band_coach='13_17' WHERE id=$1`, [P])
+    assert.equal((await row(db, P)).age_band, '13_17', 'a known band says otherwise')
+    await svc(`UPDATE players SET age_band_coach=NULL WHERE id=$1`, [P])
+    assert.equal((await row(db, P)).age_band, 'under_13')
+    await svc(`UPDATE players SET age_band_self='18_plus', age_screen_at=now() WHERE id=$1`, [P])
+    assert.equal((await row(db, P)).age_band, '18_plus', 'the player\'s answer also says otherwise')
+    const Q = u(6002)
+    await svc(`INSERT INTO players (id, coach_id, full_name) VALUES ($1,$2,'Q')`, [Q, COACH])
+    await svc(`INSERT INTO player_teams (player_id, team_id) VALUES ($1,$2)`, [Q, u(405)])
+    assert.equal((await row(db, Q)).age_band, null, '"Youth 13-14": the range says otherwise')
+  })
+}
+
+const AFFECTED = readFileSync(join(__dirname, '..', '..', 'checks', '037-affected-players.sql'), 'utf8')
+test('affected-players check (before 037): read-only, counts per coach match what 037 then does', async () => {
+  const { db } = await prodShapeDb()
+  assert.equal(await tryFile(db, M035), '')
+  await people(db)
+  const B = u(8)
+  await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'b@x','{"role":"coach"}')`, [B])
+  await db.query(`INSERT INTO teams (id, coach_id, name, age_group) VALUES ($1,$2,'U','10-12'), ($3,$2,'Y','Youth')`, [u(406), COACH, u(407)])
+  const ins = (id: string, coach: string | null, adult: boolean, consent: boolean, team?: string) => db.query(
+    `INSERT INTO players (id, coach_id, full_name, adult_confirmed_at, consent_given_at) VALUES ($1,$2,'x',$3,$4)`, [id, coach, adult ? new Date() : null, consent ? new Date() : null])
+    .then(() => team ? db.query(`INSERT INTO player_teams (player_id, team_id) VALUES ($1,$2)`, [id, team]) : undefined)
+  await ins(u(7001), COACH, false, true)            // old consent only -> loses
+  await ins(u(7002), COACH, false, true)            // old consent only -> loses
+  await ins(u(7003), COACH, true, false, u(406))    // 18+ on 10-12 -> loses
+  await ins(u(7004), COACH, true, true)             // 18+ -> keeps
+  await ins(u(7005), COACH, false, false, u(407))   // no band, Youth
+  await ins(u(7006), B, false, false)               // no band
+  await ins(u(7007), null, false, true)             // coachless, old consent only -> loses
+  const snapshot = async () => JSON.stringify((await db.query(`SELECT * FROM players ORDER BY id`)).rows)
+  const before = await snapshot()
+  const res = await db.query<Record<string, unknown>>(AFFECTED)
+  assert.equal(await snapshot(), before, 'read-only')
+  const by = Object.fromEntries(res.rows.map(r => [String(r.coach_id), Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === 'bigint' ? Number(v) : v]))]))
+  assert.deepEqual(by[COACH], { coach_id: COACH, coach_email: 'c@x', lose_old_consent_only: 2, lose_18plus_u13_group: 1, lose_video_total: 3, no_band_already_blocked: 1, no_band_youth_or_u13: 1, keep_video: 1, players: 5 })
+  assert.equal(by[B].no_band_already_blocked, 1); assert.equal(by[B].lose_video_total, 0)
+  assert.equal(by['null'].lose_old_consent_only, 1); assert.equal(by['null'].coach_email, null)
+  for (const r of res.rows) for (const k of Object.keys(r)) assert.doesNotMatch(k, /name/, 'no names')
+  // Apply 037: exactly the counted players lose video; 7004 keeps it.
+  assert.equal(await tryFile(db, M037), '')
+  for (const id of [u(7001), u(7002), u(7003), u(7007)]) assert.equal((await row(db, id)).video, false, id)
+  assert.equal((await row(db, u(7004))).video, true)
+  assert.equal((await row(db, u(7005))).age_band, 'under_13', 'Youth, no band: under 13 from the age group after the backfill')
 })

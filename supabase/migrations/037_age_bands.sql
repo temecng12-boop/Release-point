@@ -16,6 +16,7 @@
 --   players.age_confirmed_at when the effective band was last set
 --   players.age_confirmed_by who gave the deciding answer (NULL for age_group)
 --   profiles.tos_accepted_at when the account accepted the Terms (signup)
+--   profiles.tos_version     which Terms version they accepted (e.g. '2026-10-03')
 -- Bands: 'under_13' | '13_17' | '18_plus'. NULL = unknown.
 -- The birth month and year are never stored: the app turns them into a band
 -- and drops them (spec T1, data minimization).
@@ -24,7 +25,9 @@
 -- 10-12", "8-10", "12U", "U12") counts as an under-13 answer, from the
 -- player's own age_group or any of their teams (players.team_id or
 -- player_teams). public.age_group_is_under_13() is the rule; the app has the
--- same one in src/lib/age-band.ts.
+-- same one in src/lib/age-band.ts. The plain age group "Youth" (no numbers;
+-- the app's lists put it before Middle School) counts as under 13 only when
+-- no band is known from the coach or the player (age_group_is_plain_youth).
 --
 -- 023's adult_confirmed_at / adult_confirmed_by are kept in step for older
 -- code: set when the effective band is 18_plus, cleared for any other band. An
@@ -55,7 +58,8 @@
 --
 -- Backfill (one time, only rows with no answers yet): adult_confirmed_at set
 -- -> an 18_plus answer from the coach (or the player, if they confirmed it
--- themself). The trigger then works out the band, so an 18+ player in an
+-- themself). Rows with no answers in an under-13 age group get under_13 from
+-- the age group. The trigger then works out the band, so an 18+ player in an
 -- under-13 age group becomes under_13. Nobody gets age_screen_at: invited
 -- players see the age screen at their next sign-in.
 --
@@ -96,6 +100,7 @@ ALTER TABLE public.players  ADD COLUMN IF NOT EXISTS age_screen_at    timestampt
 ALTER TABLE public.players  ADD COLUMN IF NOT EXISTS age_confirmed_at timestamptz;
 ALTER TABLE public.players  ADD COLUMN IF NOT EXISTS age_confirmed_by uuid REFERENCES auth.users ON DELETE SET NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tos_accepted_at  timestamptz;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tos_version      text;
 
 DO $$
 DECLARE c record;
@@ -123,6 +128,7 @@ COMMENT ON COLUMN public.players.age_screen_at   IS 'When the player answered th
 COMMENT ON COLUMN public.players.age_confirmed_at IS 'When age_band was last set.';
 COMMENT ON COLUMN public.players.age_confirmed_by IS 'Who gave the deciding answer (coach or player); NULL when an age group decided it.';
 COMMENT ON COLUMN public.profiles.tos_accepted_at IS 'When this account accepted the Terms of Service at signup.';
+COMMENT ON COLUMN public.profiles.tos_version     IS 'The Terms of Service version accepted at signup (the Terms page''s date, e.g. 2026-10-03).';
 
 -- ── Band helpers ─────────────────────────────────────────────────────────────
 -- True for an age group whose top age is 12 or less: "Youth 10-12", "8 to 10",
@@ -145,6 +151,18 @@ BEGIN
   IF m IS NOT NULL AND m[1]::int <= 12 THEN RETURN true; END IF;
   RETURN false;
 END;
+$$;
+
+-- The plain age group "Youth" with no numbers. Same rule as
+-- ageGroupIsPlainYouth in src/lib/age-band.ts.
+CREATE OR REPLACE FUNCTION public.age_group_is_plain_youth(p_group text)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT lower(coalesce(p_group, '')) ~ '(^|[^a-z])youth([^a-z]|$)'
+     AND lower(coalesce(p_group, '')) !~ '[0-9]'
 $$;
 
 CREATE OR REPLACE FUNCTION public.age_band_rank(p_band text)
@@ -171,6 +189,22 @@ AS $$
                     AND public.age_group_is_under_13(t.age_group))
 $$;
 REVOKE ALL ON FUNCTION public.player_in_under_13_group(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
+
+-- True if the player, or any of their teams, has the plain age group "Youth".
+CREATE OR REPLACE FUNCTION public.player_in_youth_group(p_player_id uuid, p_age_group text, p_team_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.age_group_is_plain_youth(p_age_group)
+      OR EXISTS (SELECT 1 FROM public.teams t
+                  WHERE (t.id = p_team_id
+                         OR t.id IN (SELECT pt.team_id FROM public.player_teams pt WHERE pt.player_id = p_player_id))
+                    AND public.age_group_is_plain_youth(t.age_group))
+$$;
+REVOKE ALL ON FUNCTION public.player_in_youth_group(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
 
 -- ── Effective band trigger ───────────────────────────────────────────────────
 -- SECURITY DEFINER: it reads teams/player_teams whatever the caller's RLS.
@@ -205,6 +239,10 @@ BEGIN
   END IF;
   IF eff IS DISTINCT FROM 'under_13'
      AND public.player_in_under_13_group(NEW.id, NEW.age_group, NEW.team_id) THEN
+    eff := 'under_13'; src := 'age_group'; by_uid := NULL;
+  ELSIF eff IS NULL
+     AND public.player_in_youth_group(NEW.id, NEW.age_group, NEW.team_id) THEN
+    -- "Youth" alone: under 13 only while no band is known.
     eff := 'under_13'; src := 'age_group'; by_uid := NULL;
   END IF;
 
@@ -380,6 +418,15 @@ UPDATE public.players
        age_confirmed_by = adult_confirmed_by
  WHERE adult_confirmed_at IS NOT NULL
    AND age_band_coach IS NULL AND age_band_self IS NULL;
+
+-- Players with no answers in an under-13 age group (range, or plain "Youth"):
+-- work out their band now (under_13 from the age group). They still get the
+-- age screen; their video was already blocked (no band).
+UPDATE public.players p
+   SET age_band = age_band
+ WHERE p.age_band IS NULL
+   AND (public.player_in_under_13_group(p.id, p.age_group, p.team_id)
+        OR public.player_in_youth_group(p.id, p.age_group, p.team_id));
 
 -- ── Video rule ───────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.player_has_video_consent(p_player_id uuid)
