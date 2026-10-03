@@ -2,6 +2,8 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { uploadAvatar } from '@/app/actions/player'
+import { avatarFileProblem } from '@/lib/avatar-rules'
+import { runAction } from '@/lib/action-result'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -205,8 +207,10 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   function handleRawFile(file: File) {
-    if (!file.type.startsWith('image/')) { setError('Please select an image file'); return }
-    if (file.size > 20 * 1024 * 1024) { setError('Image must be under 20 MB'); return }
+    // The original is only read here and cropped to a small JPEG in the browser; the upload
+    // (checked against the 2 MB rule in handleCropped and on the server) is that crop.
+    if (!file.type.startsWith('image/')) { setError('That file isn\'t a photo. Pick a JPEG, PNG or WebP image.'); return }
+    if (file.size > 20 * 1024 * 1024) { setError('That photo is too large to open. Pick a smaller one.'); return }
     setError(null)
     setNotice(null)
     setPendingFile(file)
@@ -217,22 +221,22 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
     setUploading(true)
     setError(null)
     setNotice(null)
+    const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+    // Same rule as uploadAvatar (2 MB, JPEG/PNG/WebP), checked before anything is sent.
+    const problem = avatarFileProblem(file)
+    if (problem) { setError(problem); setUploading(false); return }
     const fd = new FormData()
-    fd.append('file', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
-    try {
-      const result = await uploadAvatar(fd)
-      if ('error' in result) {
-        setError(result.error)
-      } else if (result.avatarUrl) {
-        setImgFailed(false)
-        setAvatarUrl(result.avatarUrl)
-      } else {
-        setNotice(result.notice ?? 'Photo saved. Refresh the page to see it.')
-      }
-    } catch {
-      setError('Your photo couldn\'t be uploaded. Check your connection and try again.')
-    } finally {
-      setUploading(false)
+    fd.append('file', file)
+    const result = await runAction(() => uploadAvatar(fd))
+    setUploading(false)
+    if (!result.ok) { setError(result.error); return }
+    if (!('success' in result.value)) { setError('Couldn\'t confirm the new photo. Refresh the page to check.'); return }
+    if (result.value.avatarUrl) {
+      setImgFailed(false)
+      setAvatarUrl(result.value.avatarUrl)
+    } else {
+      // Saved on the server, but no display URL right now.
+      setNotice(result.value.notice ?? 'Photo saved. Refresh the page to see it.')
     }
   }
 

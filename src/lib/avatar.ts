@@ -7,6 +7,8 @@
 // Only `avatars/<ownerId>.<ext>` is ever signed, so a hand-edited avatar_url can't be used to get a
 // signed URL for another user's photo or for a clip.
 
+import { AVATAR_TYPES } from './avatar-rules'
+
 export const AVATAR_BUCKET = 'clips'
 export const AVATAR_URL_TTL_SECONDS = 60 * 60 // 1 hour
 const AVATAR_BUCKETS = ['clips', 'profiles'] as const
@@ -15,15 +17,14 @@ export type AvatarRef = { bucket: AvatarBucket; path: string }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const AVATAR_PATH_RE = new RegExp(`^avatars/(${UUID})\\.([a-z0-9]{1,5})$`, 'i')
-const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const
-
-/** The storage path for a user's photo. The cropper always produces JPEG; other image types keep their extension. */
-export function avatarPathFor(userId: string, fileName: string | undefined, contentType: string | undefined): string | null {
+/**
+ * The storage path for a user's new photo: avatars/<userId>.<ext>, with the extension taken from the
+ * image type (JPEG/PNG/WebP only, see avatar-rules.ts; the file name is ignored). Null for anything else.
+ */
+export function avatarPathFor(userId: string, contentType: string | undefined): string | null {
   if (!new RegExp(`^${UUID}$`, 'i').test(userId)) return null
-  const fromName = fileName?.includes('.') ? fileName.split('.').pop()!.toLowerCase() : ''
-  const fromType = contentType?.startsWith('image/') ? contentType.slice(6).toLowerCase() : ''
-  const ext = [fromName, fromType].find(e => (ALLOWED_EXT as readonly string[]).includes(e)) ?? (fromType ? 'jpg' : '')
-  return ext ? `avatars/${userId}.${ext === 'jpeg' ? 'jpg' : ext}` : null
+  const ext = contentType ? AVATAR_TYPES[contentType] : undefined
+  return ext ? `avatars/${userId}.${ext}` : null
 }
 
 function ownAvatarPath(path: string, ownerId: string): string | null {

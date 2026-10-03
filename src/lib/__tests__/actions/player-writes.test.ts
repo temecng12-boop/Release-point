@@ -12,7 +12,7 @@ const COACH = { id: 'coach', email: 'coach@example.com' }
 
 function avatarForm() {
   const fd = new FormData()
-  fd.append('file', new File([new Uint8Array([1, 2, 3])], 'avatar.jpg', { type: 'image/jpeg' }))
+  fd.append('file', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16])], 'avatar.jpg', { type: 'image/jpeg' }))
   return fd
 }
 

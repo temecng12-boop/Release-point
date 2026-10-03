@@ -1,6 +1,10 @@
 'use server'
 
 import { parseClockAxis } from '@/lib/spin-axis'
+import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { pitchMetricWriteAccess } from '@/lib/pitch-access'
+import { pdfFileProblem } from '@/lib/pitch-import'
 
 export interface ParsedPitchRow {
   pitch_type: string
@@ -82,24 +86,52 @@ function emptyRow(pitch_type: string): ParsedPitchRow {
   }
 }
 
+/**
+ * Read a TrackMan PDF into pitch rows for the preview (nothing is saved here).
+ * Signed-in users only. With a clipId: the same rule as saving pitch data
+ * (the player's direct coach or the player). Without one: a coach or player
+ * profile. The file must be a PDF (type and %PDF- header) of at most
+ * PDF_MAX_BYTES, the same cap the browser checks before sending.
+ */
 export async function parseTrackmanPDF(formData: FormData): Promise<{ pitches: ParsedPitchRow[]; error?: string }> {
-  const file = formData.get('file') as File | null
-  if (!file) return { pitches: [], error: 'No file provided.' }
-  if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
-    return { pitches: [], error: 'Please upload a PDF file.' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { pitches: [], error: 'Please sign in again to import a PDF.' }
+
+  const clipId = formData.get('clipId')
+  if (typeof clipId === 'string' && clipId) {
+    const access = await pitchMetricWriteAccess(user.id, clipId)
+    if (access === 'error') return { pitches: [], error: 'Couldn\'t check access to this clip. Please try again.' }
+    if (access === 'no-clip') return { pitches: [], error: 'This clip no longer exists.' }
+    if (access === 'denied') return { pitches: [], error: 'Only the player\'s coach or the player can import pitch data for this clip.' }
+  } else {
+    const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (profileError) {
+      console.error('[parseTrackmanPDF] profile lookup failed', user.id, profileError.code, profileError.message)
+      return { pitches: [], error: 'Couldn\'t check your account. Please try again.' }
+    }
+    const role = (profile as { role?: string } | null)?.role
+    if (role !== 'coach' && role !== 'player') return { pitches: [], error: 'Only coaches and players can import pitch data.' }
   }
 
+  const file = formData.get('file')
+  if (!file || typeof file === 'string') return { pitches: [], error: 'No file provided.' }
+  const problem = pdfFileProblem(file)
+  if (problem) return { pitches: [], error: problem }
+
   try {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') return { pitches: [], error: 'Please upload a PDF file.' }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse')
-    const buffer = Buffer.from(await file.arrayBuffer())
     const { text } = await pdfParse(buffer)
     const pitches = parseTrackmanText(text)
     if (pitches.length === 0) {
       return { pitches: [], error: 'No pitch data found in this PDF. Make sure it\'s a TrackMan player report.' }
     }
     return { pitches }
-  } catch {
+  } catch (e) {
+    console.error('[parseTrackmanPDF] could not read the PDF', e)
     return { pitches: [], error: 'Could not read the PDF. Try re-exporting from TrackMan.' }
   }
 }

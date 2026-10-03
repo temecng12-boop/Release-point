@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import { AXIS_FORMAT_HINT, degreesToClock, parseClockAxis } from '@/lib/spin-axis'
 import { readPitchCsv, skippedSummary, warningsSummary, type CsvPitchRow } from '@/lib/pitch-csv'
 import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics, importPitchMetrics } from '@/app/actions/clips'
-import { csvImportFrom, importTooBig, type PitchImport } from '@/lib/pitch-import'
+import { csvImportFrom, importTooBig, pdfFileProblem, type PitchImport } from '@/lib/pitch-import'
 import { runAction } from '@/lib/action-result'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
 
@@ -222,12 +222,16 @@ export default function MetricsTab({
     if (!file) return
     setPdfError(null)
     setPdfPreview(null)
+    // Same type/size rule as the server, checked before anything is sent.
+    const problem = pdfFileProblem(file)
+    if (problem) { setPdfError(problem); e.target.value = ''; return }
     const fd = new FormData()
     fd.set('file', file)
+    fd.set('clipId', clipId)
     startParsing(async () => {
-      const { pitches, error } = await parseTrackmanPDF(fd)
-      if (error) { setPdfError(error); return }
-      setPdfPreview(pitches)
+      const result = await runAction(() => parseTrackmanPDF(fd))
+      if (!result.ok) { setPdfError(result.error); return }
+      setPdfPreview(result.value.pitches)
     })
   }
 

@@ -40,16 +40,15 @@ test('readAvatarRef: anything else falls back to null (initials)', () => {
   assert.equal(readAvatarRef(`avatars/${ME}.jpg`, ''), null)
 })
 
-test('avatarPathFor: user id + image type -> avatars/<id>.<ext>', () => {
-  assert.equal(avatarPathFor(ME, 'avatar.jpg', 'image/jpeg'), `avatars/${ME}.jpg`)
-  assert.equal(avatarPathFor(ME, 'me.JPEG', 'image/jpeg'), `avatars/${ME}.jpg`)
-  assert.equal(avatarPathFor(ME, 'me.png', 'image/png'), `avatars/${ME}.png`)
-  assert.equal(avatarPathFor(ME, 'blob', 'image/webp'), `avatars/${ME}.webp`)
-  assert.equal(avatarPathFor(ME, 'x.svg', 'image/svg+xml'), `avatars/${ME}.jpg`)
-  assert.equal(avatarPathFor(ME, 'x.pdf', 'application/pdf'), null)
-  assert.equal(avatarPathFor('../etc', 'a.jpg', 'image/jpeg'), null)
-  // every generated path is accepted by the reader
-  assert.deepEqual(readAvatarRef(avatarPathFor(ME, 'a.gif', 'image/gif'), ME), { bucket: 'clips', path: `avatars/${ME}.gif` })
+test('avatarPathFor: user id + image type -> avatars/<id>.<ext>; JPEG/PNG/WebP only, extension from the type', () => {
+  assert.equal(avatarPathFor(ME, 'image/jpeg'), `avatars/${ME}.jpg`)
+  assert.equal(avatarPathFor(ME, 'image/png'), `avatars/${ME}.png`)
+  assert.equal(avatarPathFor(ME, 'image/webp'), `avatars/${ME}.webp`)
+  for (const t of ['image/gif', 'image/svg+xml', 'application/pdf', '', undefined]) assert.equal(avatarPathFor(ME, t), null, String(t))
+  assert.equal(avatarPathFor('../etc', 'image/jpeg'), null)
+  // every generated path is accepted by the reader; legacy .gif paths can still be read
+  for (const t of ['image/jpeg', 'image/png', 'image/webp']) assert.deepEqual(readAvatarRef(avatarPathFor(ME, t), ME), { bucket: 'clips', path: avatarPathFor(ME, t) })
+  assert.deepEqual(readAvatarRef(`avatars/${ME}.gif`, ME), { bucket: 'clips', path: `avatars/${ME}.gif` })
 })
 
 function fakeStorage(behaviour: 'ok' | 'error' | 'throw' | 'empty' = 'ok') {
