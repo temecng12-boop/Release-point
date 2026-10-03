@@ -1,3 +1,4 @@
+import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -109,6 +110,11 @@ export default async function GuardianPage() {
                       </Link>
                     ))}
                   </div>
+                </div>
+              )}
+              {user && (
+                <div className="mt-4">
+                  <LessonFeedbackSection playerId={player.id} viewerId={user.id} />
                 </div>
               )}
             </div>
