@@ -167,7 +167,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
         <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="h-1 bg-[#C8102E]" />
           <div className="p-6">
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-5">
               <div
                 className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#1C3A5C] to-[#456080] border border-[#DDE4ED] flex items-center justify-center text-xl text-white shrink-0"
                 style={oswald}
@@ -192,7 +192,9 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   </span>
                 </div>
               </div>
-              {/* Upload button for the player's own coach only */}
+              {/* Upload button for the player's own coach only. Full width under
+                  the name on phones, so a notice never covers the name. */}
+              <div className="w-full sm:w-auto sm:max-w-xs">
               {player.coach_id === user.id ? (
               <UploadButton
                 playerId={player.id}
@@ -204,6 +206,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
               ) : (
                 <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>
               )}
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">
