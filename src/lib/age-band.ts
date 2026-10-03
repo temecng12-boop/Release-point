@@ -6,7 +6,9 @@
 //     into a band right away and never store the month or year.
 //   * The coach answers with a band. When answers differ, the YOUNGER band
 //     wins (spec T2), and an under-13 age group ("Youth 10-12", "12U") counts
-//     as an under-13 answer. Migration 037's players_set_age_band trigger does
+//     as an under-13 answer. The plain age group "Youth" (no numbers)
+//     counts as under 13 only when no band is known from the coach or the
+//     player. Migration 037's players_set_age_band trigger does
 //     the same; the database result is the one stored.
 
 export const AGE_BANDS = ['under_13', '13_17', '18_plus'] as const
@@ -48,9 +50,21 @@ export function ageGroupIsUnder13(group: string | null | undefined): boolean {
 }
 
 /**
+ * True for the plain age group "Youth" with no age range or numbers in it.
+ * The app's age-group lists put Youth before Middle School, so it's treated
+ * as under 13, but only when no band is known (see effectiveAgeBand).
+ * Same rule as public.age_group_is_plain_youth (037).
+ */
+export function ageGroupIsPlainYouth(group: string | null | undefined): boolean {
+  const g = (group ?? '').toLowerCase()
+  return /(^|[^a-z])youth([^a-z]|$)/.test(g) && !/[0-9]/.test(g)
+}
+
+/**
  * The effective band, as 037's trigger works it out: the younger of the
- * player's and the coach's answers (the player's wins a tie), then under_13
- * if any age group is an under-13 one.
+ * player's and the coach's answers (the coach's wins a tie), then under_13
+ * if any age group is an under-13 range ("10-12", "12U"), or, when no band
+ * is known at all, the plain age group "Youth".
  */
 export function effectiveAgeBand(input: {
   coach?: string | null
@@ -64,6 +78,7 @@ export function effectiveAgeBand(input: {
   if (self && (!coach || RANK[self] < RANK[coach])) { band = self; source = 'self' }
   else if (coach) { band = coach; source = 'coach' }
   if (band !== 'under_13' && (input.ageGroups ?? []).some(ageGroupIsUnder13)) { band = 'under_13'; source = 'age_group' }
+  else if (band === null && (input.ageGroups ?? []).some(ageGroupIsPlainYouth)) { band = 'under_13'; source = 'age_group' }
   return { band, source }
 }
 

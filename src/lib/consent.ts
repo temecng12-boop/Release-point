@@ -52,7 +52,7 @@ export const CONSENT_MIGRATION_COLUMNS = ['adult_confirmed_at', 'adult_confirmed
 /** Columns added by migration 037. Before 037 runs, queries naming them fail. */
 export const AGE_BAND_MIGRATION_COLUMNS = [
   'age_band', 'age_band_coach', 'age_band_self', 'age_band_source', 'age_screen_at',
-  'age_confirmed_at', 'age_confirmed_by', 'tos_accepted_at',
+  'age_confirmed_at', 'age_confirmed_by', 'tos_accepted_at', 'tos_version',
 ] as const
 
 function isSet(value: string | null | undefined): boolean {
@@ -87,6 +87,23 @@ export function confirmedAgeBand(player: PlayerConsentFields | null | undefined)
 /** True if the player's effective band is under 13. */
 export function isUnder13(player: PlayerConsentFields | null | undefined): boolean {
   return confirmedAgeBand(player) === 'under_13'
+}
+
+/**
+ * Under 13 only because of an age group, with no answer from the coach or
+ * the player yet. The player still sees the age screen (their answer can
+ * matter, e.g. for "Youth"); they aren't frozen until they've answered.
+ */
+export function under13FromAgeGroupOnly(player: (PlayerConsentFields & { age_band_coach?: string | null; age_band_self?: string | null }) | null | undefined): boolean {
+  return isUnder13(player) && !player?.age_band_coach && !player?.age_band_self
+}
+
+/**
+ * A frozen under-13 account (hard stop): the player sees only the stop
+ * message, on every player page and API route (src/lib/under13-gate.ts).
+ */
+export function isFrozenUnder13(player: (PlayerConsentFields & { age_band_coach?: string | null; age_band_self?: string | null }) | null | undefined): boolean {
+  return isUnder13(player) && !under13FromAgeGroupOnly(player)
 }
 
 /** Why uploads are blocked, or null if they aren't. */
@@ -154,12 +171,14 @@ type RosterFields = PlayerConsentFields & { coach_id?: string | null; guardian_i
  * A player who signed up without a coach confirms their own age, once: no
  * coach, no guardian on file, no answer yet, 037 applied. Once a band is on
  * file only a coach can change it, so a coachless under-13 answer can't be
- * switched to an older band. guardian_id is read, so it must be selected.
+ * switched to an older band. (An under-13 band from an age group alone, with
+ * no answer yet, still lets them answer.) guardian_id is read, so it must be selected.
  */
 export function canSelfConfirmAgeBand(player: RosterFields | null | undefined): boolean {
   return !!player && !player.coach_id && !player.guardian_id
     && !player.age_band_pending_migration && !player.consent_rules_pending_migration
-    && (player.age_band ?? null) === null && (player.age_band_self ?? null) === null
+    && ((player.age_band ?? null) === null || under13FromAgeGroupOnly(player))
+    && (player.age_band_self ?? null) === null
     && !isSet(player.age_screen_at)
 }
 
@@ -177,7 +196,7 @@ export function canSelfConfirmAdult023(player: RosterFields | null | undefined):
 export function needsAgeScreen(player: RosterFields | null | undefined): boolean {
   return !!player && !!player.coach_id
     && !player.age_band_pending_migration && !player.consent_rules_pending_migration
-    && !isSet(player.age_screen_at) && !isUnder13(player)
+    && !isSet(player.age_screen_at) && !isFrozenUnder13(player)
 }
 
 /**

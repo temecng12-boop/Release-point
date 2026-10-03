@@ -5,7 +5,9 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { ageAnswerFields, isMissingAgeBandColumn, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/consent-server'
-import { AGE_STOP_COOKIE, bandFromBirth, isAgeBand, type AgeBand } from '@/lib/age-band'
+import { AGE_STOP_COOKIE, bandFromBirth, type AgeBand } from '@/lib/age-band'
+import { signSignupAge, verifySignupAge } from '@/lib/signup-age-token'
+import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
@@ -49,7 +51,7 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
       console.error('[signUp] coach profile upsert failed', data.user.id, profileError.code, profileError.message)
       return { error: 'Your account was created, but we couldn\'t finish setting it up as a coach account. Please try signing in again in a few minutes. If your dashboard shows a player account, contact support.' }
     }
-    await recordTosAcceptance(data.user.id, tosAcceptedAt)
+    await recordTosAcceptance(data.user.id, tosAcceptedAt, TERMS_VERSION)
   }
 
   redirect('/dashboard')
@@ -104,8 +106,10 @@ export async function signUpPlayer(
     email,
     options: {
       shouldCreateUser: true,
-      // Only the band and when it was answered (037); linkPlayerRow stores them.
-      data: { role: 'player', full_name: fullName, age_band: parsed.band, age_screen_at: now, tos_accepted_at: now },
+      // The band (never the month/year), when it was answered and the Terms
+      // acceptance, signed by the server and bound to this email: metadata is
+      // client-controlled, so linkPlayerRow stores only what it can verify.
+      data: { role: 'player', full_name: fullName, signup_age: signSignupAge(email, { band: parsed.band, answeredAt: now, tosAcceptedAt: now, tosVersion: TERMS_VERSION }) },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
@@ -165,7 +169,12 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
     return { error: LINK_FAILED }
   }
-  if (typeof meta.tos_accepted_at === 'string' && !(await recordTosAcceptance(user.id, meta.tos_accepted_at))) {
+  // The signup age answer and Terms acceptance, only if signed by
+  // signUpPlayer for this email. Forged metadata (age_band, adult_confirmed,
+  // tos_accepted_at, a bad signup_age) is ignored: the player answers the age
+  // screen on their first visit instead.
+  const signup = verifySignupAge(meta.signup_age, user.email)
+  if (signup && !(await recordTosAcceptance(user.id, signup.tosAcceptedAt, signup.tosVersion))) {
     return { error: LINK_FAILED }
   }
 
@@ -194,10 +203,10 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     return { error: LINK_FAILED }
   }
 
-  // The self-signup age answer (band only) for an invited email: stored as the
-  // player's answer; the younger of it and the coach's wins (037). If it
-  // can't be stored, the age screen asks again at the next page load.
-  const selfBand: AgeBand | null = isAgeBand(meta.age_band) ? meta.age_band : null
+  // The verified self-signup answer (band only) for an invited email: stored
+  // as the player's answer; the younger of it and the coach's wins (037). If
+  // it can't be stored, the age screen asks again at the next page load.
+  const selfBand: AgeBand | null = signup?.band ?? null
   if (linked && linked.length > 0 && selfBand) {
     const answered = await recordOwnAgeAnswer(supabaseAdmin, user.id, selfBand)
     if ('error' in answered) console.warn('[linkPlayerRow] signup age answer not stored', { userId: user.id, error: answered.error })
@@ -216,14 +225,12 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
 
     if (!existing || existing.length === 0) {
-      // The self-signup age answer (band only; RP-041, 037); older signups
-      // only carry adult_confirmed = true (18+). Before 037/023 the row is
-      // created with the columns that exist (see writeWithAgeFields).
-      const band: AgeBand | null = selfBand ?? (meta.adult_confirmed === true ? '18_plus' : null)
-      const answeredAt = typeof meta.age_screen_at === 'string' && !Number.isNaN(Date.parse(meta.age_screen_at)) ? meta.age_screen_at : now
+      // The verified self-signup answer (band only; RP-041, 037). Before
+      // 037/023 the row is created with the columns that exist (see
+      // writeWithAgeFields).
+      const band: AgeBand | null = selfBand
       const fields = band ? ageAnswerFields('self', band, user.id, {}, now) : null
-      if (fields && selfBand) fields.age.age_screen_at = answeredAt
-      if (fields && !selfBand) delete fields.age.age_screen_at
+      if (fields && signup) fields.age.age_screen_at = signup.answeredAt
       const { result: { error: insertError } } = await writeWithAgeFields(
         fields?.age ?? {},
         band === '18_plus' && fields ? fields.adult : {},
@@ -245,15 +252,15 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
 }
 
 /**
- * Stores when the account accepted the Terms (profiles.tos_accepted_at, 035),
- * once. Before 035 the column doesn't exist; the acceptance is still in the
- * account's signup metadata. Returns false only on a real write failure.
+ * Stores when the account accepted the Terms and which version
+ * (profiles.tos_accepted_at / tos_version, 037), once. Before 037 the columns
+ * don't exist and nothing is stored. Returns false only on a real write failure.
  */
-async function recordTosAcceptance(userId: string, acceptedAt: string): Promise<boolean> {
+async function recordTosAcceptance(userId: string, acceptedAt: string, version: string): Promise<boolean> {
   if (Number.isNaN(Date.parse(acceptedAt))) return true
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update({ tos_accepted_at: acceptedAt })
+    .update({ tos_accepted_at: acceptedAt, ...(version ? { tos_version: version } : {}) })
     .eq('id', userId)
     .is('tos_accepted_at', null)
   if (error && !isMissingAgeBandColumn(error)) {

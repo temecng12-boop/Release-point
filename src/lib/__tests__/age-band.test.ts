@@ -74,7 +74,8 @@ test('needsAgeScreen: coach-invited players who have not answered, not under 13,
   assert.equal(needsAgeScreen(invited), true, 'even with the coach\'s 18+ on file')
   assert.equal(needsAgeScreen({ ...invited, age_screen_at: T }), false, 'answered')
   assert.equal(needsAgeScreen({ ...invited, coach_id: null }), false, 'coachless: the dashboard banner asks instead')
-  assert.equal(needsAgeScreen({ ...invited, age_band: 'under_13' }), false, 'under 13: the stop message instead')
+  assert.equal(needsAgeScreen({ ...invited, age_band: 'under_13', age_band_coach: 'under_13' }), false, 'under 13 (coach): the stop message instead')
+  assert.equal(needsAgeScreen({ ...invited, age_band: 'under_13' }), true, 'under 13 from an age group only: answers first')
   assert.equal(needsAgeScreen({ ...invited, age_band_pending_migration: true }), false, 'before 037')
   assert.equal(needsAgeScreen(null), false)
 })
@@ -109,4 +110,28 @@ test('needsFirstAgeScreen: invited players, and new coachless accounts (OAuth) b
   assert.equal(needsFirstAgeScreen({ ...base, coach_id: 'c', position: 'pitcher' }), true, 'invited, not answered')
   assert.equal(needsFirstAgeScreen({ ...base, coach_id: 'c', age_screen_at: T }), false)
   assert.equal(needsFirstAgeScreen(null), false)
+})
+
+test('plain "Youth" counts as under 13 only when no band is known; ranges still win', async () => {
+  const { ageGroupIsPlainYouth } = await import('../age-band')
+  for (const g of ['Youth', 'youth', ' Youth ', 'Youth League']) assert.equal(ageGroupIsPlainYouth(g), true, g)
+  for (const g of ['Youth 13-14', 'Youth 10-12', '12U', 'Middle School', 'High School', 'Youthful', '', null]) assert.equal(ageGroupIsPlainYouth(g), false, String(g))
+  assert.deepEqual(effectiveAgeBand({ ageGroups: ['Youth'] }), { band: 'under_13', source: 'age_group' })
+  assert.deepEqual(effectiveAgeBand({ coach: '13_17', ageGroups: ['Youth'] }), { band: '13_17', source: 'coach' }, 'a known band says otherwise')
+  assert.deepEqual(effectiveAgeBand({ self: '18_plus', ageGroups: ['Youth'] }), { band: '18_plus', source: 'self' })
+  assert.deepEqual(effectiveAgeBand({ coach: '18_plus', ageGroups: ['Youth 10-12'] }), { band: 'under_13', source: 'age_group' }, 'an under-13 range always wins')
+  assert.deepEqual(effectiveAgeBand({ ageGroups: ['Youth 13-14'] }), { band: null, source: null }, 'an older range says otherwise')
+})
+
+test('frozen vs. under 13 from an age group only', async () => {
+  const { isFrozenUnder13, under13FromAgeGroupOnly } = await import('../consent')
+  const base = { age_band: 'under_13', age_confirmed_at: T, age_band_coach: null, age_band_self: null }
+  assert.equal(under13FromAgeGroupOnly(base), true)
+  assert.equal(isFrozenUnder13(base), false, 'no answer yet: the age screen first')
+  assert.equal(isFrozenUnder13({ ...base, age_band_self: 'under_13' }), true)
+  assert.equal(isFrozenUnder13({ ...base, age_band_coach: 'under_13' }), true)
+  assert.equal(isFrozenUnder13({ ...base, age_band_self: '13_17' }), true, 'answered 13-17 on a 10-12 team: still under 13, frozen')
+  assert.equal(isFrozenUnder13({ ...base, age_band: '13_17' }), false)
+  assert.equal(isFrozenUnder13(null), false)
+  assert.equal(canSelfConfirmAgeBand({ ...base, coach_id: null, guardian_id: null }), true, 'coachless, Youth only: may still answer')
 })

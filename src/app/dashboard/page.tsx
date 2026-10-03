@@ -5,7 +5,7 @@ import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, canSelfConfirmAdult023, canSelfConfirmAgeBand, isUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
+import { canUploadVideo, canSelfConfirmAdult023, canSelfConfirmAgeBand, isFrozenUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
 import AgeScreenForm from './age-screen-form'
 import Under13Stop from '@/components/under13-stop'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
   // screen before anything else (037).
   if (!isCoach && needsFirstAgeScreen(playerRow)) redirect('/onboarding/age')
   // Under 13 is a hard stop for now: the account shows only the stop message.
-  const frozen = !isCoach && isUnder13(playerRow)
+  const frozen = !isCoach && isFrozenUnder13(playerRow)
   if (!isCoach && playerRow && !playerRow.position && !frozen) redirect('/onboarding')
 
   // A coachless player with no age on file answers once, at the top.

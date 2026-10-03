@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Logo from '@/components/Logo'
+import { TERMS_VERSION_LABEL } from '@/lib/terms-version'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -15,7 +16,7 @@ export default function TermsPage() {
         <div>
           <p className="text-xs text-[#C8102E] tracking-widest mb-2" style={oswald}>Legal</p>
           <h1 className="text-4xl text-[#0F1F33] mb-2" style={oswald}>Terms of Service</h1>
-          <p className="text-xs text-[#3D5166]">Last updated: September 2026</p>
+          <p className="text-xs text-[#3D5166]">Last updated: {TERMS_VERSION_LABEL}</p>
         </div>
 
         <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">

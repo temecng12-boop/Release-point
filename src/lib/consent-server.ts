@@ -358,7 +358,7 @@ export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand):
   })
   let q = db.from('players').update({ ...fields.age, ...fields.adult })
     .eq('id', row.id).eq('user_id', userId).is('age_screen_at', null).is('age_band_self', null)
-  if (!row.coach_id) q = q.is('coach_id', null).is('guardian_id', null).is('age_band', null)
+  if (!row.coach_id) q = q.is('coach_id', null).is('guardian_id', null).is('age_band_coach', null)
   const { data: updated, error: updateError } = await q.select('age_band')
   if (updateError || !Array.isArray(updated) || updated.length !== 1) {
     console.error('[recordOwnAgeAnswer] update failed', { userId, playerId: row.id, message: updateError?.message ?? 'no row updated' })

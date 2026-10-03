@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import PositionPicker from './position-picker'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { isUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
+import { isFrozenUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
   // The age screen comes first (037); an under-13 player sees only the stop
   // message on the dashboard. If already has position, go to dashboard.
   if (needsFirstAgeScreen(playerRow)) redirect('/onboarding/age')
-  if (playerRow?.position || isUnder13(playerRow)) redirect('/dashboard')
+  if (playerRow?.position || isFrozenUnder13(playerRow)) redirect('/dashboard')
 
   return (
     <PositionPicker
