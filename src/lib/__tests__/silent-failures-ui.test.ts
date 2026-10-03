@@ -55,8 +55,10 @@ test('video player: the mark error line shows each message as written (not alway
 
 test('video player: a lesson save warning is shown instead of "Lesson saved"', () => {
   const src = read('components/video-player.tsx')
-  assert.match(src, /setLessonWarning\(saveResult && 'warning' in saveResult/)
-  assert.match(src, /lessonWarning && <span role="status"/)
+  // Lessons phase 1 (#13) shows the save result as lessonNotice: the warning
+  // text when there is one, otherwise "Lesson saved".
+  assert.match(src, /setLessonNotice\(saveResult\.warning \?\? 'Lesson saved'\)/)
+  assert.match(src, /: <span role="status"[^>]*>\{lessonNotice\}<\/span>/)
 })
 
 test('clip title: a failed rename reverts the title and shows the error', () => {
