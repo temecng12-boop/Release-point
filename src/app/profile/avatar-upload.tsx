@@ -2,6 +2,8 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { uploadAvatar } from '@/app/actions/player'
+import { avatarFileProblem } from '@/lib/avatar-rules'
+import { runAction } from '@/lib/action-result'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -210,15 +212,18 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
     setPendingFile(null)
     setUploading(true)
     setError(null)
+    const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+    // Same rule as uploadAvatar, checked before anything is sent.
+    const problem = avatarFileProblem(file)
+    if (problem) { setError(problem); setUploading(false); return }
     const fd = new FormData()
-    fd.append('file', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
-    const result = await uploadAvatar(fd)
-    if (result?.error) {
-      setError(result.error)
-    } else if (result?.avatarUrl) {
-      setAvatarUrl(result.avatarUrl + `?t=${Date.now()}`)
-    }
+    fd.append('file', file)
+    const result = await runAction(() => uploadAvatar(fd))
     setUploading(false)
+    if (!result.ok) { setError(result.error); return }
+    const url = 'avatarUrl' in result.value ? result.value.avatarUrl : null
+    if (!url) { setError('Couldn\'t confirm the new photo. Refresh the page to check.'); return }
+    setAvatarUrl(url + `?t=${Date.now()}`)
   }
 
   return (
@@ -259,7 +264,7 @@ export default function AvatarUpload({ userId: _userId, currentAvatarUrl, displa
           </div>
         </div>
 
-        {error && <p className="text-xs text-[#E8102A] mt-1 max-w-[80px] text-center leading-tight">{error}</p>}
+        {error && <p role="alert" className="text-xs text-[#E8102A] mt-1 max-w-[80px] text-center leading-tight">{error}</p>}
       </div>
     </>
   )
