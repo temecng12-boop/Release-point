@@ -5,7 +5,7 @@
  */
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { resetFake } from './fakes/db'
+import { resetFake, fail, state } from './fakes/db'
 import { signUpCalls } from './fakes/supabase-server'
 import { signUp } from '../../../app/actions/auth'
 
@@ -40,4 +40,21 @@ test('server rejects a missing password field', async () => {
 test('an 8-character uncommon password reaches Supabase signUp', async () => {
   await assert.rejects(signUp(undefined, form('Tq9#vLm2')), (e: Error) => e.message === 'NEXT_REDIRECT')
   assert.deepEqual(signUpCalls, [{ email: 'coach@example.com', password: 'Tq9#vLm2' }])
+})
+
+test('a failed coach profile upsert is reported, not redirected to the dashboard as a success', async () => {
+  fail({ table: 'profiles', action: 'upsert', error: { code: '42501', message: 'new row violates row-level security policy for table "profiles"' } })
+  const errors: unknown[] = []
+  const orig = console.error; console.error = (...a: unknown[]) => { errors.push(a) }
+  let r: { error?: string } | undefined
+  try { r = await signUp(undefined, form('Tq9#vLm2')) } finally { console.error = orig }
+  assert.match(r?.error ?? '', /couldn't finish setting it up as a coach account/)
+  assert.doesNotMatch(r?.error ?? '', /row-level|42501|profiles/, 'no raw DB text')
+  assert.equal(errors.length, 1, 'raw error logged on the server')
+  assert.deepEqual(state.tables.profiles, [])
+})
+
+test('a saved coach profile still redirects to the dashboard with role coach', async () => {
+  await assert.rejects(signUp(undefined, form('Tq9#vLm2')), (e: Error) => e.message === 'NEXT_REDIRECT')
+  assert.deepEqual(state.tables.profiles.map(p => p.role), ['coach'])
 })

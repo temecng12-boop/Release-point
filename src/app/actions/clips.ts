@@ -3,7 +3,8 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes } from '@/lib/clip-notes'
 import { writeClipNotesAtomic } from '@/lib/clip-notes-write'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
-import { degreesToClock } from '@/lib/spin-axis'
+import { degreesToClock, roundAxisForIntegerColumn } from '@/lib/spin-axis'
+import { pitchAxisError, validatePitchImport, type PitchImport } from '@/lib/pitch-import'
 import { readClipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
 import { loadLessonReplay } from '@/lib/lessons'
 import { isVoicePathFor, timestampVoicePathFor } from '@/lib/voice-path'
@@ -196,16 +197,20 @@ type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_ang
 export async function saveHittingMetrics(clipId: string, metrics: HittingMetrics) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  if (!user) return { error: 'Please sign in again to save hitting data.' }
 
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
+  // Same rule as pitch data (pitchMetricWriteAccess): direct coach or the player.
+  const access = await pitchMetricWriteAccess(user.id, clipId)
+  if (access === 'error') return { error: 'Couldn\'t check access to this clip. Please try again.' }
+  if (access === 'no-clip') return { error: 'This clip no longer exists.' }
+  if (access === 'denied') return { error: 'Only the player\'s coach or the player can edit hitting data for this clip.' }
 
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).single()
-  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
-
-  const { error } = await supabaseAdmin.from('clips').update({ hitting_metrics: metrics }).eq('id', clipId)
-  if (error) return { error: error.message }
+  const { data: changed, error } = await supabaseAdmin.from('clips').update({ hitting_metrics: metrics }).eq('id', clipId).select('id')
+  if (error) return { error: describeDbError('saveHittingMetrics', error, 'Couldn\'t save the hitting data.') }
+  if (!changed || changed.length === 0) {
+    console.error('[saveHittingMetrics] update changed 0 rows', clipId)
+    return { error: 'Couldn\'t save the hitting data. Refresh the page and try again.' }
+  }
 
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
@@ -706,24 +711,13 @@ export async function addPitchMetric(clipId: string, data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: clip } = await supabaseAdmin
-    .from('clips')
-    .select('player_id')
-    .eq('id', clipId)
-    .single()
-  if (!clip) return { error: 'Clip not found' }
-
-  const { data: player } = await supabaseAdmin
-    .from('players')
-    .select('coach_id, user_id')
-    .eq('id', clip.player_id)
-    .single()
-  if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
+  const access = await pitchMetricWriteAccess(user.id, clipId)
+  if (access === 'no-clip') return { error: 'Clip not found' }
+  if (access !== 'ok') return { error: 'Not authorized' }
 
   // spin_axis is degrees clockwise from 12:00 (see src/lib/spin-axis.ts).
-  if (data.spin_axis != null && !(Number.isFinite(data.spin_axis) && data.spin_axis >= 0 && data.spin_axis < 360)) {
-    return { error: 'Axis must be a clock time from 1:00 to 12:59.' }
-  }
+  const axisError = pitchAxisError(data.spin_axis)
+  if (axisError) return { error: axisError }
 
   // extension and vaa are new columns — insert fault-tolerantly
   const baseInsert = { clip_id: clipId, created_by: user.id, ...data }
@@ -744,6 +738,76 @@ export async function addPitchMetric(clipId: string, data: {
 
   if (insertError) return { error: describeDbError('addPitchMetric', insertError, 'Could not save this pitch.') }
   return { metric: row, warning }
+}
+
+/**
+ * Who may add pitch rows to a clip: the direct coach of the clip's player
+ * (players.coach_id) or the player themself (players.user_id). Team coaches
+ * (read-only under 031), guardians and everyone else may not. The rows are
+ * then written with the service role, so this check is the only gate.
+ */
+async function pitchMetricWriteAccess(userId: string, clipId: string): Promise<'ok' | 'no-clip' | 'denied' | 'error'> {
+  const { data: clip, error: clipError } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+  if (clipError) { console.error('[pitchMetricWriteAccess] clip lookup failed', clipId, clipError); return 'error' }
+  if (!clip?.player_id) return 'no-clip'
+  const { data: player, error: playerError } = await supabaseAdmin.from('players').select('coach_id, user_id').eq('id', clip.player_id).maybeSingle()
+  if (playerError) { console.error('[pitchMetricWriteAccess] player lookup failed', clip.player_id, playerError); return 'error' }
+  if (!player) return 'no-clip'
+  return player.coach_id === userId || player.user_id === userId ? 'ok' : 'denied'
+}
+
+const IMPORT_COLUMNS = 'id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break, extension, vaa'
+const IMPORT_COLUMNS_CORE = 'id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break'
+
+/**
+ * Save an imported CSV or TrackMan PDF to a clip's pitch rows. Same access
+ * rule as addPitchMetric (direct coach, or the player on their own clip);
+ * the import is validated again here (lib/pitch-import.ts) and saved as ONE
+ * insert, so it is all-or-nothing: either every pitch is saved and returned,
+ * or none is and an error comes back.
+ */
+export async function importPitchMetrics(clipId: string, input: PitchImport): Promise<
+  { error: string } | { metrics: Record<string, unknown>[]; warning?: string }
+> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Please sign in again to import pitch data.' }
+
+  const access = await pitchMetricWriteAccess(user.id, clipId)
+  if (access === 'error') return { error: 'Couldn\'t check access to this clip. Please try again.' }
+  if (access === 'no-clip') return { error: 'This clip no longer exists.' }
+  if (access === 'denied') return { error: 'Only the player\'s coach or the player can import pitch data for this clip.' }
+
+  const checked = validatePitchImport(input)
+  if (!checked.ok) return { error: checked.error }
+  const inserts = checked.rows.map(r => ({ clip_id: clipId, created_by: user.id, ...r }))
+  const total = inserts.length
+  const run = (rows: typeof inserts) => supabaseAdmin.from('pitch_metrics').insert(rows)
+    .select(rows.some(r => 'extension' in r || 'vaa' in r) ? IMPORT_COLUMNS : IMPORT_COLUMNS_CORE)
+
+  let { data, error } = await run(inserts)
+  // Before migration 020, spin_axis is integer and fractional degrees are
+  // rejected (22P02). One retry with whole degrees, and say so.
+  let warning: string | undefined
+  const fractional = inserts.find(r => r.spin_axis != null && !Number.isInteger(r.spin_axis))
+  if (error && fractional && isIntegerSyntaxError(error)) {
+    console.error('[importPitchMetrics] spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', error)
+    const retry = await run(inserts.map(r => ({ ...r, spin_axis: roundAxisForIntegerColumn(r.spin_axis) })))
+    data = retry.data
+    error = retry.error
+    const example = fractional.spin_axis as number
+    if (!error) warning = `Axis values were rounded to whole degrees (e.g. ${degreesToClock(example)} saved as ${degreesToClock(roundAxisForIntegerColumn(example) as number)}) because the database only stores whole degrees for now.`
+  }
+  if (error) return { error: describeDbError('importPitchMetrics', error, 'Couldn\'t save these pitches. Nothing was saved. Please try again.') }
+
+  const saved = (data ?? []) as unknown as Record<string, unknown>[]
+  if (saved.length !== total) {
+    // One INSERT is atomic, so this shouldn't happen; never report it as a full success.
+    console.error('[importPitchMetrics] insert returned', saved.length, 'of', total, 'rows', clipId)
+    return { error: `Only ${saved.length} of ${total} pitches were confirmed saved. Refresh the page to check before importing again.` }
+  }
+  revalidatePath(`/clips/${clipId}`)
+  return { metrics: saved, ...(warning ? { warning } : {}) }
 }
 
 function isIntegerSyntaxError(error: { code?: string; message?: string }) {

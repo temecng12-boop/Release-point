@@ -36,7 +36,14 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   if (error) return { error: error.message }
 
   if (data.user) {
-    await supabaseAdmin.from('profiles').upsert({ id: data.user.id, full_name: fullName || '', role: 'coach' })
+    // linkPlayerRow writes role 'player' for any profile it touches, so a coach
+    // whose profile row isn't saved here could end up as a player. Don't send
+    // them to the dashboard as if signup worked.
+    const { error: profileError } = await supabaseAdmin.from('profiles').upsert({ id: data.user.id, full_name: fullName || '', role: 'coach' })
+    if (profileError) {
+      console.error('[signUp] coach profile upsert failed', data.user.id, profileError.code, profileError.message)
+      return { error: 'Your account was created, but we couldn\'t finish setting it up as a coach account. Please try signing in again in a few minutes. If your dashboard shows a player account, contact support.' }
+    }
   }
 
   redirect('/dashboard')
@@ -106,20 +113,32 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
   }
   if (!user.email) return { success: true }
 
-  const role     = (user.user_metadata?.role ?? 'player') as string
   const fullName = (user.user_metadata?.full_name ?? '') as string
   const now      = new Date().toISOString()
 
-  // Ensure profile row exists
+  // Ensure profile row exists. user_metadata is client-controlled (anyone can
+  // call auth.signUp with any metadata), so a missing profile is always
+  // created as 'player'; coach and guardian roles are only set server-side.
+  // An existing profile is never changed.
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: user.id, full_name: fullName, role }, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert({ id: user.id, full_name: fullName, role: 'player' }, { onConflict: 'id', ignoreDuplicates: true })
   if (profileError) {
     console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
     return { error: LINK_FAILED }
   }
 
-  if (role !== 'player') return { success: true }
+  // Only player accounts are linked to a player row; go by the stored role.
+  const { data: profile, error: roleError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (roleError || !profile) {
+    console.error('[linkPlayerRow] profile role lookup failed', { code: roleError?.code, message: roleError?.message })
+    return { error: LINK_FAILED }
+  }
+  if (profile.role !== 'player') return { success: true }
 
   // Link to an existing invited player record. Accepting an invite is not
   // guardian consent, and the coach's age choice from the invite stands.
