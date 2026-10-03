@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import { AXIS_FORMAT_HINT, degreesToClock, parseClockAxis } from '@/lib/spin-axis'
 import { readPitchCsv, skippedSummary, warningsSummary, type CsvPitchRow } from '@/lib/pitch-csv'
 import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics, importPitchMetrics } from '@/app/actions/clips'
-import { csvImportFrom } from '@/lib/pitch-import'
+import { csvImportFrom, importTooBig, type PitchImport } from '@/lib/pitch-import'
 import { runAction } from '@/lib/action-result'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
 
@@ -201,7 +201,10 @@ export default function MetricsTab({
     setSaving(true)
     setSaveError(null)
     setAxisWarning(null)
-    const result = await runAction(() => importPitchMetrics(clipId, csvImportFrom(preview)))
+    const payload = csvImportFrom(preview)
+    const tooBig = importTooBig(clipId, payload)
+    if (tooBig) { setSaving(false); setSaveError(tooBig); return }
+    const result = await runAction(() => importPitchMetrics(clipId, payload))
     setSaving(false)
     if (!result.ok) { setSaveError(result.error); return }
     const saved = 'metrics' in result.value ? (result.value.metrics as MetricRow[]) : null
@@ -241,7 +244,10 @@ export default function MetricsTab({
       horizontal_break: r.horizontal_break,
       vertical_break: r.vertical_break,
     }))
-    const result = await runAction(() => importPitchMetrics(clipId, { source: 'pdf', rows }))
+    const payload: PitchImport = { source: 'pdf', rows }
+    const tooBig = importTooBig(clipId, payload)
+    if (tooBig) { setPdfSaving(false); setPdfError(tooBig); return }
+    const result = await runAction(() => importPitchMetrics(clipId, payload))
     setPdfSaving(false)
     if (!result.ok) { setPdfError(result.error); return }
     const saved = 'metrics' in result.value ? (result.value.metrics as MetricRow[]) : null

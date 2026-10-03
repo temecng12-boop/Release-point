@@ -167,6 +167,7 @@ export default function ClipTabs({
                   role={role}
                   initial={initialHittingMetrics}
                   canDelete={canDeleteMetrics}
+                  canEdit={canAddMetrics}
                 />
               )
             )}

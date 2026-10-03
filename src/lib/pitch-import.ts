@@ -10,6 +10,11 @@
 import { mapPitchRow, type PitchFields } from './pitch-csv'
 
 export const MAX_IMPORT_ROWS = 2000
+/** next.config.ts serverActions.bodySizeLimit ('4mb' = 4 * 1024 * 1024 bytes). */
+export const SERVER_ACTION_BODY_LIMIT_BYTES = 4 * 1024 * 1024
+/** What the browser may send: the limit minus room for the request's own encoding overhead. */
+export const IMPORT_BODY_LIMIT_BYTES = SERVER_ACTION_BODY_LIMIT_BYTES - 256 * 1024
+export const IMPORT_TOO_BIG = 'This file is too big to import at once; split it into smaller files.'
 const MAX_COLUMNS = 300
 const MAX_CELL = 500
 const MAX_PITCH_TYPE = 60
@@ -113,4 +118,18 @@ function validatePdf(rows: unknown[]): ImportValidation {
     })
   }
   return { ok: true, rows: out }
+}
+
+/**
+ * UTF-8 size of the action call's arguments as JSON, which is about what the
+ * request body carries (React encodes plain arguments as JSON text). Checked
+ * in the browser before sending, so a file over the server action body limit
+ * gets a clear message instead of a failed request.
+ */
+export function importPayloadBytes(clipId: string, input: PitchImport): number {
+  return new TextEncoder().encode(JSON.stringify([clipId, input])).length
+}
+
+export function importTooBig(clipId: string, input: PitchImport): string | null {
+  return importPayloadBytes(clipId, input) > IMPORT_BODY_LIMIT_BYTES ? IMPORT_TOO_BIG : null
 }
