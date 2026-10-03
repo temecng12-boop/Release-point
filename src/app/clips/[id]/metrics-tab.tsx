@@ -1,10 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { AXIS_FORMAT_HINT, degreesToClock, isIntegerSyntaxError, parseClockAxis, roundAxisForIntegerColumn } from '@/lib/spin-axis'
+import { AXIS_FORMAT_HINT, degreesToClock, parseClockAxis } from '@/lib/spin-axis'
 import { readPitchCsv, skippedSummary, warningsSummary, type CsvPitchRow } from '@/lib/pitch-csv'
-import { createClient } from '@/lib/supabase/client'
-import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics } from '@/app/actions/clips'
+import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics, importPitchMetrics } from '@/app/actions/clips'
+import { csvImportFrom } from '@/lib/pitch-import'
 import { runAction } from '@/lib/action-result'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
 
@@ -29,28 +29,6 @@ const VELOCITY_BENCHMARKS: Record<string, { avg: number; good: number; elite: nu
 }
 
 // ── CSV parsing: src/lib/pitch-csv.ts (quote-aware; reports skipped rows) ──
-
-// ── Insert imported rows ─────────────────────────────────────────────────────
-// Until migration 020 makes pitch_metrics.spin_axis numeric, the column is
-// integer and fractional degrees (converted TrackMan values, odd-minute tilts)
-// are rejected with 22P02. Retry with whole degrees and say so.
-type InsertRow = { spin_axis: number | null } & Record<string, unknown>
-const METRIC_COLUMNS = 'id, pitch_type, velocity, spin_rate, spin_axis, horizontal_break, vertical_break'
-async function insertMetricRows(supabase: ReturnType<typeof createClient>, inserts: InsertRow[]) {
-  const first = await supabase.from('pitch_metrics').insert(inserts).select(METRIC_COLUMNS)
-  const fractional = inserts.filter(r => r.spin_axis != null && !Number.isInteger(r.spin_axis))
-  if (!first.error || fractional.length === 0 || !isIntegerSyntaxError(first.error)) {
-    return { data: first.data, error: first.error, warning: null }
-  }
-  console.error('[pitch_metrics import] spin_axis is still integer; apply supabase/migrations/020_spin_axis_numeric.sql', first.error)
-  const retry = await supabase.from('pitch_metrics')
-    .insert(inserts.map(r => ({ ...r, spin_axis: roundAxisForIntegerColumn(r.spin_axis) })))
-    .select(METRIC_COLUMNS)
-  const example = fractional[0].spin_axis as number
-  const warning = retry.error ? null
-    : `Axis values were rounded to whole degrees (e.g. ${degreesToClock(example)} saved as ${degreesToClock(roundAxisForIntegerColumn(example) as number)}) because the database only stores whole degrees for now.`
-  return { data: retry.data, error: retry.error, warning }
-}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type MetricRow = {
@@ -91,6 +69,7 @@ export default function MetricsTab({
   initialMetrics,
   onMetricsChange,
   canDelete = false,
+  canAdd = false,
 }: {
   clipId: string
   role: 'coach' | 'player'
@@ -101,6 +80,8 @@ export default function MetricsTab({
   onMetricsChange?: (metrics: MetricRow[]) => void
   /** Only the player's direct coach (the rule RLS enforces on pitch_metrics). */
   canDelete?: boolean
+  /** Manual entry and CSV/PDF import: the direct coach or the player (importPitchMetrics checks the same). */
+  canAdd?: boolean
 }) {
   const isCoach = role === 'coach'
   const fileRef = useRef<HTMLInputElement>(null)
@@ -213,40 +194,23 @@ export default function MetricsTab({
     reader.readAsText(file)
   }
 
-  // ── Save parsed rows to DB ─────────────────────────────────────────────
+  // ── Save parsed rows (server action; all-or-nothing) ─────────────────
+  // The table changes only after the server confirmed every row was saved.
   async function handleSave() {
     if (!preview) return
     setSaving(true)
     setSaveError(null)
     setAxisWarning(null)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const inserts = preview.map(({ _raw, release_height: _rh, ...fields }) => {
-        void _rh
-        return {
-          clip_id: clipId,
-          created_by: user.id,
-          raw_data: _raw,
-          ...fields,
-        }
-      })
-
-      const { data, error, warning } = await insertMetricRows(supabase, inserts)
-      if (error) throw error
-
-      setAxisWarning(warning)
-      updateMetrics(prev => [...prev, ...(data as MetricRow[])])
-      setPreview(null)
-      setCsvSkipped(null)   // the skipped-rows note was about this import; it's done now
-      if (fileRef.current) fileRef.current.value = ''
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setSaving(false)
-    }
+    const result = await runAction(() => importPitchMetrics(clipId, csvImportFrom(preview)))
+    setSaving(false)
+    if (!result.ok) { setSaveError(result.error); return }
+    const saved = 'metrics' in result.value ? (result.value.metrics as MetricRow[]) : null
+    if (!saved) { setSaveError('Couldn\'t confirm the import. Refresh the page to check before trying again.'); return }
+    setAxisWarning(result.warning)
+    updateMetrics(prev => [...prev, ...saved])
+    setPreview(null)
+    setCsvSkipped(null)   // the skipped-rows note was about this import; it's done now
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   // ── Handle PDF selection ──────────────────────────────────────────────
@@ -269,36 +233,29 @@ export default function MetricsTab({
     setPdfSaving(true)
     setPdfError(null)
     setAxisWarning(null)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const inserts = pdfPreview.map(r => ({
-        clip_id: clipId,
-        created_by: user.id,
-        pitch_type: r.pitch_type,
-        velocity: r.velocity,
-        spin_rate: r.spin_rate,
-        spin_axis: r.spin_axis,
-        horizontal_break: r.horizontal_break,
-        vertical_break: r.vertical_break,
-      }))
-      const { data, error, warning } = await insertMetricRows(supabase, inserts)
-      if (error) throw error
-      setAxisWarning(warning)
-      updateMetrics(prev => [...prev, ...(data as MetricRow[])])
-      setPdfPreview(null)
-      if (pdfRef.current) pdfRef.current.value = ''
-    } catch (err) {
-      setPdfError(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setPdfSaving(false)
-    }
+    const rows = pdfPreview.map(r => ({
+      pitch_type: r.pitch_type,
+      velocity: r.velocity,
+      spin_rate: r.spin_rate,
+      spin_axis: r.spin_axis,
+      horizontal_break: r.horizontal_break,
+      vertical_break: r.vertical_break,
+    }))
+    const result = await runAction(() => importPitchMetrics(clipId, { source: 'pdf', rows }))
+    setPdfSaving(false)
+    if (!result.ok) { setPdfError(result.error); return }
+    const saved = 'metrics' in result.value ? (result.value.metrics as MetricRow[]) : null
+    if (!saved) { setPdfError('Couldn\'t confirm the import. Refresh the page to check before trying again.'); return }
+    setAxisWarning(result.warning)
+    updateMetrics(prev => [...prev, ...saved])
+    setPdfPreview(null)
+    if (pdfRef.current) pdfRef.current.value = ''
   }
 
   return (
     <div className="space-y-4">
-      {/* ── Data import (CSV + PDF) ──────────────────────────────────────── */}
+      {/* ── Data import (CSV + PDF): direct coach or the player only ─────── */}
+      {canAdd && (
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4 space-y-4">
         <div>
           <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Import Pitch Analytics</p>
@@ -311,7 +268,7 @@ export default function MetricsTab({
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
             <button
               onClick={() => fileRef.current?.click()}
-              className="w-full border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
+              className="w-full max-sm:min-h-11 border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
             >
               <span className="block font-medium" style={oswald}>CSV</span>
               <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan</span>
@@ -324,7 +281,7 @@ export default function MetricsTab({
             <button
               onClick={() => pdfRef.current?.click()}
               disabled={isParsing}
-              className="w-full border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors disabled:opacity-50"
+              className="w-full max-sm:min-h-11 border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors disabled:opacity-50"
             >
               <span className="block font-medium" style={oswald}>{isParsing ? 'Reading…' : 'PDF'}</span>
               <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan report card</span>
@@ -332,8 +289,8 @@ export default function MetricsTab({
           </div>
         </div>
 
-        {saveError && <p className="text-xs text-[#C8102E]">{saveError}</p>}
-        {pdfError  && <p className="text-xs text-[#C8102E]">{pdfError}</p>}
+        {saveError && <p role="alert" className="text-xs text-[#C8102E]">{saveError}</p>}
+        {pdfError  && <p role="alert" className="text-xs text-[#C8102E]">{pdfError}</p>}
         {axisWarning && <p role="status" className="text-xs text-[#B45309]">{axisWarning}</p>}
 
         {csvSkipped && <p role="status" className="text-xs text-[#B45309]">{csvSkipped}</p>}
@@ -344,7 +301,7 @@ export default function MetricsTab({
             <p className="text-xs text-[#456080]">Preview: {preview.length} pitch{preview.length !== 1 ? 'es' : ''} parsed</p>
             <PreviewTable rows={preview} ageGroup={playerAgeGroup} />
             <button onClick={handleSave} disabled={saving}
-              className="px-4 py-2 rounded-md text-xs text-white font-medium tracking-wide transition-colors"
+              className="max-sm:min-h-11 px-4 py-2 rounded-md text-xs text-white font-medium tracking-wide transition-colors"
               style={{ ...oswald, background: saving ? '#4A6880' : '#C8102E' }}>
               {saving ? 'Saving…' : `Save ${preview.length} pitch${preview.length !== 1 ? 'es' : ''}`}
             </button>
@@ -382,15 +339,17 @@ export default function MetricsTab({
               </table>
             </div>
             <button onClick={handlePdfSave} disabled={pdfSaving}
-              className="px-4 py-2 rounded-md text-xs text-white font-medium tracking-wide transition-colors"
+              className="max-sm:min-h-11 px-4 py-2 rounded-md text-xs text-white font-medium tracking-wide transition-colors"
               style={{ ...oswald, background: pdfSaving ? '#4A6880' : '#C8102E' }}>
               {pdfSaving ? 'Saving…' : `Save ${pdfPreview.length} pitch type${pdfPreview.length !== 1 ? 's' : ''}`}
             </button>
           </div>
         )}
       </div>
+      )}
 
       {/* ── Manual entry (coach CSV or player manual) ───────────────────── */}
+      {canAdd && (
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>
@@ -437,7 +396,7 @@ export default function MetricsTab({
             <button
               onClick={handleManualSave}
               disabled={manualSaving}
-              className="px-4 py-2 rounded-md text-xs text-white transition-colors disabled:opacity-50"
+              className="max-sm:min-h-11 px-4 py-2 rounded-md text-xs text-white transition-colors disabled:opacity-50"
               style={{ ...oswald, background: '#C8102E' }}
             >
               {manualSaving ? 'Saving…' : 'Save Pitch'}
@@ -445,6 +404,7 @@ export default function MetricsTab({
           </div>
         )}
       </div>
+      )}
 
       {/* ── Saved metrics table ──────────────────────────────────────────── */}
       {metrics.length > 0 ? (
@@ -563,9 +523,13 @@ export default function MetricsTab({
       ) : (
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-6 text-center">
           <p className="text-sm text-[#456080]">No pitch metrics yet.</p>
-          {isCoach ? (
+          {canAdd ? (
             <p className="text-xs text-[#3D5166] mt-1">
               Upload a CSV or PDF above to add pitch data for this clip.
+            </p>
+          ) : isCoach ? (
+            <p className="text-xs text-[#3D5166] mt-1">
+              Only the player&apos;s own coach can add pitch data.
             </p>
           ) : (
             <p className="text-xs text-[#3D5166] mt-1">
