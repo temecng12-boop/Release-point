@@ -53,18 +53,50 @@ export function canUploadVideo(player: PlayerConsentFields | null | undefined): 
 export const UPLOAD_BLOCKED_MESSAGE =
   "Guardian consent for this player is still pending, so video can't be added yet."
 
+/** Migration 023's clips trigger: "guardian consent for this player is still pending" (42501). */
+export function isConsentPendingError(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
+  return !!error && error.code === '42501' && /consent .*pending/i.test(error.message ?? '')
+}
+
 export type UploadBlockedViewer = 'coach' | 'player'
 
-/** Plain explanation shown wherever upload or record is blocked. */
-export function uploadBlockedCopy(viewer: UploadBlockedViewer): { message: string; nextStep: string } {
+/**
+ * Plain explanation shown wherever upload or record is blocked.
+ * `selfConfirm`: the player has no coach, so they confirm 18+ themself
+ * (see canSelfConfirmAdult); `below` when the confirm button is shown under it.
+ */
+export function uploadBlockedCopy(
+  viewer: UploadBlockedViewer,
+  opts: { selfConfirm?: boolean; confirmShownBelow?: boolean } = {},
+): { message: string; nextStep: string } {
   if (viewer === 'player') {
+    const adult = opts.selfConfirm
+      ? `If you are 18 or older, confirm it ${opts.confirmShownBelow ? 'below' : 'on your dashboard'}.`
+      : 'If you are 18 or older, ask your coach to mark you as 18+.'
     return {
       message: "Guardian consent for your account is still pending, so video can't be added yet.",
-      nextStep: 'If you are 18 or older, ask your coach to mark you as 18+.',
+      nextStep: `${adult} If you are under 18, a parent or guardian has to give consent first.`,
     }
   }
   return {
     message: UPLOAD_BLOCKED_MESSAGE,
     nextStep: 'If the player is 18 or older, mark them as 18+ on their profile or in Edit Player.',
   }
+}
+
+/** The blocked copy as one sentence pair, for an upload action's error. */
+export function uploadBlockedText(viewer: UploadBlockedViewer, opts: { selfConfirm?: boolean } = {}): string {
+  const { message, nextStep } = uploadBlockedCopy(viewer, { selfConfirm: opts.selfConfirm })
+  return `${message} ${nextStep}`
+}
+
+/**
+ * A player who signed up without a coach can confirm they are 18+ themself,
+ * once: no coach can do it for them (only the player's own coach may mark a
+ * player 18+). Players with a coach keep the coach's age choice.
+ */
+export function canSelfConfirmAdult(
+  player: (PlayerConsentFields & { coach_id?: string | null }) | null | undefined,
+): boolean {
+  return !!player && !player.coach_id && uploadConsentStatus(player) === 'pending'
 }

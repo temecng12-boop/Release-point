@@ -5,7 +5,8 @@ import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
+import { canUploadVideo, canSelfConfirmAdult, type PlayerConsentFields } from '@/lib/consent'
+import ConfirmAdultButton from './confirm-adult-button'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -127,8 +128,8 @@ export default async function DashboardPage() {
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
-    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null } & PlayerConsentFields>(
-        'id, full_name, position',
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null } & PlayerConsentFields>(
+        'id, full_name, position, coach_id',
         (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).single(),
       )
     : { data: null }
@@ -414,7 +415,14 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 {playerRow && (
-                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} viewer="player" />
+                  <UploadButton
+                    playerId={playerRow.id}
+                    playerName={playerRow.full_name ?? 'Player'}
+                    consent={playerRow}
+                    viewer="player"
+                    selfConfirm={canSelfConfirmAdult(playerRow)}
+                    blockedAction={canSelfConfirmAdult(playerRow) ? <ConfirmAdultButton /> : undefined}
+                  />
                 )}
               </div>
 

@@ -11,6 +11,7 @@ import {
   CONSENT_MIGRATION_COLUMNS,
   PLAYER_CONSENT_COLUMNS,
   UPLOAD_BLOCKED_MESSAGE,
+  uploadBlockedText,
   type PlayerConsentFields,
 } from './consent'
 
@@ -135,5 +136,56 @@ export async function setAdultConfirmation(
     return { error: "Marking players 18+ isn't available yet: a database update still needs to be applied." }
   }
   if (error) return { error: error.message }
+  return { success: true }
+}
+
+/**
+ * The friendly "can't add video yet" error for an upload by `userId`: the
+ * player's own wording (with what to do next) if they are the player, the
+ * coach's otherwise.
+ */
+export async function uploadBlockedMessageFor(db: Db, playerId: string, userId: string): Promise<string> {
+  const { data } = await db.from('players').select('user_id, coach_id').eq('id', playerId).maybeSingle()
+  const row = data as { user_id: string | null; coach_id: string | null } | null
+  if (row?.user_id && row.user_id === userId) return uploadBlockedText('player', { selfConfirm: !row.coach_id })
+  return uploadBlockedText('coach')
+}
+
+export const SELF_CONFIRM_FAILED = 'We couldn\'t save your confirmation. Please try again.'
+
+/**
+ * One-time 18+ confirmation by the player themself (RP-041), for a player who
+ * signed up without a coach: their own row, no coach, not yet confirmed.
+ * Players with a coach are refused (their coach records age). Success only
+ * after exactly that row was updated.
+ */
+export async function confirmOwnAdult(db: Db, userId: string): Promise<{ success: true } | { error: string }> {
+  const { data, error } = await db
+    .from('players')
+    .select('id, coach_id, adult_confirmed_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (isMissingConsentColumn(error)) return { error: "Confirming 18+ isn't available yet: a database update still needs to be applied." }
+  if (error) {
+    console.error('[confirmOwnAdult] read failed', { userId, message: error.message })
+    return { error: SELF_CONFIRM_FAILED }
+  }
+  const row = data as { id: string; coach_id: string | null; adult_confirmed_at: string | null } | null
+  if (!row) return { error: 'Player profile not found.' }
+  if (row.adult_confirmed_at) return { success: true }
+  if (row.coach_id) return { error: 'Your coach records your age. Ask them to mark you as 18+.' }
+
+  const { data: updated, error: updateError } = await db
+    .from('players')
+    .update({ adult_confirmed_at: new Date().toISOString(), adult_confirmed_by: userId })
+    .eq('id', row.id)
+    .eq('user_id', userId)
+    .is('coach_id', null)
+    .is('adult_confirmed_at', null)
+    .select('id')
+  if (updateError || !Array.isArray(updated) || updated.length !== 1) {
+    console.error('[confirmOwnAdult] update failed', { userId, playerId: row.id, message: updateError?.message ?? 'no row updated' })
+    return { error: SELF_CONFIRM_FAILED }
+  }
   return { success: true }
 }

@@ -6,13 +6,16 @@ import { uploadBlockedCopy, type UploadBlockedViewer } from '@/lib/consent'
 export default function UploadBlockedNotice({
   viewer = 'coach',
   action,
+  selfConfirm = false,
   className = '',
 }: {
   viewer?: UploadBlockedViewer
   action?: ReactNode
+  /** The player confirms 18+ themself (no coach); `action` holds the button. */
+  selfConfirm?: boolean
   className?: string
 }) {
-  const { message, nextStep } = uploadBlockedCopy(viewer)
+  const { message, nextStep } = uploadBlockedCopy(viewer, { selfConfirm, confirmShownBelow: selfConfirm && !!action })
   return (
     <div
       role="status"

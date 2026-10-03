@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
-import { setAdultConfirmation } from '@/lib/consent-server'
+import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
@@ -132,6 +132,18 @@ export async function setPlayerAdultConfirmed(playerId: string, confirmed: boole
 
   revalidatePath('/dashboard', 'layout')
   revalidatePath(`/profile/${playerId}`)
+  return { success: true }
+}
+
+// A player without a coach confirms they are 18 or older, once (RP-041).
+// Rules in confirmOwnAdult; players with a coach are refused.
+export async function confirmMyAdultStatus() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  const result = await confirmOwnAdult(supabaseAdmin, user.id)
+  if ('error' in result) return { error: result.error }
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

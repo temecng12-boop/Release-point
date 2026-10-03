@@ -58,6 +58,7 @@ export default function UploadButton({
   consent,
   viewer = 'coach',
   blockedAction,
+  selfConfirm = false,
   showBlockedNotice = true,
 }: {
   playerId: string
@@ -68,6 +69,8 @@ export default function UploadButton({
   viewer?: UploadBlockedViewer
   /** Optional control shown under the blocked message, e.g. "Mark as 18+". */
   blockedAction?: ReactNode
+  /** The player confirms 18+ themself (see canSelfConfirmAdult). */
+  selfConfirm?: boolean
   /** Set false when the parent renders its own UploadBlockedNotice. */
   showBlockedNotice?: boolean
 }) {
@@ -151,7 +154,7 @@ export default function UploadButton({
   // ── consent gate ──────────────────────────────────────────────────────────
   if (!canUploadVideo(consent)) {
     if (!showBlockedNotice) return null
-    return <UploadBlockedNotice viewer={viewer} action={blockedAction} className="max-w-xs" />
+    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} className="max-w-xs" />
   }
 
   // ── naming overlay ───────────────────────────────────────────────────────

@@ -13,7 +13,8 @@ import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
-import { checkUploadConsent } from '@/lib/consent-server'
+import { checkUploadConsent, uploadBlockedMessageFor } from '@/lib/consent-server'
+import { isConsentPendingError, UPLOAD_BLOCKED_MESSAGE } from '@/lib/consent'
 import { removeClipMediaAsOwnCoach } from '@/lib/clip-media-delete'
 
 // Loads the coach and account ids of the player a clip belongs to.
@@ -44,6 +45,31 @@ async function checkStorageAccess(action: string, bucket: unknown, storagePath: 
   return { ok: true as const }
 }
 
+/** The consent refusal as friendly copy for this user (player or coach wording); other errors unchanged. */
+async function consentErrorFor(error: string, playerId: string): Promise<string> {
+  if (error !== UPLOAD_BLOCKED_MESSAGE) return error
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user ? uploadBlockedMessageFor(supabaseAdmin, playerId, user.id) : error
+}
+
+/**
+ * Removes a just-uploaded clip video whose clip row couldn't be saved. Only a
+ * top-level file in this player's folder, and only if no clip uses it.
+ * Failures are logged; the caller returns an error either way.
+ */
+async function discardUploadedClipFile(playerId: string, storagePath: string, context: string): Promise<void> {
+  const [path] = clipFilesToRemove(playerId, [storagePath])
+  if (!path || path.split('/').length !== 2) return
+  const { data: users, error: usedError } = await supabaseAdmin.from('clips').select('id').eq('storage_path', path).limit(1)
+  if (usedError || (users ?? []).length > 0) {
+    console.error(`[${context}] uploaded file kept: in use by a clip or the check failed`, { path, error: usedError?.message ?? null })
+    return
+  }
+  const { error } = await supabaseAdmin.storage.from('clips').remove([path])
+  if (error) console.error(`[${context}] could not remove the uploaded file`, { path, error: error.message })
+}
+
 export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 'lessons' = 'clips') {
   const check = await checkStorageAccess('getSignedUploadUrl', bucket, storagePath, 'write')
   if ('error' in check) return { error: check.error }
@@ -51,8 +77,9 @@ export async function getSignedUploadUrl(storagePath: string, bucket: 'clips' | 
   // No media for a player who isn't a confirmed adult and has no guardian consent on record.
   const pathPlayerId = playerIdFromStoragePath(storagePath)
   if (!pathPlayerId) return { error: 'Invalid upload path' }
+  // Checked before any file is stored, so a blocked upload leaves nothing behind.
   const consent = await checkUploadConsent(supabaseAdmin, pathPlayerId)
-  if (!consent.ok) return { error: consent.error }
+  if (!consent.ok) return { error: await consentErrorFor(consent.error, pathPlayerId) }
 
   const { data, error } = await supabaseAdmin.storage
     .from(bucket)
@@ -101,8 +128,14 @@ export async function createClip(data: {
   // player's video).
   if (!(await canUploadForPlayer(user.id, data.player_id))) return { error: 'Not authorized' }
   if (playerIdFromStoragePath(data.storage_path) !== data.player_id) return { error: 'Invalid storage path' }
+  // The video is already in storage at this point (uploaded with the signed
+  // URL). If the clip can't be saved, the file is removed so nothing is left
+  // behind, and the error is returned: never a success.
   const consent = await checkUploadConsent(supabaseAdmin, data.player_id)
-  if (!consent.ok) return { error: consent.error }
+  if (!consent.ok) {
+    await discardUploadedClipFile(data.player_id, data.storage_path, 'createClip:consent')
+    return { error: await consentErrorFor(consent.error, data.player_id) }
+  }
 
   const { data: newClip, error } = await supabaseAdmin.from('clips').insert({
     player_id:    data.player_id,
@@ -113,8 +146,13 @@ export async function createClip(data: {
   }).select('id').single()
 
   if (error) {
-    console.log('[createClip] error:', JSON.stringify(error))
-    return { error: error.message }
+    await discardUploadedClipFile(data.player_id, data.storage_path, 'createClip:insert')
+    // Migration 023's trigger refuses clips for players without 18+ or guardian consent.
+    if (isConsentPendingError(error)) {
+      console.warn('[createClip] refused by the consent trigger', { playerId: data.player_id })
+      return { error: await uploadBlockedMessageFor(supabaseAdmin, data.player_id, user.id) }
+    }
+    return { error: describeDbError('createClip', error, 'Could not save this clip.') }
   }
 
   // Email the coach when a player uploads (fire-and-forget)
