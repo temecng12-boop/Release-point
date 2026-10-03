@@ -7,6 +7,7 @@ import { signIn } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { requestPasswordReset, RESET_SENT_HINT } from '@/lib/password-reset'
 import { requestEmailLink } from '@/lib/email-link'
+import { authCallbackUrl } from '@/lib/login-next'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -26,9 +27,13 @@ export default function LoginPage() {
   const [forgotState, setForgotState] = useState<{ error?: string; success?: string }>({})
   const [forgotPending, setForgotPending] = useState(false)
 
+  // ?next= (set by the middleware for a signed-out visit): where to go after sign-in.
+  const [next, setNext] = useState<string | null>(null)
+
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     setUrlError(p.get('error'))
+    setNext(p.get('next'))
     if (p.get('reset') === '1') setForgotMode(true)
   }, [])
   const [magicMode, setMagicMode]   = useState(false)
@@ -49,7 +54,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: authCallbackUrl(window.location.origin, next) },
     })
   }
 
@@ -57,7 +62,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'apple',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: authCallbackUrl(window.location.origin, next) },
     })
   }
 
@@ -65,7 +70,7 @@ export default function LoginPage() {
     e.preventDefault()
     setMagicPending(true)
     setMagicState({})
-    const result = await requestEmailLink(createClient().auth, magicEmail, `${window.location.origin}/auth/callback`)
+    const result = await requestEmailLink(createClient().auth, magicEmail, authCallbackUrl(window.location.origin, next))
     setMagicPending(false)
     setMagicState(result.ok ? { success: result.message } : { error: result.error })
   }
@@ -208,6 +213,7 @@ export default function LoginPage() {
                 </form>
               ) : !magicMode ? (
                 <form action={action} className="space-y-4">
+                  {next && <input type="hidden" name="next" value={next} />}
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Email Address</label>
                     <input type="email" name="email" required placeholder="coach@example.com" className={inputCls} />

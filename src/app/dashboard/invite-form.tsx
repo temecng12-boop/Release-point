@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
+import AgeBandFields from '@/app/dashboard/age-band-fields'
 
 interface Team { id: string; name: string }
 interface Props { teams: Team[] }
@@ -34,19 +35,7 @@ export default function InviteForm({ teams }: Props) {
             </div>
           </div>
 
-          <fieldset>
-            <legend className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Age</legend>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="age_status" value="adult" required className="accent-[#C8102E]" />
-                <span className="text-xs text-[#456080]">18 or older</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="age_status" value="minor" required className="accent-[#C8102E]" />
-                <span className="text-xs text-[#456080]">Under 18 (guardian consent pending)</span>
-              </label>
-            </div>
-          </fieldset>
+          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} inputClass={inputClass} />
 
           {(teams?.length ?? 0) > 0 && (
             <div>
@@ -85,7 +74,7 @@ export default function InviteForm({ teams }: Props) {
           </button>
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          This email gets an invite to set up the player&apos;s account. For players under 18, video can&apos;t be added until guardian consent is on file.
+          This email gets an invite to set up the player&apos;s account. Video can be added once the player&apos;s age is confirmed; players under 13 also need consent from a parent or guardian.
         </p>
       </div>
     </div>

@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePlayer, deletePlayer, setPlayerAdultConfirmed } from '@/app/actions/player'
+import { updatePlayer, deletePlayer, setPlayerAdultConfirmed, setPlayerAgeBand } from '@/app/actions/player'
+import { saveGuardianForPlayer } from '@/app/actions/guardian'
+import { runAction } from '@/lib/action-result'
+import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/consent'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -12,6 +15,11 @@ interface Props {
     age_group: string | null
     position: string | null
     adult_confirmed_at?: string | null
+    consent_given_at?: string | null
+    age_band?: string | null
+    age_band_pending_migration?: boolean
+    guardianEmail?: string | null
+    guardianName?: string | null
     teamIds: string[]
   }
   teams: Team[]
@@ -48,7 +56,11 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [height, setHeight]       = useState('')
   const [weight, setWeight]       = useState('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>(player.teamIds)
-  const [isAdult, setIsAdult]     = useState(!!player.adult_confirmed_at)
+  const initialBand: AgeBand | '' = isAgeBand(player.age_band) ? player.age_band : player.adult_confirmed_at ? '18_plus' : ''
+  const [band, setBand]           = useState<AgeBand | ''>(initialBand)
+  const [guardianEmail, setGuardianEmail] = useState(player.guardianEmail ?? '')
+  const [guardianName, setGuardianName]   = useState(player.guardianName ?? '')
+  const [notice, setNotice]       = useState<string | null>(null)
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -72,9 +84,22 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
       teamIds:   selectedTeams,
     })
     if (result?.error) { setSaving(false); setError(result.error); return }
-    if (isAdult !== !!player.adult_confirmed_at) {
-      const ageResult = await setPlayerAdultConfirmed(player.id, isAdult)
-      if (ageResult?.error) { setSaving(false); setError(ageResult.error); return }
+    if (band && band !== initialBand) {
+      // Before migration 035 only 18+ can be stored (023's column).
+      const ageResult = await runAction(() => player.age_band_pending_migration
+        ? setPlayerAdultConfirmed(player.id, band === '18_plus')
+        : setPlayerAgeBand(player.id, band))
+      if (!ageResult.ok) { setSaving(false); setError(ageResult.error); router.refresh(); return }
+    }
+    // Under 13: save the parent or guardian and email them (server checks it all).
+    const email = guardianEmail.trim()
+    if (band === 'under_13' && email && email.toLowerCase() !== (player.guardianEmail ?? '').toLowerCase()) {
+      const g = await runAction(() => saveGuardianForPlayer(player.id, { email, full_name: guardianName }))
+      setSaving(false)
+      router.refresh()
+      if (!g.ok) { setError(g.error); return }
+      setNotice('success' in g.value ? g.value.success : 'Guardian saved.')
+      return
     }
     setSaving(false)
     onClose()
@@ -157,17 +182,40 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             </div>
           </div>
 
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isAdult}
-              onChange={(e) => setIsAdult(e.target.checked)}
-              className="mt-0.5 accent-[#C8102E]"
-            />
-            <span className="text-xs text-[#456080]">
-              Player is 18 or older. Players under 18 need guardian consent on file before video can be added.
-            </span>
-          </label>
+          <fieldset>
+            <legend className="block text-xs text-[#456080] mb-1">Player Age</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {AGE_BANDS.map((b) => (
+                <label key={b} className="flex items-center gap-1.5 cursor-pointer max-sm:min-h-11">
+                  <input type="radio" name={`age_band_${player.id}`} value={b} checked={band === b} onChange={() => setBand(b)} className="accent-[#C8102E]" />
+                  <span className="text-xs text-[#456080]">{AGE_BAND_LABELS[b]}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-[#3D5166] mt-1">
+              Video can be added once the age is confirmed. Players under 13 also need consent from a parent or guardian.
+            </p>
+          </fieldset>
+
+          {band === 'under_13' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor={`edit-guardian-name-${player.id}`} className="block text-xs text-[#456080] mb-1">Guardian Name</label>
+                <input id={`edit-guardian-name-${player.id}`} type="text" value={guardianName} onChange={(e) => setGuardianName(e.target.value)}
+                  placeholder="Parent or guardian" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor={`edit-guardian-email-${player.id}`} className="block text-xs text-[#456080] mb-1">Guardian Email</label>
+                <input id={`edit-guardian-email-${player.id}`} type="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)}
+                  placeholder="parent@example.com" className={inputClass} disabled={!!player.consent_given_at} />
+              </div>
+              <p className="sm:col-span-2 text-xs text-[#3D5166]">
+                {player.consent_given_at
+                  ? 'Consent is on file from this guardian.'
+                  : 'Saving a new email sends them a link to give consent. Use Resend on the roster to send it again.'}
+              </p>
+            </div>
+          )}
 
           {teams.length > 0 && (
             <div>
@@ -192,16 +240,17 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
           )}
         </div>
 
-        {error && <p className="text-xs text-[#C8102E]">{error}</p>}
+        {error && <p role="alert" className="text-xs text-[#C8102E]">{error}</p>}
+        {notice && <p role="status" className="text-xs text-green-700">{notice}</p>}
 
         <div className="flex gap-3 pt-1">
           <button onClick={handleSave} disabled={saving || deleting}
-            className="flex-1 bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50">
+            className="flex-1 bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 max-sm:min-h-11">
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button onClick={onClose} disabled={saving || deleting}
-            className="flex-1 border border-[#DDE4ED] text-[#456080] hover:text-white hover:border-[#456080] rounded-md px-4 py-2 text-sm transition-colors disabled:opacity-50">
-            Cancel
+            className="flex-1 border border-[#DDE4ED] text-[#456080] hover:text-white hover:border-[#456080] rounded-md px-4 py-2 text-sm transition-colors disabled:opacity-50 max-sm:min-h-11">
+            {notice ? 'Close' : 'Cancel'}
           </button>
         </div>
 

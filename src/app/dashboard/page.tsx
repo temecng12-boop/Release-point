@@ -3,10 +3,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { selectPlayersWithConsent } from '@/lib/consent-server'
+import { guardianInviteSentAt, guardianNoticeFor, selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, canSelfConfirmAdult, type PlayerConsentFields } from '@/lib/consent'
+import { canUploadVideo, canSelfConfirmAgeBand, pendingReason, type PlayerConsentFields } from '@/lib/consent'
 import ConfirmAdultButton from './confirm-adult-button'
+import AgeBandConfirm from './age-band-confirm'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
+import PendingPlayersBanner from '@/components/pending-players-banner'
+import { loadPendingPlayers } from '@/lib/pending-players'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -76,6 +80,8 @@ export default async function DashboardPage() {
     : { data: null }
 
   const directPlayerIds = (directPlayers ?? []).map(p => p.id)
+  // This coach's own players who can't have video yet (banner; gone once resolved).
+  const pendingPlayers = isCoach ? await loadPendingPlayers(supabaseAdmin, user.id) : []
   const allPlayerIds = [...new Set([...allTeamPlayerIds, ...directPlayerIds])]
 
   // All clips across all players
@@ -135,6 +141,14 @@ export default async function DashboardPage() {
     : { data: null }
 
   if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
+
+  // Player banners: a coachless player with no age band confirms it once; an
+  // under-13 player without consent is told who has to give it.
+  const selfConfirm = canSelfConfirmAgeBand(playerRow)
+  const myReason = playerRow ? pendingReason(playerRow) : null
+  const guardianNotice = playerRow && myReason === 'guardian_consent'
+    ? await guardianNoticeFor(supabaseAdmin, { guardian_id: playerRow.guardian_id, guardian_invite_sent_at: await guardianInviteSentAt(supabaseAdmin, playerRow.id) })
+    : null
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
@@ -254,6 +268,8 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            <PendingPlayersBanner players={pendingPlayers} />
 
             {/* ── Onboarding wizard ── */}
             {teams.length === 0 && allPlayerIds.length === 0 && (
@@ -386,6 +402,18 @@ export default async function DashboardPage() {
         ) : (
           /* ── Player view ── */
           <div className="space-y-6">
+            {selfConfirm && playerRow && (
+              <UploadBlockedNotice
+                viewer="player"
+                reason="age_band"
+                selfConfirm
+                testId="player-age-banner"
+                action={playerRow.age_band_pending_migration ? <ConfirmAdultButton /> : <AgeBandConfirm mode="self" />}
+              />
+            )}
+            {myReason === 'guardian_consent' && (
+              <UploadBlockedNotice viewer="player" reason="guardian_consent" guardian={guardianNotice} testId="player-guardian-banner" />
+            )}
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
               background: '#ffffff',
@@ -420,8 +448,8 @@ export default async function DashboardPage() {
                     playerName={playerRow.full_name ?? 'Player'}
                     consent={playerRow}
                     viewer="player"
-                    selfConfirm={canSelfConfirmAdult(playerRow)}
-                    blockedAction={canSelfConfirmAdult(playerRow) ? <ConfirmAdultButton /> : undefined}
+                    selfConfirm={selfConfirm}
+                    guardian={guardianNotice}
                   />
                 )}
               </div>

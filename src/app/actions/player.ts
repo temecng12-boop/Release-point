@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
-import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
+import { setAdultConfirmation, confirmOwnAdult, setAgeBand, confirmOwnAgeBand } from '@/lib/consent-server'
+import { isAgeBand } from '@/lib/consent'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
@@ -132,6 +133,37 @@ export async function setPlayerAdultConfirmed(playerId: string, confirmed: boole
 
   revalidatePath('/dashboard', 'layout')
   revalidatePath(`/profile/${playerId}`)
+  return { success: true }
+}
+
+// The player's coach sets the player's age band (under 13, 13 to 17, 18+).
+// Authorization is checked in setAgeBand (players.coach_id = caller).
+export async function setPlayerAgeBand(playerId: string, band: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (typeof playerId !== 'string' || !playerId) return { error: 'Invalid player' }
+  if (!isAgeBand(band)) return { error: 'Choose an age band.' }
+
+  const result = await setAgeBand(supabaseAdmin, user.id, playerId, band)
+  if ('error' in result) return { error: result.error }
+
+  revalidatePath('/dashboard', 'layout')
+  revalidatePath(`/profile/${playerId}`)
+  return { success: true }
+}
+
+// A player without a coach confirms their own age band, once. Rules in
+// confirmOwnAgeBand: refused with a coach or a guardian on file, and once a
+// band is on file only a coach can change it.
+export async function confirmMyAgeBand(band: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (!isAgeBand(band)) return { error: 'Choose your age.' }
+  const result = await confirmOwnAgeBand(supabaseAdmin, user.id, band)
+  if ('error' in result) return { error: result.error }
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

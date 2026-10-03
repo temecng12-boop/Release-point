@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isPublicAssetPath } from '@/lib/public-paths'
+import { loginRedirectSearch, signedInAuthRedirect } from '@/lib/login-next'
 
 export async function middleware(request: NextRequest) {
   // Manifest, icons, sw.js, robots, social images, static files: public, no
@@ -45,13 +46,17 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublicPath && !isServerAction) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
+    // Come back here after signing in (e.g. a guardian's consent link).
+    url.search = loginRedirectSearch(pathname, request.nextUrl.search)
     return NextResponse.redirect(url)
   }
 
   // /auth/reset is opened signed in (the reset link's recovery session).
   if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/reset') {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    const target = new URL(signedInAuthRedirect(request.nextUrl.searchParams.get('next')), url.origin)
+    url.pathname = target.pathname
+    url.search = target.search
     return NextResponse.redirect(url)
   }
 

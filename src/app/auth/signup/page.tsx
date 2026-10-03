@@ -6,6 +6,7 @@ import Logo from '@/components/Logo'
 import { signUp, signUpPlayer } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
+import { AGE_BANDS, AGE_BAND_LABELS } from '@/lib/consent'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -97,6 +98,7 @@ function CoachForm({ onBack }: { onBack: () => void }) {
 
 function PlayerForm({ onBack }: { onBack: () => void }) {
   const [state, action, pending] = useActionState(signUpPlayer, undefined)
+  const [tosAccepted, setTosAccepted] = useState(false)
 
   if (state?.sent) {
     return (
@@ -131,25 +133,43 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="your@email.com" className={inputCls} />
         <p className="text-[11px] text-slate-400 mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
       </div>
-      <label className="flex items-start gap-3 cursor-pointer">
-        <input type="checkbox" name="adult_confirmed" value="yes" required className="mt-0.5 w-4 h-4 accent-[#E8102A] shrink-0" />
+      <fieldset>
+        <legend className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Your Age</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {AGE_BANDS.map((b) => (
+            <label key={b} className="flex items-center gap-2 cursor-pointer max-sm:min-h-11">
+              <input type="radio" name="age_band" value={b} required className="w-4 h-4 accent-[#E8102A] shrink-0" />
+              <span className="text-xs text-slate-500">{AGE_BAND_LABELS[b]}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1.5">Players under 13 need a parent or guardian&apos;s consent before video can be added.</p>
+      </fieldset>
+      <label className="flex items-start gap-3 cursor-pointer max-sm:min-h-11">
+        <input
+          type="checkbox"
+          name="tos"
+          value="yes"
+          required
+          checked={tosAccepted}
+          onChange={(e) => setTosAccepted(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-[#E8102A] shrink-0"
+        />
         <span className="text-xs text-slate-500 leading-relaxed">
-          I am 18 or older. Players under 18 join through their coach.
+          I agree to the{' '}
+          <a href="/terms" target="_blank" className="text-slate-700 hover:text-slate-900 hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" target="_blank" className="text-slate-700 hover:text-slate-900 hover:underline">Privacy Policy</a>
         </span>
       </label>
       {state?.error && (
-        <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+        <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
           <p className="text-sm text-[#E8102A]">{state.error}</p>
         </div>
       )}
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        By continuing you agree to our{' '}
-        <a href="/terms" target="_blank" className="text-slate-600 hover:underline">Terms of Service</a>
-        {' '}and consent to video storage for coaching purposes.
-      </p>
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !tosAccepted}
         className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2"
         style={os}
       >

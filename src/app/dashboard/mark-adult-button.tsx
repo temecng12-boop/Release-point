@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setPlayerAdultConfirmed } from '@/app/actions/player'
+import { runAction } from '@/lib/action-result'
 
 // Lets the player's coach record that the player is 18 or older (RP-041).
 // The server action checks that the caller is allowed to do this.
@@ -15,9 +16,9 @@ export default function MarkAdultButton({ playerId, playerName }: { playerId: st
   async function confirm() {
     setSaving(true)
     setError(null)
-    const result = await setPlayerAdultConfirmed(playerId, true)
+    const result = await runAction(() => setPlayerAdultConfirmed(playerId, true))
     setSaving(false)
-    if (result?.error) { setError(result.error); return }
+    if (!result.ok) { setError(result.error); return }
     setConfirming(false)
     router.refresh()
   }
@@ -27,7 +28,7 @@ export default function MarkAdultButton({ playerId, playerName }: { playerId: st
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 px-3 py-1 rounded-md transition-colors"
+        className="text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 px-3 py-1 rounded-md transition-colors max-sm:min-h-11"
       >
         Mark as 18+
       </button>
@@ -41,7 +42,7 @@ export default function MarkAdultButton({ playerId, playerName }: { playerId: st
         type="button"
         onClick={confirm}
         disabled={saving}
-        className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50"
+        className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50 max-sm:min-h-11"
       >
         {saving ? 'Saving…' : 'Confirm'}
       </button>
@@ -49,11 +50,11 @@ export default function MarkAdultButton({ playerId, playerName }: { playerId: st
         type="button"
         onClick={() => { setConfirming(false); setError(null) }}
         disabled={saving}
-        className="text-xs text-amber-900 hover:underline"
+        className="text-xs text-amber-900 hover:underline max-sm:min-h-11 max-sm:min-w-11"
       >
         Cancel
       </button>
-      {error && <span className="text-xs text-[#C8102E]">{error}</span>}
+      {error && <span role="alert" className="text-xs text-[#C8102E]">{error}</span>}
     </div>
   )
 }

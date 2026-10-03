@@ -5,7 +5,9 @@ import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
 import MarkAdultButton from '@/app/dashboard/mark-adult-button'
-import { canUploadVideo } from '@/lib/consent'
+import { canUploadVideo, pendingReason } from '@/lib/consent'
+import AgeBandConfirm from '@/app/dashboard/age-band-confirm'
+import GuardianActions from '@/app/dashboard/guardian-actions'
 import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
@@ -28,9 +30,13 @@ type ProfilePlayer = {
   age_group: string | null
   position: string | null
   coach_id: string | null
+  guardian_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
+  age_band?: string | null
+  age_confirmed_at?: string | null
   consent_rules_pending_migration?: boolean
+  age_band_pending_migration?: boolean
 }
 
 export default async function PlayerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,7 +55,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   if (profile?.role !== 'coach') redirect('/dashboard')
 
   const { data: player } = await selectPlayersWithConsent<ProfilePlayer>(
-    'id, full_name, email, accepted_at, age_group, position, coach_id',
+    'id, full_name, email, accepted_at, age_group, position, coach_id, guardian_id',
     (cols) => supabaseAdmin.from('players').select(cols).eq('id', id).single(),
   )
 
@@ -61,6 +67,17 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   // Offer "Mark as 18+" only when uploads are blocked and this coach may change the player's age status.
   const showMarkAdult = !canUploadVideo(player) && (await canManagePlayerAge(supabaseAdmin, user.id, player.id))
+  const reason = pendingReason(player)
+  const { data: guardianRow } = showMarkAdult && reason === 'guardian_consent' && player.guardian_id
+    ? await supabaseAdmin.from('guardians').select('email, full_name').eq('id', player.guardian_id).maybeSingle()
+    : { data: null }
+  const guardian = guardianRow as { email: string; full_name: string | null } | null
+  const blockedAction = !showMarkAdult ? undefined
+    : reason === 'guardian_consent'
+      ? <GuardianActions playerId={player.id} playerName={player.full_name} guardianEmail={guardian?.email ?? null} guardianName={guardian?.full_name ?? null} />
+      : player.age_band_pending_migration
+        ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
+        : <AgeBandConfirm mode="coach" playerId={player.id} playerName={player.full_name} />
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -189,7 +206,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 playerName={player.full_name}
                 consent={player}
                 maxFiles={50}
-                blockedAction={showMarkAdult ? <MarkAdultButton playerId={player.id} playerName={player.full_name} /> : undefined}
+                blockedAction={blockedAction}
               />
               ) : (
                 <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>

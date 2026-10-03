@@ -27,7 +27,7 @@ export default function ConfirmAdultButton() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 px-3 py-1 rounded-md transition-colors"
+        className="text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 px-3 py-1 rounded-md transition-colors max-sm:min-h-11"
       >
         I&apos;m 18 or older
       </button>
@@ -41,7 +41,7 @@ export default function ConfirmAdultButton() {
         type="button"
         onClick={confirm}
         disabled={saving}
-        className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50"
+        className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50 max-sm:min-h-11"
       >
         {saving ? 'Saving…' : 'Confirm'}
       </button>
@@ -49,7 +49,7 @@ export default function ConfirmAdultButton() {
         type="button"
         onClick={() => { setConfirming(false); setError(null) }}
         disabled={saving}
-        className="text-xs text-amber-900 hover:underline"
+        className="text-xs text-amber-900 hover:underline max-sm:min-h-11 max-sm:min-w-11"
       >
         Cancel
       </button>

@@ -3,7 +3,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { writeWithAdultFields } from '@/lib/consent-server'
+import { ageBandFields, isMissingAgeBandColumn, writeWithAgeFields } from '@/lib/consent-server'
+import { isAgeBand, type AgeBand } from '@/lib/consent'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
@@ -27,16 +29,18 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   const problem = passwordProblem(password)
   if (problem) return { error: problem }
 
+  const tosAcceptedAt = new Date().toISOString()
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role: 'coach', full_name: fullName } },
+    options: { data: { role: 'coach', full_name: fullName, tos_accepted_at: tosAcceptedAt } },
   })
 
   if (error) return { error: error.message }
 
   if (data.user) {
     await supabaseAdmin.from('profiles').upsert({ id: data.user.id, full_name: fullName || '', role: 'coach' })
+    await recordTosAcceptance(data.user.id, tosAcceptedAt)
   }
 
   redirect('/dashboard')
@@ -48,10 +52,10 @@ export async function signUpPlayer(
 ) {
   const supabase = await createClient()
 
-  // Self-signup is for players 18 and older; younger players join through their coach.
-  if (formData.get('adult_confirmed') !== 'yes') {
-    return { error: 'You must be 18 or older to sign up yourself. Players under 18 join through their coach.' }
-  }
+  // The player picks an age band and accepts the Terms (RP-041, 035).
+  const band = formData.get('age_band')
+  if (!isAgeBand(band)) return { error: 'Choose your age: under 13, 13 to 17, or 18 or older.' }
+  if (formData.get('tos') !== 'yes') return { error: 'You must accept the Terms of Service to continue.' }
 
   const email = formData.get('email') as string
   let fullName = formData.get('full_name') as string
@@ -61,7 +65,8 @@ export async function signUpPlayer(
     email,
     options: {
       shouldCreateUser: true,
-      data: { role: 'player', full_name: fullName, adult_confirmed: true },
+      // adult_confirmed stays for 023's backfill and older code; age_band is 035's.
+      data: { role: 'player', full_name: fullName, age_band: band, adult_confirmed: band === '18_plus', tos_accepted_at: new Date().toISOString() },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
@@ -82,7 +87,8 @@ export async function signIn(_prevState: { error?: string } | undefined, formDat
 
   if (error) return { error: error.message }
 
-  redirect('/dashboard')
+  // ?next= from the login URL (e.g. a guardian's consent link); same-site paths only.
+  redirect(safeRedirectPath(formData.get('next'), '/dashboard'))
 }
 
 export async function signOut() {
@@ -106,19 +112,25 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
   }
   if (!user.email) return { success: true }
 
-  const role     = (user.user_metadata?.role ?? 'player') as string
-  const fullName = (user.user_metadata?.full_name ?? '') as string
+  const meta     = user.user_metadata ?? {}
+  const role     = (meta.role ?? 'player') as string
+  const fullName = (meta.full_name ?? '') as string
   const now      = new Date().toISOString()
 
-  // Ensure profile row exists
+  // Ensure profile row exists. A guardian invite's account starts as 'player';
+  // 'guardian' is only granted server-side on the consent page (migration 029).
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: user.id, full_name: fullName, role }, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert({ id: user.id, full_name: fullName, role: role === 'guardian' ? 'player' : role }, { onConflict: 'id', ignoreDuplicates: true })
   if (profileError) {
     console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
     return { error: LINK_FAILED }
   }
+  if (typeof meta.tos_accepted_at === 'string' && !(await recordTosAcceptance(user.id, meta.tos_accepted_at))) {
+    return { error: LINK_FAILED }
+  }
 
+  // Parents invited to give consent never get a players row.
   if (role !== 'player') return { success: true }
 
   // Link to an existing invited player record. Accepting an invite is not
@@ -134,6 +146,21 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     return { error: LINK_FAILED }
   }
 
+  // No invite: a parent who signed in with an email link (no role chosen at
+  // signup) and whose email a coach entered as a guardian is not a player.
+  if ((!linked || linked.length === 0) && !meta.role) {
+    const { data: asGuardian, error: guardianError } = await supabaseAdmin
+      .from('guardians')
+      .select('id')
+      .eq('email', user.email.toLowerCase())
+      .limit(1)
+    if (guardianError) {
+      console.error('[linkPlayerRow] guardian lookup failed', { code: guardianError.code, message: guardianError.message })
+      return { error: LINK_FAILED }
+    }
+    if (asGuardian && asGuardian.length > 0) return { success: true }
+  }
+
   // No invite — create a standalone player row
   if (!linked || linked.length === 0) {
     const { data: existing, error: existingError } = await supabaseAdmin
@@ -147,13 +174,15 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
 
     if (!existing || existing.length === 0) {
-      // 18+ confirmation from the self-signup form (RP-041). No guardian
-      // consent is recorded here.
-      // Before migration 023 the adult columns don't exist; the row is then
-      // created without them (see writeWithAdultFields).
-      const adultConfirmed = user.user_metadata?.adult_confirmed === true
-      const { error: insertError } = await writeWithAdultFields(
-        adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {},
+      // Age band from the self-signup form (RP-041, 035); older signups only
+      // carry adult_confirmed = true (18+). No guardian consent is recorded
+      // here. Before 035/023 the row is created with the columns that exist
+      // (see writeWithAgeFields).
+      const band: AgeBand | null = isAgeBand(meta.age_band) ? meta.age_band : meta.adult_confirmed === true ? '18_plus' : null
+      const fields = band ? ageBandFields(band, user.id, now) : null
+      const { result: { error: insertError } } = await writeWithAgeFields(
+        fields?.age ?? {},
+        band === '18_plus' && fields ? fields.adult : {},
         (adultFields) => supabaseAdmin.from('players').insert({
           user_id:     user.id,
           full_name:   fullName,
@@ -169,6 +198,25 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
   }
   return { success: true }
+}
+
+/**
+ * Stores when the account accepted the Terms (profiles.tos_accepted_at, 035),
+ * once. Before 035 the column doesn't exist; the acceptance is still in the
+ * account's signup metadata. Returns false only on a real write failure.
+ */
+async function recordTosAcceptance(userId: string, acceptedAt: string): Promise<boolean> {
+  if (Number.isNaN(Date.parse(acceptedAt))) return true
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ tos_accepted_at: acceptedAt })
+    .eq('id', userId)
+    .is('tos_accepted_at', null)
+  if (error && !isMissingAgeBandColumn(error)) {
+    console.error('[recordTosAcceptance] failed', { code: error.code, message: error.message })
+    return false
+  }
+  return true
 }
 
 /**
