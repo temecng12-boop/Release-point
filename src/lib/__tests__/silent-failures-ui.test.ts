@@ -100,8 +100,9 @@ test('guardian consent form: shows the returned error and re-enables the button'
 
 test('auth confirm: a failed player link shows a message with Try again and Continue, sign-in is kept', () => {
   const src = read('app/auth/confirm/page.tsx')
-  inOrder(src, 'const link = await runAction(() => linkPlayerRow())', 'if (!link.ok) {', "setStatus('link-failed')", 'return', 'window.location.href = next')
-  inOrder(src, "status === 'link-failed'", '{errorMsg}', 'onClick={retryLink}', 'Continue Anyway')
+  inOrder(src, 'const link = await runAction(() => linkPlayerRow())', 'if (!link.ok) {', "setStatus('link-failed')", 'return', 'window.location.href = safeRedirectPath(next,')
+  inOrder(src, "status === 'link-failed'", '{errorMsg}', 'onClick={retryLink}', 'href={safeRedirectPath(nextUrl)}', 'Continue Anyway')
+  inOrder(fnBody(src, 'retryLink'), 'window.location.href = safeRedirectPath(nextUrl,')
   assert.doesNotMatch(src, /^\s*await linkPlayerRow\(\)/m)
 })
 

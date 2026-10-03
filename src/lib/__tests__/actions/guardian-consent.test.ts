@@ -31,7 +31,7 @@ test('all writes succeed: consent, guardian link and profile are saved, then red
   assert.deepEqual(state.tables.profiles, [{ id: USER.id, full_name: 'Pat Parent', role: 'guardian' }])
 })
 
-for (const [table, action] of [['guardians', 'update'], ['profiles', 'upsert'], ['players', 'update']] as const) {
+for (const [table, action] of [['guardians', 'update'], ['profiles', 'upsert'], ['promote_empty_player_to_guardian', 'rpc'], ['players', 'update']] as const) {
   test(`${table} ${action} fails: returns an error to the form, no redirect, no consent recorded`, async () => {
     fail({ table, action, error: { code: '42501', message: 'permission denied' } })
     const r = await run()
@@ -44,7 +44,7 @@ for (const [table, action] of [['guardians', 'update'], ['profiles', 'upsert'], 
 test('consent is the last write, so an earlier failure never leaves consent on file', async () => {
   await run()
   const writes = state.ops.filter(o => o.action !== 'select').map(o => `${o.table}.${o.action}`)
-  assert.deepEqual(writes, ['guardians.update', 'profiles.upsert', 'players.update'])
+  assert.deepEqual(writes, ['guardians.update', 'profiles.upsert', 'promote_empty_player_to_guardian.rpc', 'players.update'])
 })
 
 test('retry after a failure completes the consent', async () => {

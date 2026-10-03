@@ -4,7 +4,7 @@
 
 export type Row = Record<string, unknown>
 export type DbError = { code?: string; message: string }
-type Action = 'select' | 'insert' | 'update' | 'upsert' | 'delete'
+type Action = 'select' | 'insert' | 'update' | 'upsert' | 'delete' | 'rpc'
 type Filter = { kind: 'eq' | 'is' | 'in'; column: string; value: unknown }
 export type Op = { table: string; action: Action; values?: unknown; filters: Filter[]; via: Via }
 type Via = 'admin' | 'session'
@@ -131,11 +131,45 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   }
 }
 
+// Stand-ins for database functions, keyed by name. fail({ table: name, action: 'rpc' })
+// makes a call fail; an unknown name fails like a function that isn't deployed.
+type RpcResult = { data: unknown; error: DbError | null }
+export const rpcs: Record<string, (args: Row) => RpcResult> = {
+  // Mirrors migration 029 (tested against Postgres in PGlite): 'player' -> 'guardian'
+  // only for a profile linked to a guardians row with no user data anywhere.
+  promote_empty_player_to_guardian({ p_user_id: id }) {
+    const t = (name: string) => state.tables[name] ?? []
+    const has = (name: string, ...cols: string[]) => t(name).some(r => cols.some(c => r[c] === id))
+    const profile = t('profiles').find(p => p.id === id)
+    const optional = ['team_name', 'avatar_url', 'bio', 'college', 'playing_career', 'coaching_since', 'location',
+      'social_twitter', 'social_instagram', 'social_linkedin']
+    const ok = !!profile && profile.role === 'player'
+      && has('guardians', 'user_id')
+      && !has('players', 'user_id', 'coach_id', 'adult_confirmed_by')
+      && !has('clips', 'uploaded_by') && !has('annotations', 'created_by') && !has('timestamp_notes', 'created_by')
+      && !has('pitch_metrics', 'created_by') && !has('pitch_analysis', 'coach_id') && !has('bullpen_sessions', 'coach_id')
+      && !has('teams', 'coach_id') && !has('team_coaches', 'coach_id') && !has('guardians', 'created_by')
+      && !has('lessons', 'coach_id') && !has('feedback_reports', 'user_id')
+      && optional.every(c => profile[c] == null)
+      && !(Array.isArray(profile.certifications) && profile.certifications.length > 0)
+    if (ok) profile.role = 'guardian'
+    return { data: ok, error: null }
+  },
+}
+
 /** The signed-in user's client (createClient in @/lib/supabase/server): subject to state.rls. */
 export const sessionFrom = (table: string) => new Query(table, 'session')
 
 export const fakeClient = {
   from: (table: string) => new Query(table),
+  async rpc(name: string, args: Row = {}): Promise<RpcResult> {
+    state.ops.push({ table: name, action: 'rpc', values: args, filters: [], via: 'admin' })
+    const error = takeFailure(f => f.bucket === undefined && f.table === name && f.action === 'rpc')
+    if (error) return { data: null, error }
+    const fn = rpcs[name]
+    if (!fn) return { data: null, error: { code: 'PGRST202', message: `Could not find the function public.${name}` } }
+    return fn(args)
+  },
   storage: {
     from: (bucket: string) => ({
       async upload(path: string) {

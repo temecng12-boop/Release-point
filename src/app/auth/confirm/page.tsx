@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { linkPlayerRow } from '@/app/actions/auth'
 import { runAction } from '@/lib/action-result'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -22,14 +23,14 @@ function ConfirmInner() {
     setRetrying(true)
     const result = await runAction(() => linkPlayerRow())
     setRetrying(false)
-    if (result.ok) { window.location.href = nextUrl; return }
+    if (result.ok) { window.location.href = safeRedirectPath(nextUrl, '/dashboard', window.location.origin); return }
     setErrorMsg(result.error)
   }
 
   useEffect(() => {
     async function handleConfirm() {
       const supabase = createClient()
-      const next = searchParams.get('next') ?? '/dashboard'
+      const next = safeRedirectPath(searchParams.get('next'), '/dashboard', window.location.origin)
 
       const hash = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
@@ -57,11 +58,11 @@ function ConfirmInner() {
         if (!link.ok) {
           setErrorMsg(link.error)
           // Same-site paths only for the Continue link and retry.
-          setNextUrl(/^\/(?![/\\])/.test(next) ? next : '/dashboard')
+          setNextUrl(safeRedirectPath(next, '/dashboard', window.location.origin))
           setStatus('link-failed')
           return
         }
-        window.location.href = next
+        window.location.href = safeRedirectPath(next, '/dashboard', window.location.origin)
         return
       }
 
@@ -70,11 +71,11 @@ function ConfirmInner() {
       const code      = searchParams.get('code')
 
       if (code) {
-        window.location.href = `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`
+        window.location.href = `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeRedirectPath(next, '/dashboard', window.location.origin))}`
         return
       }
       if (tokenHash && type) {
-        window.location.href = `/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&next=${encodeURIComponent(next)}`
+        window.location.href = `/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&next=${encodeURIComponent(safeRedirectPath(next, '/dashboard', window.location.origin))}`
         return
       }
 
@@ -100,7 +101,7 @@ function ConfirmInner() {
             >
               {retrying ? 'Trying again…' : 'Try Again'}
             </button>
-            <a href={nextUrl} className="text-xs text-[#1C3A5C] hover:text-[#C8102E] transition-colors" style={oswald}>
+            <a href={safeRedirectPath(nextUrl)} className="text-xs text-[#1C3A5C] hover:text-[#C8102E] transition-colors" style={oswald}>
               Continue Anyway →
             </a>
           </div>

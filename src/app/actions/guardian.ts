@@ -38,11 +38,27 @@ export async function recordConsent(playerId: string): Promise<{ error: string }
     return { error: CONSENT_FAILED }
   }
 
+  // Insert-only: an existing profile's role and name are never overwritten.
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' })
+    .upsert(
+      { id: user.id, full_name: guardian.full_name ?? user.email!, role: 'guardian' },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
   if (profileError) {
     console.error('[recordConsent] guardian profile failed', { code: profileError.code, message: profileError.message })
+    return { error: CONSENT_FAILED }
+  }
+
+  // Signup gives every account a 'player' profile, so a parent who signed up
+  // from the consent link is 'player'. Migration 029's function turns that into
+  // 'guardian' only if the role is 'player' and the account has no players row,
+  // clips or other data; anything else keeps its role. One conditional UPDATE
+  // in the database, called with the service role only.
+  const { error: roleError } = await supabaseAdmin
+    .rpc('promote_empty_player_to_guardian', { p_user_id: user.id })
+  if (roleError) {
+    console.error('[recordConsent] guardian role check failed', { code: roleError.code, message: roleError.message })
     return { error: CONSENT_FAILED }
   }
 
