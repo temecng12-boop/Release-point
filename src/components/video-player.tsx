@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { newLessonPath } from '@/lib/lesson-path'
-import { formatClock, formatSeconds, lessonLengthSeconds, watchMediaDuration } from '@/lib/media-duration'
+import { browserRecordingEnv, micErrorMessage, recordedDurationMs, recordingSupportError } from '@/lib/lesson-recording'
+import { useRouter } from 'next/navigation'
+import { formatSeconds, watchMediaDuration } from '@/lib/media-duration'
 import { runAction } from '@/lib/action-result'
 import { marksAfterClear } from '@/lib/mark-clear'
-import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, getLessonSignedUrl, saveLessonPath, deleteLessonPath, saveReframe } from '@/app/actions/clips'
+import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 // ── playback ───────────────────────────────────────────────────────────────
@@ -274,21 +276,23 @@ export default function VideoPlayer({
   playerId,
   role,
   initialAnnotations = [],
-  initialLessonUrl = null,
   initialReframe = null,
   canAddMedia,
+  canRecordLesson,
 }: {
   src: string
   clipId: string
   playerId: string
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
-  initialLessonUrl?: string | null
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
   /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
   canAddMedia: boolean
+  /** Lesson recording is for the player's direct coach only (defaults to role === 'coach'). */
+  canRecordLesson?: boolean
 }) {
   const isCoach = role === 'coach'
+  const canRecord = canRecordLesson ?? isCoach
 
   const videoRef       = useRef<HTMLVideoElement>(null)
   const overlayRef     = useRef<HTMLCanvasElement>(null)
@@ -344,22 +348,19 @@ export default function VideoPlayer({
   const cropDragRef     = useRef<{ handle: HandleId; startX: number; startY: number; startCrop: Crop } | null>(null)
 
   // lesson recording
-  const [lessonUrl,      setLessonUrl]        = useState<string | null>(initialLessonUrl)
+  // Saved lessons are listed below the player (LessonList); this only records.
+  const router = useRouter()
+  const [lessonNotice,   setLessonNotice]     = useState<string | null>(null)
+  const lessonStartRef   = useRef<number>(0)
   const [lessonPhase,    setLessonPhase]      = useState<'idle' | 'recording' | 'saving'>('idle')
   const [lessonSecs,     setLessonSecs]       = useState(0)
   const [lessonError,    setLessonError]      = useState<string | null>(null)
-  const [lessonWarning,  setLessonWarning]    = useState<string | null>(null)
   const lessonCanvasRef  = useRef<HTMLCanvasElement | null>(null)
   const lessonRecRef     = useRef<MediaRecorder | null>(null)
   const lessonChunksRef  = useRef<Blob[]>([])
   const lessonRafRef     = useRef<number | null>(null)
   const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Lesson length (QA-005): measured while recording when known, else the
-  // media duration once the browser has a finite one; "--:--" until then.
-  const lessonVideoRef   = useRef<HTMLVideoElement | null>(null)
-  const lessonStartRef   = useRef(0)
-  const [lessonRecordedSec, setLessonRecordedSec] = useState<number | null>(null)
-  const [lessonMediaSec,    setLessonMediaSec]    = useState<number | null>(null)
+  const lessonTicksRef   = useRef(0)   // whole seconds recorded (duration fallback)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -630,6 +631,9 @@ export default function VideoPlayer({
     function onEnded() { setPlaying(false) }
 
     video.addEventListener('loadedmetadata', onLoadedMetadata)
+    video.addEventListener('durationchange', onLoadedMetadata)
+    // Metadata may have loaded before this effect ran (QA-007: "0.00s" total).
+    const lateMeta = video.readyState >= 1 ? setTimeout(onLoadedMetadata, 0) : null
     video.addEventListener('timeupdate',     onTimeUpdate)
     video.addEventListener('play',           onPlay)
     video.addEventListener('pause',          onPause)
@@ -647,6 +651,8 @@ export default function VideoPlayer({
       setDuration(null)
       prevFrameRef.current = null
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeEventListener('durationchange', onLoadedMetadata)
+      if (lateMeta) clearTimeout(lateMeta)
       video.removeEventListener('timeupdate',     onTimeUpdate)
       video.removeEventListener('play',           onPlay)
       video.removeEventListener('pause',          onPause)
@@ -774,7 +780,21 @@ export default function VideoPlayer({
   }
 
   async function startLessonRecording() {
-    setLessonError(null); setLessonWarning(null)
+    setLessonError(null)
+    setLessonNotice(null)
+    // QA-004: say why instead of failing silently (no MediaRecorder, no mic API, http).
+    const unsupported = recordingSupportError(browserRecordingEnv())
+    if (unsupported) { setLessonError(unsupported); return }
+    try {
+      await startVideoLessonRecording()
+    } catch (err) {
+      console.error('[lesson] could not start recording', err)
+      setLessonError('Couldn\'t start recording in this browser. Try again, or use the latest Safari or Chrome.')
+      setLessonPhase('idle')
+    }
+  }
+
+  async function startVideoLessonRecording() {
     const video = videoRef.current
     const overlay = overlayRef.current
     if (!video || !overlay) return
@@ -789,8 +809,8 @@ export default function VideoPlayer({
     let micStream: MediaStream
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch {
-      setLessonError('Microphone access denied. Check browser permissions.')
+    } catch (err) {
+      setLessonError(micErrorMessage(err))
       return
     }
 
@@ -821,13 +841,14 @@ export default function VideoPlayer({
       micStream.getTracks().forEach(t => t.stop())
       canvasStream.getTracks().forEach(t => t.stop())
     }
+    // Event timestamps share one clock, so stop - start is the recording length.
     lessonStartRef.current = 0
     recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp }
     recorder.onstop = (ev) => {
-      const recordedSec = lessonStartRef.current > 0 ? (ev.timeStamp - lessonStartRef.current) / 1000 : null
       releaseStreams()
       lessonRecRef.current = null
-      uploadLesson(mimeType, recordedSec)
+      const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
+      uploadLesson(mimeType, durationMs)
     }
     recorder.onerror = (ev) => {
       console.error('[lesson] recorder error', ev)
@@ -840,8 +861,10 @@ export default function VideoPlayer({
     recorder.start(250)
     lessonRecRef.current = recorder
     setLessonSecs(0)
+    setLessonNotice(null)
     setLessonPhase('recording')
-    lessonTimerRef.current = setInterval(() => setLessonSecs(s => s + 1), 1000)
+    lessonTicksRef.current = 0
+    lessonTimerRef.current = setInterval(() => { lessonTicksRef.current++; setLessonSecs(s => s + 1) }, 1000)
   }
 
   function stopLessonRecording() {
@@ -850,7 +873,7 @@ export default function VideoPlayer({
     setLessonPhase('saving')
   }
 
-  async function uploadLesson(mimeType: string, recordedSec: number | null) {
+  async function uploadLesson(mimeType: string, durationMs: number | null) {
     // A fresh object per recording: re-recording used to reuse lesson.<ext>,
     // which already existed, so the non-upsert signed upload was rejected.
     const path = newLessonPath(playerId, clipId, mimeType)
@@ -875,27 +898,15 @@ export default function VideoPlayer({
       setLessonError(`Upload failed (${res.status}). Try again.`); setLessonPhase('idle'); return
     }
 
-    const saveResult = await saveLessonPath(clipId, path)
-    if (saveResult && 'error' in saveResult) { setLessonError('Saved video but failed to attach to clip. Try again.'); setLessonPhase('idle'); return }
-    setLessonWarning(saveResult && 'warning' in saveResult && saveResult.warning ? saveResult.warning : null)
-
-    const signedResult = await getLessonSignedUrl(path)
-    if ('signedUrl' in signedResult) { setLessonRecordedSec(recordedSec); setLessonUrl(signedResult.signedUrl ?? null) }
+    const saveResult = await saveLessonPath(clipId, path, { mime: baseMime, durationMs })
+    if ('error' in saveResult) {
+      console.error('[lesson] save failed', { path, error: saveResult.error })
+      setLessonError(`Uploaded, but the lesson wasn't saved: ${saveResult.error}`); setLessonPhase('idle'); return
+    }
+    setLessonNotice(saveResult.warning ?? 'Lesson saved')
     setLessonPhase('idle')
+    router.refresh()   // reload the lesson list for this clip
   }
-
-  async function deleteLesson() {
-    await deleteLessonPath(clipId)
-    setLessonUrl(null)
-    setLessonRecordedSec(null)
-  }
-
-  useEffect(() => {
-    const v = lessonVideoRef.current
-    if (!v || !lessonUrl || lessonPhase !== 'idle') return
-    const stop = watchMediaDuration(v, setLessonMediaSec)
-    return () => { stop(); setLessonMediaSec(null) }
-  }, [lessonUrl, lessonPhase])
 
   // ── reframe helpers ──────────────────────────────────────────────────────
   useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
@@ -1218,7 +1229,7 @@ export default function VideoPlayer({
       )}
 
       {/* Lesson recording */}
-      {isCoach && lessonPhase !== 'idle' ? (
+      {canRecord && lessonPhase !== 'idle' ? (
         <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
           <span className="w-2 h-2 rounded-full bg-[#C8102E] animate-pulse shrink-0" />
           <span className="text-xs text-[#C8102E]" style={oswald}>
@@ -1233,11 +1244,11 @@ export default function VideoPlayer({
             {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
           </button>
         </div>
-      ) : isCoach && !canAddMedia ? (
+      ) : canRecord && !canAddMedia ? (
         <div className="mt-2 pt-2" style={divider}>
           <UploadBlockedNotice viewer="coach" />
         </div>
-      ) : isCoach && (
+      ) : canRecord && (
         <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>
           <button
             onClick={startLessonRecording}
@@ -1248,29 +1259,9 @@ export default function VideoPlayer({
             ● Record Lesson
           </button>
           {lessonError && <span className="text-xs text-[#C8102E]">{lessonError}</span>}
-          {lessonUrl && !lessonError && !lessonWarning && <span className="text-xs text-slate-400" style={oswald}>Lesson saved</span>}
-          {lessonUrl && !lessonError && lessonWarning && <span role="status" className="text-xs text-[#8A5A00]">{lessonWarning}</span>}
-        </div>
-      )}
-
-      {/* Lesson playback */}
-      {lessonUrl && lessonPhase === 'idle' && (
-        <div className="mt-3 pt-3" style={divider}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[0.68rem] text-[#8096AE] tracking-widest" style={oswald}>
-              {isCoach ? 'Coach Lesson Recording' : 'Lesson from your coach'}
-              <span className="ml-2 tabular-nums" data-testid="lesson-length">{formatClock(lessonLengthSeconds(lessonRecordedSec, lessonMediaSec))}</span>
-            </p>
-            {isCoach && (
-              <div className="flex gap-3">
-                {canAddMedia && (
-                  <button onClick={startLessonRecording} className="text-[10px] text-[#456080] hover:text-[#0F1F33] transition-colors max-sm:min-h-11 max-sm:min-w-11" style={oswald}>Re-record</button>
-                )}
-                <button onClick={deleteLesson} className="text-[10px] text-[#456080] hover:text-[#C8102E] transition-colors max-sm:min-h-11 max-sm:min-w-11" style={oswald}>Delete</button>
-              </div>
-            )}
-          </div>
-          <video ref={lessonVideoRef} src={lessonUrl} controls playsInline className="w-full rounded-lg" style={{ maxHeight: 300, background: '#000' }} />
+          {lessonNotice && !lessonError && (lessonNotice === 'Lesson saved'
+            ? <span className="text-xs text-slate-400" style={oswald}>{lessonNotice}</span>
+            : <span role="status" className="text-xs text-[#B45309]">{lessonNotice}</span>)}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
@@ -541,6 +542,11 @@ export default async function DashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {!isCoach && playerRow && user && (
+          <div className="mt-6">
+            <LessonFeedbackSection playerId={playerRow.id} viewerId={user.id} />
           </div>
         )}
       </main>

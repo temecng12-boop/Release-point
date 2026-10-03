@@ -3,7 +3,7 @@ import { describeDbError, isMissingColumnError } from '@/lib/db-errors'
 import { normalizeClipNotes, isStaleClipNotesWrite, CLIP_NOTES_CONFLICT_ERROR } from '@/lib/clip-notes'
 import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import { degreesToClock } from '@/lib/spin-axis'
-import { isLessonPathFor } from '@/lib/lesson-path'
+import { readClipLessonFiles, deleteLessonRecord, saveLessonRecord } from '@/lib/lessons-write'
 import { isVoicePathFor, timestampVoicePathFor } from '@/lib/voice-path'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -465,46 +465,35 @@ export async function deleteTimestampNote(noteId: string) {
   return { success: true }
 }
 
-export async function saveLessonPath(clipId: string, lessonPath: string) {
+// A new lesson recording: adds a lessons row (never deletes older lessons) and
+// points clips.lesson_path at it. Coach-only; see src/lib/lessons-write.ts.
+export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null } = {}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: clip } = await supabaseAdmin.from('clips').select('player_id, lesson_path').eq('id', clipId).single()
-  if (!clip) return { error: 'Clip not found' }
-  if (!isLessonPathFor(lessonPath, clip.player_id, clipId)) {
-    console.warn('[saveLessonPath] rejected path', { clipId, lessonPath })
-    return { error: 'Invalid lesson file' }
-  }
-  // Same rule as lesson upload links (src/lib/storage-access.ts): only the
-  // player's own coach may write lesson files.
-  const decision = await decideStorageAccess(supabaseAdmin, user.id, 'lessons', lessonPath, 'write')
-  if (!decision.allowed || decision.playerId !== clip.player_id.toLowerCase()) return { error: 'Not authorized' }
-  const consent = await checkUploadConsent(supabaseAdmin, clip.player_id)
-  if (!consent.ok) return { error: consent.error }
-  const { error } = await supabaseAdmin.from('clips').update({ lesson_path: lessonPath }).eq('id', clipId)
-  if (error) return { error: error.message }
-  // Re-record: remove the previous recording once the new one is attached.
-  const previous = clip.lesson_path as string | null
-  if (previous && previous !== lessonPath && isLessonPathFor(previous, clip.player_id, clipId)) {
-    const { error: removeError } = await supabaseAdmin.storage.from('lessons').remove([previous])
-    if (removeError) {
-      console.warn('[saveLessonPath] could not remove previous lesson file', { previous, error: removeError.message })
-      revalidatePath(`/clips/${clipId}`)
-      return { success: true, warning: 'Lesson saved, but the previous recording couldn\'t be removed from storage.' }
+  // No new lesson for a player without 18+ confirmation or guardian consent
+  // (#17). Checked only for the player's own coach; anyone else is refused
+  // by saveLessonRecord without learning the player's consent status.
+  if (user) {
+    const owner = await playerForClip(clipId)
+    if (owner && isPlayersOwnCoach(user.id, owner)) {
+      const { data: clipRow } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+      if (clipRow) {
+        const consent = await checkUploadConsent(supabaseAdmin, clipRow.player_id as string)
+        if (!consent.ok) return { error: consent.error }
+      }
     }
   }
-  revalidatePath(`/clips/${clipId}`)
-  return { success: true }
-}
-
-export async function deleteLessonPath(clipId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  // Only the player's own coach (see src/lib/clip-media-delete.ts).
-  const result = await removeClipMediaAsOwnCoach(supabaseAdmin, user.id, clipId, 'lesson')
+  const result = await saveLessonRecord(supabaseAdmin, user?.id, clipId, lessonPath, meta)
   if ('success' in result) revalidatePath(`/clips/${clipId}`)
   return result
+}
+
+export async function deleteLesson(lessonId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const result = await deleteLessonRecord(supabaseAdmin, user?.id, lessonId)
+  if ('success' in result && result.clipId) revalidatePath(`/clips/${result.clipId}`)
+  return 'error' in result ? { error: result.error } : { success: true as const }
 }
 
 export async function deleteVoicePath(clipId: string) {
@@ -568,9 +557,12 @@ export async function deleteClip(clipId: string) {
     return { error: 'Not authorized' }
   }
 
-  // lesson_path is read separately in case that column isn't migrated yet.
-  const { data: lessonRow } = await supabaseAdmin.from('clips').select('lesson_path').eq('id', clipId).maybeSingle()
-  const lessonPath = (lessonRow as { lesson_path?: string | null } | null)?.lesson_path ?? null
+  // Every lesson file of this clip (lessons bucket), collected before the rows
+  // cascade away. If they can't be read, stop: deleting now would leave the
+  // recordings behind with nothing pointing at them.
+  const lessons = await readClipLessonFiles(supabaseAdmin, clipId, clip.player_id as string)
+  if (lessons.error) return { error: describeDbError('deleteClip:lessons', lessons.error, 'Could not delete this clip.') }
+  const lessonFiles = lessons.files
 
   // Timestamp voice note files (D3), collected before their rows are deleted.
   const { data: tsNotes, error: tsError } = await supabaseAdmin.from('timestamp_notes').select('body').eq('clip_id', clipId)
@@ -600,10 +592,10 @@ export async function deleteClip(clipId: string) {
     const { error: storageError } = await supabaseAdmin.storage.from('clips').remove(files)
     if (storageError) { console.error('[deleteClip] storage cleanup failed', clipId, storageError.message); cleanupFailed = true }
   }
-  // Lesson recordings live in the lessons bucket.
-  if (lessonPath && isLessonPathFor(lessonPath, clip.player_id as string, clipId)) {
-    const { error: lessonError } = await supabaseAdmin.storage.from('lessons').remove([lessonPath])
-    if (lessonError) { console.error('[deleteClip] lesson cleanup failed', clipId, lessonError.message); cleanupFailed = true }
+  // Every lesson file of this clip (lessons bucket), not only lesson_path.
+  if (lessonFiles.length) {
+    const { error: lessonRemoveError } = await supabaseAdmin.storage.from('lessons').remove(lessonFiles)
+    if (lessonRemoveError) { console.error('[deleteClip] lesson file cleanup failed', clipId, lessonRemoveError.message); cleanupFailed = true }
   }
 
   revalidatePath('/dashboard')

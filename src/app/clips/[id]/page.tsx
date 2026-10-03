@@ -13,6 +13,8 @@ import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ClipSkeleton from './clip-skeleton'
+import LessonList from '@/components/lessons/lesson-list'
+import { canManageLessons, loadLessons, type LessonItem } from '@/lib/lessons'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -179,14 +181,14 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
     voiceUrl = signedVoice?.signedUrl ?? null
   }
 
-  let lessonPath: string | null = null
-  {
-    const { data: lpData } = await supabaseAdmin
-      .from('clips')
-      .select('lesson_path')
-      .eq('id', id)
-      .single()
-    lessonPath = (lpData as { lesson_path?: string | null } | null)?.lesson_path ?? null
+  // Every lesson for this clip, newest first (falls back to clips.lesson_path before 025).
+  const lessonAccess = await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)
+  const canManage = lessonAccess.allowed && canManageLessons(lessonAccess.via)
+  let clipLessons: LessonItem[] = []
+  try {
+    clipLessons = (await loadLessons(supabaseAdmin, { clipId: id })).lessons
+  } catch (e) {
+    console.error('[clip page] lessons load failed', e)
   }
 
   let initialReframe: { left: number; top: number; right: number; bottom: number } | null = null
@@ -201,14 +203,6 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
     if (raw && 'left' in raw) {
       initialReframe = raw as { left: number; top: number; right: number; bottom: number }
     }
-  }
-
-  let lessonUrl: string | null = null
-  if (lessonPath) {
-    const { data: signedLesson } = await supabaseAdmin.storage
-      .from('lessons')
-      .createSignedUrl(lessonPath, 3600)
-    lessonUrl = signedLesson?.signedUrl ?? null
   }
 
   type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
@@ -290,10 +284,19 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
           playerId={clip.player_id}
           role={role}
           initialAnnotations={rawAnnotations ?? []}
-          initialLessonUrl={lessonUrl}
           initialReframe={initialReframe}
           canAddMedia={canUploadVideo(playerRow)}
+          canRecordLesson={canManage}
         />
+
+        {clipLessons.length > 0 && (
+          <section className="mt-4 bg-white rounded-xl border border-[#DDE4ED] shadow-sm p-4">
+            <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
+              {role === 'coach' ? 'Lesson Recordings' : 'Lessons from your coach'} · {clipLessons.length}
+            </p>
+            <LessonList lessons={clipLessons} canManage={canManage} />
+          </section>
+        )}
 
         <div className="mt-4">
           <ClipTabs

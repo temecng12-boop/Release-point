@@ -98,6 +98,53 @@ test('deleteClip: removes the clip\'s timestamp voice note files too, only under
   assert.deepEqual(state.storage.clips, [FOREIGN])
 })
 
+// Lessons (#13) and storage cleanup (#39) both run in one deleteClip.
+const LESSON_A = `${P}/${C}/lesson-3-c.webm`
+const LESSON_B = `${P}/${C}/lesson-4-d.webm`
+const FOREIGN_LESSON = `${OTHER_P}/${C}/lesson-5-e.webm`
+function seedLessonsAndVoice() {
+  seedVoiceNotes()
+  state.tables.lessons = [
+    { id: 'l1', clip_id: C, player_id: P, media_path: LESSON_A },
+    { id: 'l2', clip_id: C, player_id: P, media_path: LESSON_B },
+    { id: 'l3', clip_id: C, player_id: P, media_path: FOREIGN_LESSON },   // not under this player: never removed
+  ]
+  state.storage.lessons.push(LESSON_A, LESSON_B, FOREIGN_LESSON)
+}
+
+test('deleteClip: removes every lesson file AND the clip, voice and note recordings in one delete', async () => {
+  seedLessonsAndVoice()
+  assert.deepEqual(await deleteClip(C), { success: true })
+  assert.equal(state.tables.clips.length, 0)
+  assert.deepEqual(state.storage.clips, [FOREIGN])
+  assert.deepEqual(state.storage.lessons, [FOREIGN_LESSON])
+  const removed = Object.fromEntries(state.storageOps.map(o => [o.bucket, [...o.paths].sort()]))
+  assert.deepEqual(removed.clips, [VIDEO, VOICE, TS_VOICE].sort())
+  assert.deepEqual(removed.lessons, [OLD_LESSON, LESSON_A, LESSON_B].sort())
+})
+
+test('deleteClip: lessons-bucket cleanup fails -> clips files still removed, warning returned', async () => {
+  seedLessonsAndVoice()
+  fail({ bucket: 'lessons', error: { message: 'storage unavailable' } })
+  const r = await deleteClip(C) as { success?: true; warning?: string }
+  assert.equal(r.success, true)
+  assert.match(String(r.warning), /Clip deleted, but some of its files couldn't be cleaned up/)
+  assert.deepEqual(state.storage.clips, [FOREIGN])
+})
+
+test('deleteClip: lessons can\'t be read -> error, nothing deleted, no files removed', async () => {
+  seedLessonsAndVoice()
+  fail({ table: 'lessons', action: 'select', error: { code: '57014', message: 'timeout' } })
+  const orig = console.error
+  console.error = () => {}
+  let r: Awaited<ReturnType<typeof deleteClip>>
+  try { r = await deleteClip(C) } finally { console.error = orig }
+  assert.match(String((r as { error?: string }).error), /^Could not delete this clip\./)
+  assert.equal(state.tables.clips.length, 1)
+  assert.equal(state.tables.timestamp_notes.length, 3)
+  assert.deepEqual(state.storageOps, [])
+})
+
 test('deleteTimestampNote: a voice note\'s file is removed after the row', async () => {
   seedVoiceNotes()
   assert.deepEqual(await deleteTimestampNote('n1'), { success: true })
@@ -194,19 +241,24 @@ test('deleteAnnotation and renameClip return the database error', async () => {
   assert.deepEqual(await renameClip(C, 'New title'), { error: 'rename failed' })
 })
 
-test('saveLessonPath: previous recording cleanup fails -> saved, with a warning', async () => {
+// Lessons phase 1 (#13): a new recording adds a lessons row and never deletes
+// older recordings, so there is no "previous file" cleanup to warn about.
+test('saveLessonPath: adds a lesson, keeps the previous recording, plain success', async () => {
   seed()
-  fail({ bucket: 'lessons', error: { message: 'storage unavailable' } })
-  const r = await saveLessonPath(C, NEW_LESSON) as { success?: true; warning?: string }
-  assert.equal(r.success, true)
-  assert.match(String(r.warning), /previous recording couldn't be removed/)
+  state.tables.lessons = []
+  assert.deepEqual(await saveLessonPath(C, NEW_LESSON), { success: true })
+  assert.equal(state.tables.lessons.length, 1)
   assert.equal(state.tables.clips[0].lesson_path, NEW_LESSON)
+  assert.deepEqual(state.storage.lessons, [OLD_LESSON])
 })
 
-test('saveLessonPath: cleanup ok -> plain success', async () => {
+test('saveLessonPath: lessons insert fails -> error, not success', async () => {
   seed()
-  assert.deepEqual(await saveLessonPath(C, NEW_LESSON), { success: true })
-  assert.deepEqual(state.storage.lessons, [])
+  state.tables.lessons = []
+  fail({ table: 'lessons', action: 'insert', error: { message: 'boom' } })
+  const r = await saveLessonPath(C, NEW_LESSON)
+  assert.ok('error' in r, JSON.stringify(r))
+  assert.equal(state.tables.lessons.length, 0)
 })
 
 test('saveLessonPath: player without 18+ confirmation or guardian consent -> error, nothing changed', async () => {

@@ -8,6 +8,7 @@ import MarkAdultButton from '@/app/dashboard/mark-adult-button'
 import { canUploadVideo } from '@/lib/consent'
 import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
+import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -237,6 +238,8 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
             career_stats: athleteData.career_stats as Record<string, string> | null ?? null,
           }}
         />
+
+        <LessonFeedbackSection playerId={player.id} viewerId={user.id} />
       </main>
     </div>
   )
