@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# "Report a problem" triage downloads (scripts/triage/list-feedback.mjs)
+/feedback-downloads/
