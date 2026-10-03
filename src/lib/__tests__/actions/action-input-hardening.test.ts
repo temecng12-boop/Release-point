@@ -157,9 +157,13 @@ test('parseTrackmanPDF: direct coach / player pass the check; type, header and s
 const JPEG = [0xff, 0xd8, 0xff, 0xe0]
 const avatar = (bytes: number[] | Uint8Array, type = 'image/jpeg', name = 'avatar.jpg') => { const fd = new FormData(); fd.append('file', new File([new Uint8Array(bytes)], name, { type })); return fd }
 const uploads = () => state.storage.clips ?? []
+// Avatar paths need a real (uuid) user id: avatars/<uuid>.<ext> in the private clips bucket (#43).
+const AV = { id: '22222222-2222-4222-8222-222222222222', email: 'av@example.com' }
+const seedAv = () => seed(AV, { profiles: [{ id: AV.id, role: 'player', avatar_url: null }] })
+const myAvatar = () => state.tables.profiles.find(p => p.id === AV.id)!.avatar_url
 
 test('uploadAvatar: over 2 MB is refused with the friendly message; nothing uploaded', async () => {
-  seed(PLAYER)
+  seedAv()
   const big = new Uint8Array(MAX_AVATAR_BYTES + 1); big.set(JPEG)
   assert.deepEqual(await uploadAvatar(avatar(big)), { error: 'That photo is too big. Pick one under 2 MB.' })
   assert.deepEqual(uploads(), [])
@@ -168,23 +172,41 @@ test('uploadAvatar: over 2 MB is refused with the friendly message; nothing uplo
 })
 
 test('uploadAvatar: non-images and mismatched bytes are refused; the path uses the type, not the file name', async () => {
-  seed(PLAYER)
+  seedAv()
   for (const fd of [avatar(JPEG, 'image/gif', 'a.gif'), avatar(JPEG, 'text/html', 'a.html'), avatar([0x3c, 0x68, 0x74, 0x6d], 'image/jpeg')]) {
     assert.match(String((await uploadAvatar(fd) as { error?: string }).error), /isn't a photo/)
   }
   assert.deepEqual(uploads(), [])
   const r = await uploadAvatar(avatar([...JPEG, 1, 2], 'image/jpeg', 'evil.html')) as { success?: boolean }
   assert.equal(r.success, true)
-  assert.deepEqual(uploads(), [`avatars/${PLAYER.id}.jpg`])
+  assert.deepEqual(uploads(), [`avatars/${AV.id}.jpg`])
+  assert.equal(myAvatar(), `avatars/${AV.id}.jpg`, 'avatar_url holds the path, not a URL')
+  seedAv()
+  assert.equal((await uploadAvatar(avatar([0x89, 0x50, 0x4e, 0x47, 0x0d], 'image/png', 'photo.jpg')) as { success?: boolean }).success, true)
+  assert.equal(myAvatar(), `avatars/${AV.id}.png`, 'extension from the type, not the name')
+})
+
+test('uploadAvatar: GIF is no longer accepted (even with real GIF bytes)', async () => {
+  seedAv()
+  const gif = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]
+  assert.match(String((await uploadAvatar(avatar(gif, 'image/gif', 'a.gif')) as { error?: string }).error), /isn't a photo/)
+  assert.deepEqual(uploads(), []); assert.equal(myAvatar(), null)
+})
+
+test('updateProfile can never write avatar_url; only uploadAvatar sets it (to a path)', async () => {
+  seedAv()
+  assert.deepEqual(await updateProfile({ bio: 'x', avatar_url: 'https://evil.example/a.jpg' } as never), { success: true })
+  assert.equal(myAvatar(), null)
+  assert.ok(!writes().some(o => o.table === 'profiles' && o.values && 'avatar_url' in (o.values as Row)))
 })
 
 test('uploadAvatar: a storage error is friendly (raw text only logged)', async () => {
-  seed(PLAYER)
+  seedAv()
   const from = supabaseAdmin.storage.from
   supabaseAdmin.storage.from = (b: string) => ({ ...from(b), upload: async () => ({ data: null, error: { message: 'Payload too large: bucket quota' } }) })
   try {
     const r = await quiet(() => uploadAvatar(avatar(JPEG))) as { error?: string }
     assert.equal(r.error, 'Couldn\'t upload your photo. Please try again.')
   } finally { supabaseAdmin.storage.from = from }
-  assert.equal(state.tables.profiles.find(p => p.id === PLAYER.id)!.avatar_url, null)
+  assert.equal(myAvatar(), null)
 })

@@ -54,7 +54,10 @@ test('avatar upload: checked in the browser before sending; success only with th
   const check = fn.indexOf('avatarFileProblem(file)'), bail = fn.indexOf('if (problem) { setError(problem)'), call = fn.indexOf('runAction(() => uploadAvatar(fd))')
   assert.ok(check > 0 && bail > check && call > bail, fn)
   assert.ok(fn.indexOf('if (!result.ok) { setError(result.error); return }') < fn.indexOf('setAvatarUrl('))
-  assert.match(fn, /if \(!url\) \{ setError\(/)
+  // No success flag -> error; saved without a signed URL -> a notice, never a fake photo (#43 private avatars).
+  assert.match(fn, /if \(!\('success' in result\.value\)\) \{ setError\(/)
+  assert.ok(fn.indexOf('if (result.value.avatarUrl)') < fn.indexOf('setAvatarUrl(result.value.avatarUrl)'))
+  assert.match(fn, /setNotice\(result\.value\.notice/)
   assert.match(src, /error && <p role="alert"/)
 })
 

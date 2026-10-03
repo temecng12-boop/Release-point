@@ -6,11 +6,20 @@ import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/l
 import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
+import { AVATAR_BUCKET, avatarPathFor, signAvatarUrl } from '@/lib/avatar'
 import { pickFields, OWN_PROFILE_FIELDS, ATHLETE_PROFILE_FIELDS, PLAYER_SELF_FIELDS } from '@/lib/action-fields'
 import { describeDbError } from '@/lib/db-errors'
-import { avatarFileProblem, avatarBytesMatchType, AVATAR_TYPES, AVATAR_TOO_BIG, AVATAR_NOT_IMAGE, MAX_AVATAR_BYTES } from '@/lib/avatar-rules'
+import { avatarFileProblem, avatarBytesMatchType, AVATAR_TOO_BIG, AVATAR_NOT_IMAGE, MAX_AVATAR_BYTES } from '@/lib/avatar-rules'
 
-export async function uploadAvatar(formData: FormData) {
+/**
+ * Saves the photo at clips/avatars/<userId>.<ext> (private bucket) and stores that path in
+ * profiles.avatar_url (the only place avatar_url is written; updateProfile's allowlist excludes it).
+ * JPEG/PNG/WebP only, at most 2 MB, bytes must match the type, and the extension comes from the
+ * type (src/lib/avatar-rules.ts, also checked in the browser before upload). Returns a short-lived signed URL for immediate display.
+ * Result: { error } when nothing usable was saved; { success, avatarUrl } on success, where avatarUrl
+ * is null (with a notice) if the photo saved but a display URL couldn't be made right now.
+ */
+export async function uploadAvatar(formData: FormData): Promise<{ error: string } | { success: true; avatarUrl: string | null; notice?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Please sign in again to change your photo.' }
@@ -25,26 +34,24 @@ export async function uploadAvatar(formData: FormData) {
   if (buffer.length > MAX_AVATAR_BYTES) return { error: AVATAR_TOO_BIG }
   if (!avatarBytesMatchType(buffer, file.type)) return { error: AVATAR_NOT_IMAGE }
 
-  const path = `avatars/${user.id}.${AVATAR_TYPES[file.type]}`
+  const path = avatarPathFor(user.id, file.type)
+  if (!path) { console.error('[uploadAvatar] no avatar path for user', user.id); return { error: 'Couldn\'t upload your photo. Please try again.' } }
   const { error: uploadErr } = await supabaseAdmin.storage
-    .from('clips')
+    .from(AVATAR_BUCKET)
     .upload(path, buffer, { contentType: file.type, upsert: true })
-
   if (uploadErr) {
     console.error('[uploadAvatar] upload failed', user.id, uploadErr.message)
     return { error: 'Couldn\'t upload your photo. Please try again.' }
   }
 
-  const { data: signed } = await supabaseAdmin.storage
-    .from('clips')
-    .createSignedUrl(path, 315_360_000) // ~10 years
-
-  if (!signed?.signedUrl) return { error: 'Could not generate avatar URL' }
-
-  const { error: profileError } = await supabaseAdmin.from('profiles').update({ avatar_url: signed.signedUrl }).eq('id', user.id)
+  const { error: profileError } = await supabaseAdmin.from('profiles').update({ avatar_url: path }).eq('id', user.id)
   if (profileError) return { error: 'Photo uploaded, but it couldn\'t be saved to your profile. Please try again.' }
   revalidatePath('/profile')
-  return { success: true, avatarUrl: signed.signedUrl }
+  revalidatePath('/player-settings')
+
+  const avatarUrl = await signAvatarUrl(supabaseAdmin.storage, path, user.id)
+  if (!avatarUrl) return { success: true, avatarUrl: null, notice: 'Photo saved. Refresh the page to see it.' }
+  return { success: true, avatarUrl }
 }
 
 function toTitleCase(s: string) {

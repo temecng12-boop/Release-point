@@ -14,7 +14,10 @@ import { coreFlows } from './flows'
 
 const M034 = migration('034_profiles_role_guard.sql')
 const M035 = migration('035_drop_legacy_policies.sql')
+// expected-policies.txt = the policy set after every migration (through 036). Before 036, prod also has 008's 3 avatar policies.
 const EXPECTED = readFileSync(join(__dirname, 'expected-policies.txt'), 'utf8').split('\n').filter(Boolean).map(l => l.split('\t').slice(0, 2).join('\t')).sort()
+const EXPECTED_035 = [...EXPECTED, ...AVATAR_NAMES.map(n => `storage.objects\t${n}`)].sort()
+const M036 = migration('036_avatars_private.sql')
 const norm = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ')
 const policyKeys = async (db: PGlite) => (await db.query<{ k: string }>(`SELECT schemaname||'.'||tablename||E'\t'||policyname k FROM pg_policies WHERE schemaname IN ('public','storage') ORDER BY 1`)).rows.map(r => r.k).sort()
 const policy = async (db: PGlite, name: string) => (await db.query<Record<string, unknown>>(`SELECT cmd, array_to_string(roles, ',') roles, qual, with_check FROM pg_policies WHERE policyname=$1`, [name])).rows
@@ -95,7 +98,7 @@ async function exploits(db: PGlite) {
   return x
 }
 
-test('035 on the prod shape: runs twice, drops every legacy policy, leaves exactly expected-policies.txt, blocks every legacy exploit, core flows unchanged', async () => {
+test('035 on the prod shape: runs twice, drops every legacy policy, leaves expected-policies.txt + 008 avatar policies, blocks every legacy exploit, core flows unchanged', async () => {
   const before = await prodShapeDb()
   const fb = await coreFlows(before.db)
   for (const [k, v] of Object.entries(fb.res)) if (k !== '__avatars') assert.equal(v, 'ok', `before 035: ${k}`)
@@ -115,7 +118,7 @@ test('035 on the prod shape: runs twice, drops every legacy policy, leaves exact
   assert.equal(await tryFile(db, M035), ''); assert.equal(await tryFile(db, M035), '')
   const left = (await db.query(`SELECT policyname FROM pg_policies WHERE policyname = ANY($1)`, [LEGACY_NAMES.concat('players: coach can invite')])).rows
   assert.deepEqual(left, [])
-  assert.deepEqual(await policyKeys(db), EXPECTED)
+  assert.deepEqual(await policyKeys(db), EXPECTED_035)
   const fa = await coreFlows(db)
   for (const [k, v] of Object.entries(fa.res)) if (k !== '__avatars') assert.equal(v, 'ok', `after 035: ${k}`)
   assert.ok(fa.avatarsOk, `after 035: avatars ${fa.res.__avatars}`)
@@ -165,7 +168,7 @@ const LESSONS_SET = ['lessons_coach_delete', 'lessons_coach_insert', 'lessons_co
 
 for (const shape of ['fresh', 'prod'] as const) {
   test(`lessons storage after 035 (${shape} database): exactly one set, prod's 4b definitions, team coach read-only`, async () => {
-    const { db, unexpected } = shape === 'fresh' ? await freshDb('036') : await prodShapeDb()
+    const { db, unexpected } = shape === 'fresh' ? await freshDb() : await prodShapeDb()
     assert.deepEqual(unexpected, [])
     if (shape === 'prod') { assert.equal(await tryFile(db, M035), ''); assert.equal(await tryFile(db, M035), '') }
     const names = (await db.query<{ policyname: string }>(`SELECT policyname FROM pg_policies WHERE schemaname='storage' AND (qual LIKE '%lessons%' OR with_check LIKE '%lessons%') ORDER BY 1`)).rows.map(r => r.policyname)
@@ -180,14 +183,15 @@ for (const shape of ['fresh', 'prod'] as const) {
   })
 }
 
-test('fresh database (001-035): migrations apply, policy set = expected-policies.txt minus 008\'s avatar policies, core flows pass', async () => {
-  const { db, unexpected } = await freshDb('036')
+test('fresh database (001-036): migrations apply, policy set = expected-policies.txt, core flows pass', async () => {
+  const { db, unexpected } = await freshDb()
   assert.deepEqual(unexpected, [])
-  assert.deepEqual(await policyKeys(db), EXPECTED.filter(k => !AVATAR_NAMES.some(a => k.endsWith('\t' + a))))
+  assert.deepEqual(await policyKeys(db), EXPECTED)
   assert.equal(await tryFile(db, M035), '')  // re-run on fresh
+  assert.equal(await tryFile(db, M036), '')
   const f = await coreFlows(db)
   for (const [k, v] of Object.entries(f.res)) if (k !== '__avatars') assert.equal(v, 'ok', `fresh: ${k}`)
-  assert.equal(f.avatarsOk, false, 'fresh DB has no avatar policies (008 is invalid Postgres); prod has them')
+  assert.equal(f.avatarsOk, false, 'no avatar policies on a fresh DB (008 is invalid Postgres, and 036 drops them)')
   const x = await exploits(db)
   for (const [k, v] of Object.entries(x)) assert.equal(v, false, `fresh: ${k}`)
 })
@@ -209,4 +213,67 @@ test('clip storage_path rule: app paths pass, foreign paths fail; read-only chec
   await db.query(`INSERT INTO clips (player_id, uploaded_by, storage_path, title) VALUES ($1,$2,'legacy/old.mp4','old')`, [P, C])
   const bad = (await db.query(`SELECT id, player_id, storage_path FROM public.clips WHERE storage_path IS NULL OR NOT starts_with(storage_path, player_id::text || '/')`)).rows
   assert.equal(bad.length, 1)
+})
+
+const bucketPublic = async (db: PGlite, id: string) => (await db.query<{ public: boolean }>(`SELECT public FROM storage.buckets WHERE id=$1`, [id])).rows[0]?.public
+const avatarPolicies = async (db: PGlite) => (await db.query(`SELECT 1 FROM pg_policies WHERE policyname = ANY($1)`, [AVATAR_NAMES])).rows.length
+
+test('036 on the prod shape (after 035): profiles bucket private, 008 avatar policies gone, runs twice, policy set = expected-policies.txt, flows unchanged', async () => {
+  const { db } = await prodShapeDb()
+  assert.equal(await tryFile(db, M035), '')
+  assert.equal(await bucketPublic(db, 'profiles'), true)
+  const K = u(41), ME = u(42)
+  await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'k@x','{}'),($2,'me@x','{}')`, [K, ME])
+  await db.query(`INSERT INTO storage.objects (bucket_id, name) VALUES ('profiles',$1),('clips',$2)`, [`avatars/${K}.png`, `avatars/${ME}.jpg`])
+  const anonRead = async () => (await as(db, null, `SELECT count(*)::int c FROM storage.objects WHERE bucket_id='profiles'`)).rows[0]?.c
+  const userRead = async (uid: string) => (await as(db, uid, `SELECT count(*)::int c FROM storage.objects WHERE bucket_id='profiles'`)).rows[0]?.c
+  assert.equal(await anonRead(), 1, 'before 036 anon can list every photo')
+  assert.equal(await userRead(ME), 1, 'before 036 any user can list every photo')
+
+  assert.equal(await tryFile(db, M036), ''); assert.equal(await tryFile(db, M036), '')
+  assert.equal(await bucketPublic(db, 'profiles'), false)
+  assert.equal(await avatarPolicies(db), 0)
+  assert.deepEqual(await policyKeys(db), EXPECTED)
+  assert.equal(await anonRead(), 0)
+  assert.equal(await userRead(ME), 0)
+  assert.equal(await userRead(K), 0, 'not even the owner reads the object directly; the server signs it')
+  assert.match((await as(db, K, `INSERT INTO storage.objects (bucket_id, name) VALUES ('profiles',$1)`, [`avatars/${K}.jpg`])).err, /row-level security/)
+  assert.equal((await as(db, K, `UPDATE storage.objects SET name=name WHERE bucket_id='profiles' AND name=$1`, [`avatars/${K}.png`])).n, 0)
+  // photos in clips/avatars/ are not readable by end users either (024 keys on a player-id folder)
+  assert.equal((await as(db, ME, `SELECT count(*)::int c FROM storage.objects WHERE bucket_id='clips' AND name=$1`, [`avatars/${ME}.jpg`])).rows[0]?.c, 0)
+  assert.match((await as(db, ME, `INSERT INTO storage.objects (bucket_id, name) VALUES ('clips',$1)`, [`avatars/${ME}.png`])).err, /row-level security/)
+  // the server (service role) can still read and therefore sign both
+  assert.equal((await as(db, 'service', `SELECT count(*)::int c FROM storage.objects WHERE name = ANY($1)`, [[`avatars/${K}.png`, `avatars/${ME}.jpg`]])).rows[0]?.c, 2)
+  // and the app's flows are unchanged (avatar uploads now go through the service role into clips/avatars/)
+  const f = await coreFlows(db, 1000)
+  for (const [k, v] of Object.entries(f.res)) if (k !== '__avatars') assert.equal(v, 'ok', `after 036: ${k}`)
+  assert.equal(f.avatarsOk, false, 'end users can no longer write or publicly read the profiles bucket')
+  const s = await as(db, 'service', `INSERT INTO storage.objects (bucket_id, name) VALUES ('clips',$1)`, [`avatars/${u(1003)}.jpg`])
+  assert.equal(s.err, '')
+})
+
+test('036 pre-checks and post-check: refuses without 035, with a public clips bucket, or when another policy opens the profiles bucket; nothing changed', async () => {
+  const unchanged = async (db: PGlite) => { assert.equal(await bucketPublic(db, 'profiles'), true); assert.equal(await avatarPolicies(db), 3) }
+  const a = await prodShapeDb()
+  assert.match(await tryFile(a.db, M036), /needs migration 035 .*Nothing was changed/)
+  await unchanged(a.db)
+
+  const b = await prodShapeDb()
+  assert.equal(await tryFile(b.db, M035), '')
+  await b.db.exec(`UPDATE storage.buckets SET public = true WHERE id = 'clips'`)
+  assert.match(await tryFile(b.db, M036), /needs the private clips bucket .*Nothing was changed/)
+  await unchanged(b.db)
+
+  const c = await prodShapeDb()
+  assert.equal(await tryFile(c.db, M035), '')
+  await c.db.exec(`CREATE POLICY "x_profiles_read" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'profiles')`)
+  assert.match(await tryFile(c.db, M036), /other storage policies still open the profiles bucket \(x_profiles_read\)\. Nothing was changed/)
+  await unchanged(c.db)
+})
+
+test('036 on a database without a profiles bucket (fresh) is a no-op apart from the policy drops', async () => {
+  const { db } = await freshDb()
+  await db.exec(`DELETE FROM storage.buckets WHERE id = 'profiles'`)
+  assert.equal(await tryFile(db, M036), '')
+  assert.equal((await db.query(`SELECT 1 FROM storage.buckets WHERE id = 'profiles'`)).rows.length, 0)
 })

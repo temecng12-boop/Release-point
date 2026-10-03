@@ -47,9 +47,6 @@ public.teams	teams_owner_update	UPDATE
 public.teams	teams_player_select	SELECT
 public.timestamp_notes	timestamp_notes_coach_all	ALL
 public.timestamp_notes	timestamp_notes_player_select	SELECT
-storage.objects	Public read avatars	SELECT
-storage.objects	Users can update own avatar	UPDATE
-storage.objects	Users can upload own avatar	INSERT
 storage.objects	clips_bucket_delete	DELETE
 storage.objects	clips_bucket_insert	INSERT
 storage.objects	clips_bucket_select	SELECT
