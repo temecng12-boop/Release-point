@@ -26,7 +26,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Name</label>
             <input type="text" name="full_name" placeholder="Player's full name" className={inputClass} />
           </div>
-          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} inputClass={inputClass} />
+          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} />
 
           <div>
             <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Player Email</label>

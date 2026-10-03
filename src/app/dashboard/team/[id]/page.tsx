@@ -24,11 +24,12 @@ type TeamRosterPlayer = {
   age_group: string | null
   position: string | null
   coach_id: string | null
-  guardian_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
   age_band?: string | null
   age_confirmed_at?: string | null
+  age_band_coach?: string | null
+  age_band_self?: string | null
   consent_rules_pending_migration?: boolean
   age_band_pending_migration?: boolean
 }
@@ -85,7 +86,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const { data: players } = ownPlayerIds.length > 0
     ? await selectPlayersWithConsent<TeamRosterPlayer[]>(
-        'id, full_name, email, accepted_at, age_group, position, coach_id, guardian_id',
+        'id, full_name, email, accepted_at, age_group, position, coach_id',
         (cols) => supabaseAdmin.from('players').select(cols).in('id', ownPlayerIds).order('full_name', { ascending: true }),
       )
     : { data: [] as TeamRosterPlayer[] }
@@ -101,13 +102,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const playerIds = players?.map((p) => p.id) ?? []
 
-  // Guardians on file for this coach's own players (for Edit Player), and the
-  // banner of own players who can't have video yet.
-  const guardianIds = [...new Set((players ?? []).map((p) => p.guardian_id).filter((g): g is string => !!g))]
-  const { data: guardianRows } = guardianIds.length > 0
-    ? await supabaseAdmin.from('guardians').select('id, email, full_name').in('id', guardianIds)
-    : { data: [] }
-  const guardianById = Object.fromEntries(((guardianRows ?? []) as { id: string; email: string; full_name: string | null }[]).map((g) => [g.id, g]))
+  // Banner of this coach's own players who can't have video yet.
   const pendingPlayers = await loadPendingPlayers(supabaseAdmin, user.id, ownPlayerIds)
 
   // The edit form saves the player's full set of this coach's teams, so give
@@ -230,12 +225,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               {(players ?? []).map((p) => (
                 <PlayerRow
                   key={p.id}
-                  player={{
-                    ...p,
-                    teamIds: teamIdsByPlayer[p.id] ?? [id],
-                    guardianEmail: p.guardian_id ? guardianById[p.guardian_id]?.email ?? null : null,
-                    guardianName: p.guardian_id ? guardianById[p.guardian_id]?.full_name ?? null : null,
-                  }}
+                  player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
                   isOwnPlayer={p.coach_id === user.id}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
                   teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}

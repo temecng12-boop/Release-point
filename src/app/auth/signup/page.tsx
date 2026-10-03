@@ -3,10 +3,11 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import { signUp, signUpPlayer } from '@/app/actions/auth'
+import { checkSignupAge, signUp, signUpPlayer } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
-import { AGE_BANDS, AGE_BAND_LABELS } from '@/lib/consent'
+import BirthFields from '@/components/birth-fields'
+import Under13Stop from '@/components/under13-stop'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -96,9 +97,43 @@ function CoachForm({ onBack }: { onBack: () => void }) {
   )
 }
 
+// Player self-signup: the birth month/year screen first (checkSignupAge), then
+// name, email and Terms. Under 13 stops at step 1 (nothing stored).
 function PlayerForm({ onBack }: { onBack: () => void }) {
+  const [age, ageAction, agePending] = useActionState(checkSignupAge, undefined)
   const [state, action, pending] = useActionState(signUpPlayer, undefined)
   const [tosAccepted, setTosAccepted] = useState(false)
+
+  if (age?.stopped || state?.stopped) {
+    return (
+      <div className="space-y-4">
+        <Under13Stop />
+        <button type="button" onClick={onBack} className="text-xs text-slate-400 hover:text-slate-700 transition-colors min-h-11" style={os}>
+          ← Back
+        </button>
+      </div>
+    )
+  }
+
+  if (!age?.ok) {
+    return (
+      <form action={ageAction} className="space-y-4" data-testid="signup-age-screen">
+        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-2 min-h-11" style={os}>
+          ← Back
+        </button>
+        <BirthFields legendClassName="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" legendStyle={os} />
+        {age?.error && (
+          <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
+            <p className="text-sm text-[#E8102A]">{age.error}</p>
+          </div>
+        )}
+        <button type="submit" disabled={agePending}
+          className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2 min-h-11" style={os}>
+          {agePending ? 'Checking…' : 'Continue'}
+        </button>
+      </form>
+    )
+  }
 
   if (state?.sent) {
     return (
@@ -133,18 +168,8 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
         <input type="email" name="email" required placeholder="your@email.com" className={inputCls} />
         <p className="text-[11px] text-slate-400 mt-1.5">Use the same email your coach invited you with to auto-connect to your team.</p>
       </div>
-      <fieldset>
-        <legend className="block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]" style={os}>Your Age</legend>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {AGE_BANDS.map((b) => (
-            <label key={b} className="flex items-center gap-2 cursor-pointer max-sm:min-h-11">
-              <input type="radio" name="age_band" value={b} required className="w-4 h-4 accent-[#E8102A] shrink-0" />
-              <span className="text-xs text-slate-500">{AGE_BAND_LABELS[b]}</span>
-            </label>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-400 mt-1.5">Players under 13 need a parent or guardian&apos;s consent before video can be added.</p>
-      </fieldset>
+      <input type="hidden" name="birth_month" value={age.month} />
+      <input type="hidden" name="birth_year" value={age.year} />
       <label className="flex items-start gap-3 cursor-pointer max-sm:min-h-11">
         <input
           type="checkbox"
@@ -170,7 +195,7 @@ function PlayerForm({ onBack }: { onBack: () => void }) {
       <button
         type="submit"
         disabled={pending || !tosAccepted}
-        className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2"
+        className="w-full bg-slate-950 hover:bg-slate-800 active:scale-95 text-white rounded-lg py-3 text-sm transition-all disabled:opacity-40 mt-2 min-h-11"
         style={os}
       >
         {pending ? 'Sending Link…' : 'Send Sign-in Link'}

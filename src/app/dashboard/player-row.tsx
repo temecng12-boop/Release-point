@@ -6,7 +6,6 @@ import UploadButton from './upload-button'
 import RecordButton from './record-button'
 import MarkAdultButton from './mark-adult-button'
 import AgeBandConfirm from './age-band-confirm'
-import GuardianActions from './guardian-actions'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 import { canUploadVideo, pendingReason } from '@/lib/consent'
 import EditPlayerModal from './edit-player-modal'
@@ -36,8 +35,8 @@ interface Player {
   age_band?: string | null
   age_confirmed_at?: string | null
   age_band_pending_migration?: boolean
-  guardianEmail?: string | null
-  guardianName?: string | null
+  age_band_coach?: string | null
+  age_band_self?: string | null
   teamIds: string[]
 }
 
@@ -153,11 +152,11 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
             <UploadBlockedNotice
               viewer="coach"
               reason={reason ?? undefined}
-              action={reason === 'guardian_consent'
-                ? <GuardianActions playerId={player.id} playerName={player.full_name} guardianEmail={player.guardianEmail} guardianName={player.guardianName} />
+              action={reason === 'under_13'
+                ? undefined
                 : player.age_band_pending_migration
                   ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
-                  : <AgeBandConfirm mode="coach" playerId={player.id} playerName={player.full_name} />}
+                  : <AgeBandConfirm playerId={player.id} playerName={player.full_name} />}
             />
           </div>
         )}

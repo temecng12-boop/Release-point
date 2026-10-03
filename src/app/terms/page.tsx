@@ -35,9 +35,11 @@ If you do not agree to these terms, do not use the platform.`,
             title: '2. Who Can Use Release Point',
             body: `**Coaches:** Any adult (18+) who coaches a baseball or softball program may create a coach account. You are responsible for the players you add to your account and any content you upload.
 
-**Players:** Players join by invitation from their coach. Players under 18 must have parental or guardian consent to use the platform. By accepting an invitation, you confirm that appropriate consent has been obtained.
+**Players:** Players join by invitation from their coach, or sign up on their own, to work on pitching or hitting. When you join, you enter your birth month and year and accept these Terms. Players 13 to 17 should read these Terms with a parent or guardian.
 
-**Age restriction:** Direct account creation is limited to adults (18+). Players under 13 may not create their own accounts. Coaches creating accounts for players under 13 are responsible for obtaining verifiable parental consent (COPPA compliance).`,
+**Age information:** Coaches must choose a player's age band (under 13, 13 to 17, or 18 or older) truthfully, and players must enter their own birth month and year truthfully. If the answers don't match, we use the younger band.
+
+**Children under 13** can't use Release Point yet. Coaches may not add players under 13, children under 13 may not sign up, and video can't be added for a player marked under 13. Parent permission for players under 13 is coming soon.`,
           },
           {
             title: '3. Acceptable Use',

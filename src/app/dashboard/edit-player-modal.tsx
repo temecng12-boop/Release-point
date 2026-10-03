@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updatePlayer, deletePlayer, setPlayerAdultConfirmed, setPlayerAgeBand } from '@/app/actions/player'
-import { saveGuardianForPlayer } from '@/app/actions/guardian'
 import { runAction } from '@/lib/action-result'
-import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/consent'
+import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/age-band'
+import { PARENT_CONSENT_COMING_SOON } from '@/lib/under13-mode'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -17,9 +17,9 @@ interface Props {
     adult_confirmed_at?: string | null
     consent_given_at?: string | null
     age_band?: string | null
+    age_band_coach?: string | null
+    age_band_self?: string | null
     age_band_pending_migration?: boolean
-    guardianEmail?: string | null
-    guardianName?: string | null
     teamIds: string[]
   }
   teams: Team[]
@@ -56,10 +56,12 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [height, setHeight]       = useState('')
   const [weight, setWeight]       = useState('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>(player.teamIds)
-  const initialBand: AgeBand | '' = isAgeBand(player.age_band) ? player.age_band : player.adult_confirmed_at ? '18_plus' : ''
+  // The coach's own answer (037); before 037, 023's 18+ confirmation.
+  const initialBand: AgeBand | '' = player.age_band_pending_migration
+    ? (player.adult_confirmed_at ? '18_plus' : '')
+    : isAgeBand(player.age_band_coach) ? player.age_band_coach : ''
+  const selfBand = isAgeBand(player.age_band_self) ? player.age_band_self : null
   const [band, setBand]           = useState<AgeBand | ''>(initialBand)
-  const [guardianEmail, setGuardianEmail] = useState(player.guardianEmail ?? '')
-  const [guardianName, setGuardianName]   = useState(player.guardianName ?? '')
   const [notice, setNotice]       = useState<string | null>(null)
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState(false)
@@ -85,21 +87,19 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
     })
     if (result?.error) { setSaving(false); setError(result.error); return }
     if (band && band !== initialBand) {
-      // Before migration 035 only 18+ can be stored (023's column).
+      // Before migration 037 only 18+ can be stored (023's column).
       const ageResult = await runAction(() => player.age_band_pending_migration
         ? setPlayerAdultConfirmed(player.id, band === '18_plus')
         : setPlayerAgeBand(player.id, band))
       if (!ageResult.ok) { setSaving(false); setError(ageResult.error); router.refresh(); return }
-    }
-    // Under 13: save the parent or guardian and email them (server checks it all).
-    const email = guardianEmail.trim()
-    if (band === 'under_13' && email && email.toLowerCase() !== (player.guardianEmail ?? '').toLowerCase()) {
-      const g = await runAction(() => saveGuardianForPlayer(player.id, { email, full_name: guardianName }))
-      setSaving(false)
-      router.refresh()
-      if (!g.ok) { setError(g.error); return }
-      setNotice('success' in g.value ? g.value.success : 'Guardian saved.')
-      return
+      const saved = ageResult.value as { band?: string | null; youngerKept?: boolean }
+      if (saved.youngerKept && isAgeBand(saved.band)) {
+        // The player's own (younger) answer wins: say so instead of closing.
+        setSaving(false)
+        router.refresh()
+        setNotice(`Saved. ${fullName || 'The player'}'s own answer is younger, so their age stays ${AGE_BAND_LABELS[saved.band].toLowerCase()}.`)
+        return
+      }
     }
     setSaving(false)
     onClose()
@@ -193,29 +193,16 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
               ))}
             </div>
             <p className="text-xs text-[#3D5166] mt-1">
-              Video can be added once the age is confirmed. Players under 13 also need consent from a parent or guardian.
+              {band === 'under_13'
+                ? `Video can't be added for players under 13. ${PARENT_CONSENT_COMING_SOON}`
+                : 'Video can be added once the age is confirmed (13 or older).'}
             </p>
-          </fieldset>
-
-          {band === 'under_13' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor={`edit-guardian-name-${player.id}`} className="block text-xs text-[#456080] mb-1">Guardian Name</label>
-                <input id={`edit-guardian-name-${player.id}`} type="text" value={guardianName} onChange={(e) => setGuardianName(e.target.value)}
-                  placeholder="Parent or guardian" className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor={`edit-guardian-email-${player.id}`} className="block text-xs text-[#456080] mb-1">Guardian Email</label>
-                <input id={`edit-guardian-email-${player.id}`} type="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)}
-                  placeholder="parent@example.com" className={inputClass} disabled={!!player.consent_given_at} />
-              </div>
-              <p className="sm:col-span-2 text-xs text-[#3D5166]">
-                {player.consent_given_at
-                  ? 'Consent is on file from this guardian.'
-                  : 'Saving a new email sends them a link to give consent. Use Resend on the roster to send it again.'}
+            {selfBand && (
+              <p className="text-xs text-[#3D5166] mt-1" data-testid="self-band-note">
+                The player answered {AGE_BAND_LABELS[selfBand].toLowerCase()}. If your answers differ, the younger one is used.
               </p>
-            </div>
-          )}
+            )}
+          </fieldset>
 
           {teams.length > 0 && (
             <div>

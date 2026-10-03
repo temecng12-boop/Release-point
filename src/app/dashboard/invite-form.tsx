@@ -35,7 +35,7 @@ export default function InviteForm({ teams }: Props) {
             </div>
           </div>
 
-          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} inputClass={inputClass} />
+          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} />
 
           {(teams?.length ?? 0) > 0 && (
             <div>

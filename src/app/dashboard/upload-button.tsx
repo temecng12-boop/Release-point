@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
 import BulkUploadModal from './bulk-upload-modal'
-import { canUploadVideo, pendingReason, type GuardianNotice, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
+import { canUploadVideo, pendingReason, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
 const COMPRESS_THRESHOLD_MB = 30
@@ -60,7 +60,6 @@ export default function UploadButton({
   blockedAction,
   selfConfirm = false,
   showBlockedNotice = true,
-  guardian,
 }: {
   playerId: string
   playerName: string
@@ -74,8 +73,6 @@ export default function UploadButton({
   selfConfirm?: boolean
   /** Set false when the parent renders its own UploadBlockedNotice. */
   showBlockedNotice?: boolean
-  /** Under-13 player's own view: guardian on file / emailed. */
-  guardian?: GuardianNotice | null
 }) {
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
@@ -157,7 +154,7 @@ export default function UploadButton({
   // ── consent gate ──────────────────────────────────────────────────────────
   if (!canUploadVideo(consent)) {
     if (!showBlockedNotice) return null
-    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} reason={pendingReason(consent) ?? undefined} guardian={guardian} className="max-w-xs" />
+    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} reason={pendingReason(consent) ?? undefined} className="max-w-xs" />
   }
 
   // ── naming overlay ───────────────────────────────────────────────────────

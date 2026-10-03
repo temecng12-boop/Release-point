@@ -3,11 +3,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { guardianInviteSentAt, guardianNoticeFor, selectPlayersWithConsent } from '@/lib/consent-server'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, canSelfConfirmAgeBand, pendingReason, type PlayerConsentFields } from '@/lib/consent'
-import ConfirmAdultButton from './confirm-adult-button'
-import AgeBandConfirm from './age-band-confirm'
+import { canUploadVideo, canSelfConfirmAdult023, canSelfConfirmAgeBand, isUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
+import AgeScreenForm from './age-screen-form'
+import Under13Stop from '@/components/under13-stop'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 import PendingPlayersBanner from '@/components/pending-players-banner'
 import { loadPendingPlayers } from '@/lib/pending-players'
@@ -140,15 +140,15 @@ export default async function DashboardPage() {
       )
     : { data: null }
 
-  if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
+  // A coach-invited player (or a new coachless account) answers the age
+  // screen before anything else (037).
+  if (!isCoach && needsFirstAgeScreen(playerRow)) redirect('/onboarding/age')
+  // Under 13 is a hard stop for now: the account shows only the stop message.
+  const frozen = !isCoach && isUnder13(playerRow)
+  if (!isCoach && playerRow && !playerRow.position && !frozen) redirect('/onboarding')
 
-  // Player banners: a coachless player with no age band confirms it once; an
-  // under-13 player without consent is told who has to give it.
-  const selfConfirm = canSelfConfirmAgeBand(playerRow)
-  const myReason = playerRow ? pendingReason(playerRow) : null
-  const guardianNotice = playerRow && myReason === 'guardian_consent'
-    ? await guardianNoticeFor(supabaseAdmin, { guardian_id: playerRow.guardian_id, guardian_invite_sent_at: await guardianInviteSentAt(supabaseAdmin, playerRow.id) })
-    : null
+  // A coachless player with no age on file answers once, at the top.
+  const selfConfirm = canSelfConfirmAgeBand(playerRow) || canSelfConfirmAdult023(playerRow)
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
@@ -402,18 +402,17 @@ export default async function DashboardPage() {
         ) : (
           /* ── Player view ── */
           <div className="space-y-6">
+            {frozen && <Under13Stop />}
             {selfConfirm && playerRow && (
               <UploadBlockedNotice
                 viewer="player"
                 reason="age_band"
                 selfConfirm
                 testId="player-age-banner"
-                action={playerRow.age_band_pending_migration ? <ConfirmAdultButton /> : <AgeBandConfirm mode="self" />}
+                action={<AgeScreenForm compact />}
               />
             )}
-            {myReason === 'guardian_consent' && (
-              <UploadBlockedNotice viewer="player" reason="guardian_consent" guardian={guardianNotice} testId="player-guardian-banner" />
-            )}
+            {!frozen && (<>
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
               background: '#ffffff',
@@ -449,7 +448,6 @@ export default async function DashboardPage() {
                     consent={playerRow}
                     viewer="player"
                     selfConfirm={selfConfirm}
-                    guardian={guardianNotice}
                   />
                 )}
               </div>
@@ -578,9 +576,10 @@ export default async function DashboardPage() {
                 </div>
               </div>
             )}
+            </>)}
           </div>
         )}
-        {!isCoach && playerRow && user && (
+        {!isCoach && !frozen && playerRow && user && (
           <div className="mt-6">
             <LessonFeedbackSection playerId={playerRow.id} viewerId={user.id} />
           </div>
