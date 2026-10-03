@@ -15,6 +15,18 @@ export const SERVER_ACTION_BODY_LIMIT_BYTES = 4 * 1024 * 1024
 /** What the browser may send: the limit minus room for the request's own encoding overhead. */
 export const IMPORT_BODY_LIMIT_BYTES = SERVER_ACTION_BODY_LIMIT_BYTES - 256 * 1024
 export const IMPORT_TOO_BIG = 'This file is too big to import at once; split it into smaller files.'
+/** TrackMan PDFs sent to parseTrackmanPDF: same budget as an import. */
+export const PDF_MAX_BYTES = IMPORT_BODY_LIMIT_BYTES
+export const PDF_TOO_BIG = 'This PDF is too big to import. Pick one under 3.75 MB.'
+
+/** Checked in the browser before sending and again on the server. */
+export function pdfFileProblem(file: { name: string; type: string; size: number }): string | null {
+  const isPdf = file.type === 'application/pdf' || (file.type === '' || file.type === 'application/octet-stream') && /\.pdf$/i.test(file.name)
+  if (!isPdf) return 'Please upload a PDF file.'
+  if (file.size > PDF_MAX_BYTES) return PDF_TOO_BIG
+  if (file.size === 0) return 'This PDF is empty.'
+  return null
+}
 const MAX_COLUMNS = 300
 const MAX_CELL = 500
 const MAX_PITCH_TYPE = 60
@@ -91,31 +103,48 @@ function validateCsv(headers: unknown, rows: unknown[]): ImportValidation {
   return { ok: true, rows: out }
 }
 
+/** Columns a client may set on a pitch_metrics row (clip_id / created_by are always the server's). */
+export const PITCH_FIELDS = ['pitch_type', 'velocity', 'spin_rate', 'spin_axis', 'horizontal_break', 'vertical_break', 'extension', 'vaa'] as const
+const PDF_FIELDS = ['pitch_type', 'velocity', 'spin_rate', 'spin_axis', 'horizontal_break', 'vertical_break'] as const
+type PitchField = (typeof PITCH_FIELDS)[number]
+
+/**
+ * Check one row field by field and keep only `fields` (anything else the
+ * client sent, such as clip_id or created_by, is dropped).
+ */
+function checkPitchRow(r: unknown, where: string, fields: readonly PitchField[], blankTypeIsError: boolean):
+  { ok: true; row: PitchInsert } | { ok: false; error: string } {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return { ok: false, error: `${where} couldn't be read.` }
+  const v = r as Partial<Record<PitchField, unknown>>
+  const pitchType = v.pitch_type ?? null
+  if (pitchType !== null && (typeof pitchType !== 'string' || pitchType.length > MAX_PITCH_TYPE)) {
+    return { ok: false, error: `${where}: the pitch type isn't valid.` }
+  }
+  const type = typeof pitchType === 'string' && pitchType.trim() !== '' ? pitchType.trim() : null
+  if (blankTypeIsError && pitchType !== null && type === null) return { ok: false, error: `${where} has no pitch type.` }
+  const bad = fields.filter(k => k !== 'pitch_type').find(k => !isNum(v[k] ?? null))
+  if (bad) return { ok: false, error: `${where}: ${bad.replace('_', ' ')} isn't a number.` }
+  const axisError = pitchAxisError((v.spin_axis ?? null) as number | null)
+  if (axisError) return { ok: false, error: `${where}: ${axisError}` }
+  const row: Record<string, unknown> = { pitch_type: type }
+  for (const k of fields) if (k !== 'pitch_type') row[k] = v[k] ?? null
+  if (row.spin_rate != null) row.spin_rate = Math.trunc(row.spin_rate as number)
+  return { ok: true, row: row as PitchInsert }
+}
+
+/** One manually entered pitch (addPitchMetric): same checks and field list as imports. */
+export function validateManualPitch(data: unknown): { ok: true; row: PitchInsert } | { ok: false; error: string } {
+  const r = checkPitchRow(data, 'This pitch', PITCH_FIELDS, false)
+  if (!r.ok) return { ok: false, error: r.error.replace(/^This pitch: /, '').replace(/^./, c => c.toUpperCase()) }
+  return r
+}
+
 function validatePdf(rows: unknown[]): ImportValidation {
   const out: PitchInsert[] = []
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i] as Partial<Record<keyof PdfImportRow, unknown>> | null
-    const where = `Pitch type ${i + 1}`
-    if (!r || typeof r !== 'object') return { ok: false, error: `${where} couldn't be read. Nothing was saved.` }
-    const pitchType = r.pitch_type
-    if (!(pitchType === null || (typeof pitchType === 'string' && pitchType.trim() !== '' && pitchType.length <= MAX_PITCH_TYPE))) {
-      return { ok: false, error: `${where} has no pitch type. Nothing was saved.` }
-    }
-    const nums = ['velocity', 'spin_rate', 'spin_axis', 'horizontal_break', 'vertical_break'] as const
-    const bad = nums.find(k => !isNum(r[k] ?? null))
-    if (bad) return { ok: false, error: `${where}: ${bad.replace('_', ' ')} isn't a number. Nothing was saved.` }
-    const spinRate = (r.spin_rate ?? null) as number | null
-    const axis = (r.spin_axis ?? null) as number | null
-    const axisError = pitchAxisError(axis)
-    if (axisError) return { ok: false, error: `${where}: ${axisError} Nothing was saved.` }
-    out.push({
-      pitch_type: pitchType === null ? null : pitchType.trim(),
-      velocity: (r.velocity ?? null) as number | null,
-      spin_rate: spinRate == null ? null : Math.trunc(spinRate),
-      spin_axis: axis,
-      horizontal_break: (r.horizontal_break ?? null) as number | null,
-      vertical_break: (r.vertical_break ?? null) as number | null,
-    })
+    const r = checkPitchRow(rows[i], `Pitch type ${i + 1}`, PDF_FIELDS, true)
+    if (!r.ok) return { ok: false, error: `${r.error} Nothing was saved.` }
+    out.push(r.row)
   }
   return { ok: true, rows: out }
 }

@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
+import { pdfFileProblem } from '@/lib/pitch-import'
+import { runAction } from '@/lib/action-result'
 
 interface Props {
   onImport: (rows: ParsedPitchRow[]) => void
@@ -16,12 +18,14 @@ export default function TrackmanImport({ onImport }: Props) {
   function handleFile(file: File) {
     setError(null)
     setPreview(null)
+    const problem = pdfFileProblem(file)
+    if (problem) { setError(problem); return }
     const fd = new FormData()
     fd.set('file', file)
     startTransition(async () => {
-      const { pitches, error: err } = await parseTrackmanPDF(fd)
-      if (err) { setError(err); return }
-      setPreview(pitches)
+      const result = await runAction(() => parseTrackmanPDF(fd))
+      if (!result.ok) { setError(result.error); return }
+      setPreview(result.value.pitches)
     })
   }
 
