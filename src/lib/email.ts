@@ -1,5 +1,4 @@
 import { Resend } from 'resend'
-import { guardianConsentHtml, guardianConsentSubject, type GuardianConsentEmailInput } from './guardian-consent-email'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const FROM = 'Release Point <notifications@releasepoint.app>'
@@ -157,21 +156,4 @@ export async function sendPlayerJoinedEmail({
       </div>
     `,
   })
-}
-
-/**
- * Guardian consent request (wording: ./guardian-consent-email.ts, a
- * TODO(Compliance) placeholder). Returns { error } on any failure, so the
- * caller never reports an email as sent when it wasn't.
- */
-export async function sendGuardianConsentEmail(input: GuardianConsentEmailInput & { toEmail: string }): Promise<{ error?: string }> {
-  if (!resend) return { error: 'Email sending is not set up' }
-  const { toEmail, ...content } = input
-  const { error } = await resend.emails.send({
-    from: FROM,
-    to: toEmail,
-    subject: guardianConsentSubject(content),
-    html: guardianConsentHtml(content),
-  })
-  return error ? { error: error.message } : {}
 }
