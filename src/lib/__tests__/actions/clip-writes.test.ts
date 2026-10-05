@@ -23,7 +23,7 @@ function seed() {
     tables: {
       clips: [{ id: C, player_id: P, title: 'Bullpen 1', storage_path: VIDEO, voice_path: VOICE, uploaded_by: COACH.id, lesson_path: OLD_LESSON }],
       // Confirmed 18+, so the consent gate (#17, src/lib/consent-server.ts) lets lesson saves through.
-      players: [{ id: P, coach_id: COACH.id, user_id: 'player-user', guardian_id: null, team_id: null, adult_confirmed_at: '2026-01-01T00:00:00Z', consent_given_at: null }],
+      players: [{ id: P, coach_id: COACH.id, user_id: 'player-user', guardian_id: null, team_id: null, adult_confirmed_at: '2026-01-01T00:00:00Z', consent_given_at: null, age_band: '18_plus', age_confirmed_at: '2026-01-01T00:00:00Z' }],
       annotations: [
         { id: 'a-mine-1', clip_id: C, created_by: COACH.id },
         { id: 'a-mine-2', clip_id: C, created_by: COACH.id },
@@ -261,9 +261,9 @@ test('saveLessonPath: lessons insert fails -> error, not success', async () => {
   assert.equal(state.tables.lessons.length, 0)
 })
 
-test('saveLessonPath: player without 18+ confirmation or guardian consent -> error, nothing changed', async () => {
+for (const band of [null, 'under_13']) test(`saveLessonPath: player with band ${band} (no video) -> error, nothing changed`, async () => {
   seed()
-  state.tables.players[0].adult_confirmed_at = null
+  Object.assign(state.tables.players[0], { age_band: band, adult_confirmed_at: null })
   const r = await saveLessonPath(C, NEW_LESSON)
   assert.ok('error' in r && r.error, JSON.stringify(r))
   assert.equal(state.tables.clips[0].lesson_path, OLD_LESSON)

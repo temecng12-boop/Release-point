@@ -1,5 +1,5 @@
 /**
- * Tests for the player video consent rule (RP-041).
+ * Tests for the player video rule (RP-041; age bands, migration 037).
  * Run with: npx tsx src/lib/__tests__/consent.test.ts
  *
  * No database or network: the server-side checks get a mocked Supabase client.
@@ -87,57 +87,75 @@ async function main() {
   // ───────────────────────────────────────────────────────────────────────────
   section('canUploadVideo / uploadConsentStatus')
 
+  // With 037: only a confirmed 13_17 or 18_plus band allows video.
+  const pre037 = { age_band_pending_migration: true }
   const cases: { label: string; player: PlayerConsentFields | null | undefined; status: string; allowed: boolean }[] = [
-    { label: 'confirmed adult', player: { adult_confirmed_at: T, consent_given_at: null }, status: 'adult_confirmed', allowed: true },
-    { label: 'adult flag with no DOB or age_group', player: { adult_confirmed_at: T }, status: 'adult_confirmed', allowed: true },
-    { label: 'minor with guardian consent', player: { adult_confirmed_at: null, consent_given_at: T }, status: 'guardian_consent', allowed: true },
-    { label: 'adult flag and consent both set', player: { adult_confirmed_at: T, consent_given_at: T }, status: 'adult_confirmed', allowed: true },
-    { label: 'minor, consent pending', player: { adult_confirmed_at: null, consent_given_at: null }, status: 'pending', allowed: false },
+    { label: '18_plus confirmed', player: { age_band: '18_plus', age_confirmed_at: T }, status: 'adult_confirmed', allowed: true },
+    { label: '13_17 confirmed', player: { age_band: '13_17', age_confirmed_at: T }, status: 'age_confirmed', allowed: true },
+    { label: 'under_13 (hard stop)', player: { age_band: 'under_13', age_confirmed_at: T }, status: 'pending', allowed: false },
+    { label: 'under_13 with consent_given_at (old one-click consent)', player: { age_band: 'under_13', age_confirmed_at: T, consent_given_at: T }, status: 'pending', allowed: false },
+    { label: 'unknown band with consent_given_at', player: { age_band: null, consent_given_at: T }, status: 'pending', allowed: false },
+    { label: 'unknown band with a stray adult flag', player: { age_band: null, adult_confirmed_at: T }, status: 'pending', allowed: false },
+    { label: 'band without confirmation time', player: { age_band: '18_plus', age_confirmed_at: null }, status: 'pending', allowed: false },
+    { label: 'unknown band', player: { age_band: null }, status: 'pending', allowed: false },
     { label: 'no status fields at all', player: {}, status: 'pending', allowed: false },
     { label: 'player row missing (null)', player: null, status: 'pending', allowed: false },
     { label: 'player row missing (undefined)', player: undefined, status: 'pending', allowed: false },
-    { label: 'empty-string timestamps are not a status', player: { adult_confirmed_at: '', consent_given_at: '  ' }, status: 'pending', allowed: false },
-    { label: 'garbage timestamp is not a status', player: { adult_confirmed_at: 'yes' }, status: 'pending', allowed: false },
+    { label: 'garbage band', player: { age_band: 'adult', age_confirmed_at: T }, status: 'pending', allowed: false },
+    // Before 037: 023's rule (as its trigger).
+    { label: 'pre-037: confirmed adult', player: { ...pre037, adult_confirmed_at: T, consent_given_at: null }, status: 'adult_confirmed', allowed: true },
+    { label: 'pre-037: consent on file', player: { ...pre037, adult_confirmed_at: null, consent_given_at: T }, status: 'guardian_consent', allowed: true },
+    { label: 'pre-037: neither', player: { ...pre037, adult_confirmed_at: null, consent_given_at: null }, status: 'pending', allowed: false },
+    { label: 'pre-037: empty-string timestamps are not a status', player: { ...pre037, adult_confirmed_at: '', consent_given_at: '  ' }, status: 'pending', allowed: false },
+    { label: 'pre-037: garbage timestamp is not a status', player: { ...pre037, adult_confirmed_at: 'yes' }, status: 'pending', allowed: false },
   ]
   for (const c of cases) {
     assert(uploadConsentStatus(c.player) === c.status, `${c.label}: status ${c.status}`, `got ${uploadConsentStatus(c.player)}`)
     assert(canUploadVideo(c.player) === c.allowed, `${c.label}: ${c.allowed ? 'allowed' : 'blocked'}`)
   }
 
-  // age_group is not used to infer age: an "adult" group without the flag is still blocked.
-  const adultGroupNoFlag = { age_group: 'Professional', adult_confirmed_at: null, consent_given_at: null }
-  assert(!canUploadVideo(adultGroupNoFlag), 'age_group "Professional" without a stored status is blocked')
+  // age_group alone sets nothing here: the database turns an under-13 age
+  // group into the under_13 band (037); an "adult" group without a band is blocked.
+  const adultGroupNoFlag = { age_group: 'Professional', age_band: null }
+  assert(!canUploadVideo(adultGroupNoFlag), 'age_group "Professional" without a band is blocked')
 
   // ───────────────────────────────────────────────────────────────────────────
   section('Blocked copy')
 
   const coachCopy = uploadBlockedCopy('coach')
-  assert(coachCopy.message === UPLOAD_BLOCKED_MESSAGE, 'coach message is the shared blocked message')
-  assert(/18\+/.test(coachCopy.nextStep), 'coach next step mentions marking 18+')
+  assert(/age isn't confirmed/.test(coachCopy.message), 'coach message: age not confirmed')
+  assert(/under 13, 13 to 17, or 18 or older/.test(coachCopy.nextStep), 'coach next step: pick a band')
+  const coach13 = uploadBlockedCopy('coach', { reason: 'under_13' })
+  assert(/under 13/.test(coach13.message) && /coming soon/.test(coach13.nextStep), 'coach under-13 copy: parent consent coming soon')
   const playerCopy = uploadBlockedCopy('player')
-  assert(/your account/.test(playerCopy.message), 'player message addresses the player')
+  assert(/^Your age/.test(playerCopy.message), 'player message addresses the player')
   assert(/coach/.test(playerCopy.nextStep), 'player next step points to the coach')
+  assert(uploadBlockedCopy('player', { reason: 'under_13' }).message === "We need a parent's permission first. Ask your coach.", 'under-13 player copy is the stop message')
 
   // ───────────────────────────────────────────────────────────────────────────
   section('checkUploadConsent (server refusal path, mocked client)')
 
   {
-    const { db, queries } = mockDb({ players: () => ({ data: { adult_confirmed_at: null, consent_given_at: null }, error: null }) })
+    const { db, queries } = mockDb({ players: () => ({ data: { age_band: null, age_confirmed_at: null, adult_confirmed_at: null, consent_given_at: null }, error: null }) })
     const r = await checkUploadConsent(db, PLAYER)
     assert(!r.ok, 'pending player is refused')
     assert(!r.ok && r.error === UPLOAD_BLOCKED_MESSAGE, 'refusal returns the plain blocked message')
     const q = queries[0]
     assert(q?.table === 'players', 'reads the players table')
-    assert(JSON.stringify(opArgs(q, 'select')) === JSON.stringify(['adult_confirmed_at, consent_given_at']), 'selects only the consent columns')
+    assert(JSON.stringify(opArgs(q, 'select')) === JSON.stringify(['id, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at']), 'selects the consent and age columns')
     assert(JSON.stringify(opArgs(q, 'eq')) === JSON.stringify(['id', PLAYER]), 'filters by player id')
   }
   {
-    const { db } = mockDb({ players: () => ({ data: { adult_confirmed_at: T, consent_given_at: null }, error: null }) })
-    assert((await checkUploadConsent(db, PLAYER)).ok, 'confirmed adult is allowed')
+    const { db } = mockDb({ players: () => ({ data: { age_band: '18_plus', age_confirmed_at: T, adult_confirmed_at: T }, error: null }) })
+    assert((await checkUploadConsent(db, PLAYER)).ok, '18_plus is allowed')
   }
   {
-    const { db } = mockDb({ players: () => ({ data: { adult_confirmed_at: null, consent_given_at: T }, error: null }) })
-    assert((await checkUploadConsent(db, PLAYER)).ok, 'minor with consent is allowed')
+    const { db } = mockDb({ players: () => ({ data: { age_band: '13_17', age_confirmed_at: T }, error: null }) })
+    assert((await checkUploadConsent(db, PLAYER)).ok, '13_17 is allowed')
+  }
+  {
+    const { db } = mockDb({ players: () => ({ data: { age_band: 'under_13', age_confirmed_at: T, consent_given_at: T }, error: null }) })
+    assert(!(await checkUploadConsent(db, PLAYER)).ok, 'under_13 is refused, even with consent_given_at')
   }
   {
     const { db } = mockDb({ players: () => ({ data: null, error: null }) })
@@ -158,7 +176,7 @@ async function main() {
 
   {
     const { db, queries } = mockDb({
-      players: (q) => (hasOp(q, 'update') ? { data: null, error: null } : { data: { coach_id: COACH }, error: null }),
+      players: (q) => (hasOp(q, 'update') ? { data: [{ age_band: '18_plus' }], error: null } : { data: { id: PLAYER, coach_id: COACH, user_id: null, age_group: null, team_id: null, age_band_self: null }, error: null }),
     })
     const r = await setAdultConfirmation(db, COACH, PLAYER, true)
     assert('success' in r, "player's coach can mark 18+")
@@ -166,11 +184,12 @@ async function main() {
     const fields = (opArgs(upd!, 'update')?.[0] ?? {}) as Record<string, unknown>
     assert(typeof fields.adult_confirmed_at === 'string' && !Number.isNaN(Date.parse(fields.adult_confirmed_at as string)), 'sets adult_confirmed_at to a timestamp')
     assert(fields.adult_confirmed_by === COACH, 'records who confirmed')
+    assert(fields.age_band_coach === '18_plus' && fields.age_band === '18_plus' && fields.age_band_source === 'coach', "stores the coach's answer and the effective band")
     assert(JSON.stringify(opArgs(upd!, 'eq')) === JSON.stringify(['id', PLAYER]), 'updates only that player')
   }
   {
     const { db, queries } = mockDb({
-      players: (q) => (hasOp(q, 'update') ? { data: null, error: null } : { data: { coach_id: COACH }, error: null }),
+      players: (q) => (hasOp(q, 'update') ? { data: [{ age_band: null }], error: null } : { data: { id: PLAYER, coach_id: COACH, age_band_self: null }, error: null }),
     })
     const r = await setAdultConfirmation(db, COACH, PLAYER, false)
     const upd = queries.find((q) => hasOp(q, 'update'))
@@ -322,8 +341,8 @@ async function main() {
     {
       const { db, queries } = mockDb({ players: () => ({ data: { id: PLAYER, adult_confirmed_at: null, consent_given_at: null }, error: null }) })
       const r = await selectPlayersWithConsent<PlayerConsentFields>('id', (cols) => db.from('players').select(cols).single())
-      assert(queries.length === 1 && JSON.stringify(opArgs(queries[0], 'select')) === JSON.stringify(['id, adult_confirmed_at, consent_given_at']), 'after 023: one query with the consent columns')
-      assert(!r.data?.consent_rules_pending_migration && !canUploadVideo(r.data), 'after 023: the consent rule applies (pending player blocked)')
+      assert(queries.length === 1 && JSON.stringify(opArgs(queries[0], 'select')) === JSON.stringify(['id, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at']), 'after 037: one query with the consent and age columns')
+      assert(!r.data?.consent_rules_pending_migration && !canUploadVideo(r.data), 'after 023: the rule applies (pending player blocked)')
     }
     {
       const { db, queries } = mockDb({ players: () => ({ data: null, error: { code: '42501', message: 'permission denied' } }) })
@@ -352,8 +371,11 @@ async function main() {
 
     // Marking 18+ reports that the update is pending instead of a raw error.
     {
+      const missingBand = { code: '42703', message: 'column players.age_band_self does not exist' }
       const { db } = mockDb({
-        players: (q) => hasOp(q, 'update') ? { data: null, error: missingWrite } : { data: { coach_id: COACH }, error: null },
+        players: (q) => hasOp(q, 'update') ? { data: null, error: missingWrite }
+          : String(opArgs(q, 'select')?.[0]).includes('age_band_self') ? { data: null, error: missingBand }
+          : { data: { coach_id: COACH }, error: null },
       })
       const r = await setAdultConfirmation(db, COACH, PLAYER, true)
       assert('error' in r && /isn't available yet/.test(r.error), 'setAdultConfirmation before 023: clear message', JSON.stringify(r))

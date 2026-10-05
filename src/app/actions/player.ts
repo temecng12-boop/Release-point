@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { isPlayersOwnCoach, pickCoachEditableFields, teamIdsNotOwned } from '@/lib/auth/roster-access'
-import { setAdultConfirmation, confirmOwnAdult } from '@/lib/consent-server'
+import { setCoachAgeBand } from '@/lib/consent-server'
+import { isAgeBand } from '@/lib/age-band'
 import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 import { AVATAR_BUCKET, avatarPathFor, signAvatarUrl } from '@/lib/avatar'
@@ -139,29 +140,27 @@ export async function updatePlayer(playerId: string, data: {
 // Coach confirms (or un-confirms) that a player is 18 or older (RP-041).
 // Authorization is checked in setAdultConfirmation.
 export async function setPlayerAdultConfirmed(playerId: string, confirmed: boolean) {
+  return setPlayerAgeBand(playerId, confirmed === true ? '18_plus' : null)
+}
+
+// The player's coach gives their age answer (under 13, 13 to 17, 18+), or
+// clears it (null). The stored band is the younger of the coach's and the
+// player's answers and any under-13 age group (037). Authorization is checked
+// in setCoachAgeBand (players.coach_id = caller); written with the service
+// role because 037 refuses these columns from end users.
+export async function setPlayerAgeBand(playerId: string, band: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   if (typeof playerId !== 'string' || !playerId) return { error: 'Invalid player' }
+  if (band !== null && !isAgeBand(band)) return { error: 'Choose an age band.' }
 
-  const result = await setAdultConfirmation(supabaseAdmin, user.id, playerId, confirmed === true)
+  const result = await setCoachAgeBand(supabaseAdmin, user.id, playerId, band)
   if ('error' in result) return { error: result.error }
 
   revalidatePath('/dashboard', 'layout')
   revalidatePath(`/profile/${playerId}`)
-  return { success: true }
-}
-
-// A player without a coach confirms they are 18 or older, once (RP-041).
-// Rules in confirmOwnAdult; players with a coach are refused.
-export async function confirmMyAdultStatus() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const result = await confirmOwnAdult(supabaseAdmin, user.id)
-  if ('error' in result) return { error: result.error }
-  revalidatePath('/dashboard')
-  return { success: true }
+  return { success: true as const, band: result.band, youngerKept: result.youngerKept === true }
 }
 
 export async function deletePlayer(playerId: string) {

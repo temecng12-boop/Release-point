@@ -21,6 +21,7 @@ export async function createClient() {
     from: sessionFrom,
     auth: {
       getUser: async () => ({ data: { user: state.user }, error: null }),
+      signOut: async () => { state.signOuts++; return { error: null } },
       signUp: async ({ email, password }: { email: string; password: string }) => {
         signUpCalls.push({ email, password })
         return { data: { user: { id: `u-${signUpCalls.length}`, email } }, error: null }

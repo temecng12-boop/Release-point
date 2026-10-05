@@ -24,6 +24,9 @@ export const state = {
   signed: [] as { bucket: string; path: string; expiresIn?: number }[],
   revalidated: [] as string[],
   rls: {} as Record<string, RlsRule>,
+  /** Request cookies (next/headers fake); set() records options too. */
+  cookies: {} as Record<string, { value: string; options?: Record<string, unknown> }>,
+  signOuts: 0,
 }
 
 let nextId = 1
@@ -38,6 +41,8 @@ export function resetFake(init: { tables?: Record<string, Row[]>; storage?: Reco
   state.signed = []
   state.revalidated = []
   state.rls = {}
+  state.cookies = {}
+  state.signOuts = 0
 }
 
 /** Make matching calls fail. `times` limits how many calls fail (default: all). */

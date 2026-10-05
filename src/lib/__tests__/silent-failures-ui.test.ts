@@ -92,10 +92,20 @@ test('player row: a clip delete warning is shown', () => {
   assert.match(src, /\{deleteWarning && \(/)
 })
 
-test('guardian consent form: shows the returned error and re-enables the button', () => {
-  const src = read('app/guardian/consent/consent-form.tsx')
-  inOrder(fnBody(src, 'handleConsent'), 'runAction(() => recordConsent(playerId))', 'if (!result.ok) {', 'setError(result.error)', 'setPending(false)')
-  assert.match(src, /\{error && <p role="alert"/)
+test('age screen and one-tap age band: errors shown, the screen moves on only after the server saved', () => {
+  const form = read('app/dashboard/age-screen-form.tsx')
+  inOrder(form, 'useActionState<AgeAnswerState, FormData>(submitAgeAnswer, undefined)', 'if (!state?.done) return', 'router.replace(next)')
+  inOrder(form, 'if (state?.stopped) return <Under13Stop', '{state?.error && <p role="alert"')
+  const confirm = read('app/dashboard/age-band-confirm.tsx')
+  inOrder(fnBody(confirm, 'save'), 'runAction(() => setPlayerAgeBand(playerId, band))', 'if (!result.ok) { setError(result.error); return }', 'router.refresh()')
+  assert.match(confirm, /\{error && <span role="alert"/)
+})
+
+test('guardian consent page: no consent form (parent consent is coming soon)', () => {
+  assert.equal(existsSync(new URL('app/guardian/consent/consent-form.tsx', SRC)), false)
+  const page = read('app/guardian/consent/page.tsx')
+  assert.doesNotMatch(page, /recordConsent|ConsentForm/)
+  assert.match(page, /PARENT_CONSENT_UNAVAILABLE/)
 })
 
 test('auth confirm: a failed player link shows a message with Try again and Continue, sign-in is kept', () => {

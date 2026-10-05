@@ -1,0 +1,12 @@
+{
+  // Middleware tests: the real src/middleware.ts with @supabase/ssr swapped for
+  // a fake (./fake-ssr.ts). Run with:
+  //   npx tsx --tsconfig src/lib/__tests__/middleware/tsconfig.json --test src/lib/__tests__/middleware/*.test.ts
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@supabase/ssr": ["./fake-ssr.ts"],
+      "@/*": ["../../../*"]
+    }
+  }
+}

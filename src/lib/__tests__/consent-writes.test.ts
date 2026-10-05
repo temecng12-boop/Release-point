@@ -1,7 +1,8 @@
 /**
- * players.consent_given_at means a guardian gave consent. Only the guardian
- * consent form (recordConsent in src/app/actions/guardian.ts) may write it;
- * signup, invite linking, onboarding and other code must not stamp it.
+ * players.consent_given_at means a guardian gave consent. Parent consent can't
+ * be given in the app yet (compliance spec P1: the old one-click
+ * recordConsent never verified a parent), so NOTHING in src/ may write it.
+ * PR B's admin approval will be the only writer.
  * This scans src/ (not tests) for every mention of consent_given_at and fails
  * on anything that isn't a read: a type field, a select/column string, a
  * property read (row.consent_given_at) or a comment.
@@ -21,10 +22,8 @@ function files(dir: string): string[] {
   })
 }
 
-/** The only places allowed to write consent_given_at: file -> function. */
-const ALLOWED_WRITERS: Record<string, string> = {
-  'app/actions/guardian.ts': 'recordConsent',
-}
+/** The only places allowed to write consent_given_at: file -> function. None for now. */
+const ALLOWED_WRITERS: Record<string, string> = {}
 
 type Hit = { file: string; line: number; text: string; fn: string | undefined }
 
@@ -54,7 +53,7 @@ export function suspectWrites(file: string, src: string): Hit[] {
   return hits
 }
 
-test('only the guardian consent form writes consent_given_at', () => {
+test('nothing writes consent_given_at (parent consent is not available yet)', () => {
   const bad: Hit[] = []
   let allowed = 0
   for (const f of files(root)) {
@@ -64,8 +63,10 @@ test('only the guardian consent form writes consent_given_at', () => {
       else bad.push(h)
     }
   }
-  assert.deepEqual(bad, [], 'consent_given_at written outside the guardian consent form')
-  assert.equal(allowed, 1, 'recordConsent should still write consent_given_at exactly once')
+  assert.deepEqual(bad, [], 'consent_given_at written in app code')
+  assert.equal(allowed, 0)
+  const guardian = readFileSync(join(root, 'app/actions/guardian.ts'), 'utf8')
+  assert.doesNotMatch(guardian, /\.update\(|\.insert\(|\.upsert\(|\.rpc\(/, 'recordConsent writes nothing')
 })
 
 test('the scanner flags writes and ignores reads', () => {

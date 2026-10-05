@@ -5,8 +5,9 @@ import Link from 'next/link'
 import UploadButton from './upload-button'
 import RecordButton from './record-button'
 import MarkAdultButton from './mark-adult-button'
+import AgeBandConfirm from './age-band-confirm'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
-import { canUploadVideo } from '@/lib/consent'
+import { canUploadVideo, pendingReason } from '@/lib/consent'
 import EditPlayerModal from './edit-player-modal'
 import BullpenModal from './bullpen-modal'
 import type { BullpenSession } from './bullpen-modal'
@@ -31,6 +32,11 @@ interface Player {
   position: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
+  age_band?: string | null
+  age_confirmed_at?: string | null
+  age_band_pending_migration?: boolean
+  age_band_coach?: string | null
+  age_band_self?: string | null
   teamIds: string[]
 }
 
@@ -55,6 +61,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
   const uploadAllowed = canUploadVideo(player)
+  const reason = pendingReason(player)
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null)
 
   async function handleDeleteClip(clipId: string) {
@@ -144,7 +151,12 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
           <div className="px-4 py-2 border-b border-[#DDE4ED]">
             <UploadBlockedNotice
               viewer="coach"
-              action={<MarkAdultButton playerId={player.id} playerName={player.full_name} />}
+              reason={reason ?? undefined}
+              action={reason === 'under_13'
+                ? undefined
+                : player.age_band_pending_migration
+                  ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
+                  : <AgeBandConfirm playerId={player.id} playerName={player.full_name} />}
             />
           </div>
         )}

@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePlayer, deletePlayer, setPlayerAdultConfirmed } from '@/app/actions/player'
+import { updatePlayer, deletePlayer, setPlayerAdultConfirmed, setPlayerAgeBand } from '@/app/actions/player'
+import { runAction } from '@/lib/action-result'
+import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/age-band'
+import { PARENT_CONSENT_COMING_SOON } from '@/lib/under13-mode'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -12,6 +15,11 @@ interface Props {
     age_group: string | null
     position: string | null
     adult_confirmed_at?: string | null
+    consent_given_at?: string | null
+    age_band?: string | null
+    age_band_coach?: string | null
+    age_band_self?: string | null
+    age_band_pending_migration?: boolean
     teamIds: string[]
   }
   teams: Team[]
@@ -48,7 +56,13 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [height, setHeight]       = useState('')
   const [weight, setWeight]       = useState('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>(player.teamIds)
-  const [isAdult, setIsAdult]     = useState(!!player.adult_confirmed_at)
+  // The coach's own answer (037); before 037, 023's 18+ confirmation.
+  const initialBand: AgeBand | '' = player.age_band_pending_migration
+    ? (player.adult_confirmed_at ? '18_plus' : '')
+    : isAgeBand(player.age_band_coach) ? player.age_band_coach : ''
+  const selfBand = isAgeBand(player.age_band_self) ? player.age_band_self : null
+  const [band, setBand]           = useState<AgeBand | ''>(initialBand)
+  const [notice, setNotice]       = useState<string | null>(null)
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -72,9 +86,20 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
       teamIds:   selectedTeams,
     })
     if (result?.error) { setSaving(false); setError(result.error); return }
-    if (isAdult !== !!player.adult_confirmed_at) {
-      const ageResult = await setPlayerAdultConfirmed(player.id, isAdult)
-      if (ageResult?.error) { setSaving(false); setError(ageResult.error); return }
+    if (band && band !== initialBand) {
+      // Before migration 037 only 18+ can be stored (023's column).
+      const ageResult = await runAction(() => player.age_band_pending_migration
+        ? setPlayerAdultConfirmed(player.id, band === '18_plus')
+        : setPlayerAgeBand(player.id, band))
+      if (!ageResult.ok) { setSaving(false); setError(ageResult.error); router.refresh(); return }
+      const saved = ageResult.value as { band?: string | null; youngerKept?: boolean }
+      if (saved.youngerKept && isAgeBand(saved.band)) {
+        // The player's own (younger) answer wins: say so instead of closing.
+        setSaving(false)
+        router.refresh()
+        setNotice(`Saved. ${fullName || 'The player'}'s own answer is younger, so their age stays ${AGE_BAND_LABELS[saved.band].toLowerCase()}.`)
+        return
+      }
     }
     setSaving(false)
     onClose()
@@ -157,17 +182,27 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             </div>
           </div>
 
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isAdult}
-              onChange={(e) => setIsAdult(e.target.checked)}
-              className="mt-0.5 accent-[#C8102E]"
-            />
-            <span className="text-xs text-[#456080]">
-              Player is 18 or older. Players under 18 need guardian consent on file before video can be added.
-            </span>
-          </label>
+          <fieldset>
+            <legend className="block text-xs text-[#456080] mb-1">Player Age</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {AGE_BANDS.map((b) => (
+                <label key={b} className="flex items-center gap-1.5 cursor-pointer max-sm:min-h-11">
+                  <input type="radio" name={`age_band_${player.id}`} value={b} checked={band === b} onChange={() => setBand(b)} className="accent-[#C8102E]" />
+                  <span className="text-xs text-[#456080]">{AGE_BAND_LABELS[b]}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-[#3D5166] mt-1">
+              {band === 'under_13'
+                ? `Video can't be added for players under 13. ${PARENT_CONSENT_COMING_SOON}`
+                : 'Video can be added once the age is confirmed (13 or older).'}
+            </p>
+            {selfBand && (
+              <p className="text-xs text-[#3D5166] mt-1" data-testid="self-band-note">
+                The player answered {AGE_BAND_LABELS[selfBand].toLowerCase()}. If your answers differ, the younger one is used.
+              </p>
+            )}
+          </fieldset>
 
           {teams.length > 0 && (
             <div>
@@ -192,16 +227,17 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
           )}
         </div>
 
-        {error && <p className="text-xs text-[#C8102E]">{error}</p>}
+        {error && <p role="alert" className="text-xs text-[#C8102E]">{error}</p>}
+        {notice && <p role="status" className="text-xs text-green-700">{notice}</p>}
 
         <div className="flex gap-3 pt-1">
           <button onClick={handleSave} disabled={saving || deleting}
-            className="flex-1 bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50">
+            className="flex-1 bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 max-sm:min-h-11">
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button onClick={onClose} disabled={saving || deleting}
-            className="flex-1 border border-[#DDE4ED] text-[#456080] hover:text-white hover:border-[#456080] rounded-md px-4 py-2 text-sm transition-colors disabled:opacity-50">
-            Cancel
+            className="flex-1 border border-[#DDE4ED] text-[#456080] hover:text-white hover:border-[#456080] rounded-md px-4 py-2 text-sm transition-colors disabled:opacity-50 max-sm:min-h-11">
+            {notice ? 'Close' : 'Cancel'}
           </button>
         </div>
 

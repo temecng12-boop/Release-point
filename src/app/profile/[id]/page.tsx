@@ -5,7 +5,8 @@ import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
 import MarkAdultButton from '@/app/dashboard/mark-adult-button'
-import { canUploadVideo } from '@/lib/consent'
+import { canUploadVideo, pendingReason } from '@/lib/consent'
+import AgeBandConfirm from '@/app/dashboard/age-band-confirm'
 import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
@@ -30,7 +31,10 @@ type ProfilePlayer = {
   coach_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
+  age_band?: string | null
+  age_confirmed_at?: string | null
   consent_rules_pending_migration?: boolean
+  age_band_pending_migration?: boolean
 }
 
 export default async function PlayerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +65,12 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   // Offer "Mark as 18+" only when uploads are blocked and this coach may change the player's age status.
   const showMarkAdult = !canUploadVideo(player) && (await canManagePlayerAge(supabaseAdmin, user.id, player.id))
+  const reason = pendingReason(player)
+  // Under 13: no action (parent consent is coming soon; the notice says so).
+  const blockedAction = !showMarkAdult || reason === 'under_13' ? undefined
+    : player.age_band_pending_migration
+      ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
+      : <AgeBandConfirm playerId={player.id} playerName={player.full_name} />
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -157,7 +167,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
         <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
           <div className="h-1 bg-[#C8102E]" />
           <div className="p-6">
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-5">
               <div
                 className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#1C3A5C] to-[#456080] border border-[#DDE4ED] flex items-center justify-center text-xl text-white shrink-0"
                 style={oswald}
@@ -182,18 +192,21 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   </span>
                 </div>
               </div>
-              {/* Upload button for the player's own coach only */}
+              {/* Upload button for the player's own coach only. Full width under
+                  the name on phones, so a notice never covers the name. */}
+              <div className="w-full sm:w-auto sm:max-w-xs">
               {player.coach_id === user.id ? (
               <UploadButton
                 playerId={player.id}
                 playerName={player.full_name}
                 consent={player}
                 maxFiles={50}
-                blockedAction={showMarkAdult ? <MarkAdultButton playerId={player.id} playerName={player.full_name} /> : undefined}
+                blockedAction={blockedAction}
               />
               ) : (
                 <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>
               )}
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[#DDE4ED]">

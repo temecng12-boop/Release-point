@@ -3,7 +3,13 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { writeWithAdultFields } from '@/lib/consent-server'
+import { cookies } from 'next/headers'
+import { ageAnswerFields, isMissingAgeBandColumn, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/consent-server'
+import { AGE_STOP_COOKIE, bandFromBirth, type AgeBand } from '@/lib/age-band'
+import { signSignupAge, verifySignupAge } from '@/lib/signup-age-token'
+import { TERMS_VERSION } from '@/lib/terms-version'
+import { parentConsentFlowEnabled } from '@/lib/under13-mode'
+import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
@@ -27,10 +33,11 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
   const problem = passwordProblem(password)
   if (problem) return { error: problem }
 
+  const tosAcceptedAt = new Date().toISOString()
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role: 'coach', full_name: fullName } },
+    options: { data: { role: 'coach', full_name: fullName, tos_accepted_at: tosAcceptedAt } },
   })
 
   if (error) return { error: error.message }
@@ -44,31 +51,65 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
       console.error('[signUp] coach profile upsert failed', data.user.id, profileError.code, profileError.message)
       return { error: 'Your account was created, but we couldn\'t finish setting it up as a coach account. Please try signing in again in a few minutes. If your dashboard shows a player account, contact support.' }
     }
+    await recordTosAcceptance(data.user.id, tosAcceptedAt, TERMS_VERSION)
   }
 
   redirect('/dashboard')
 }
 
+/**
+ * Step 1 of player self-signup: the neutral birth month/year screen, before
+ * any other field (spec T1). Nothing is stored. Under 13: the stop message
+ * and the session cookie that blocks another answer (hard stop). signUpPlayer
+ * checks the same answer again.
+ */
+export async function checkSignupAge(
+  _prevState: { error?: string; ok?: boolean; stopped?: boolean; month?: string; year?: string } | undefined,
+  formData: FormData,
+) {
+  const jar = await cookies()
+  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
+  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!parsed.ok) return { error: parsed.error }
+  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
+    setAgeStopCookie(jar)
+    return { stopped: true }
+  }
+  return { ok: true, month: String(formData.get('birth_month')), year: String(formData.get('birth_year')).trim() }
+}
+
 export async function signUpPlayer(
-  _prevState: { error?: string; sent?: boolean; email?: string } | undefined,
+  _prevState: { error?: string; sent?: boolean; email?: string; stopped?: boolean } | undefined,
   formData: FormData
 ) {
-  const supabase = await createClient()
-
-  // Self-signup is for players 18 and older; younger players join through their coach.
-  if (formData.get('adult_confirmed') !== 'yes') {
-    return { error: 'You must be 18 or older to sign up yourself. Players under 18 join through their coach.' }
+  // Neutral age screen (spec T1): birth month and year, turned into a band
+  // here; the month and year are never stored. Under 13 is a hard stop for
+  // now (src/lib/under13-mode.ts): no account, nothing stored, and a session
+  // cookie blocks trying again with another age.
+  const jar = await cookies()
+  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
+  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!parsed.ok) return { error: parsed.error }
+  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
+    setAgeStopCookie(jar)
+    return { stopped: true }
   }
+  if (formData.get('tos') !== 'yes') return { error: 'You must accept the Terms of Service to continue.' }
 
   const email = formData.get('email') as string
   let fullName = formData.get('full_name') as string
   if (fullName) fullName = toTitleCase(fullName)
 
+  const supabase = await createClient()
+  const now = new Date().toISOString()
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: true,
-      data: { role: 'player', full_name: fullName, adult_confirmed: true },
+      // The band (never the month/year), when it was answered and the Terms
+      // acceptance, signed by the server and bound to this email: metadata is
+      // client-controlled, so linkPlayerRow stores only what it can verify.
+      data: { role: 'player', full_name: fullName, signup_age: signSignupAge(email, { band: parsed.band, answeredAt: now, tosAcceptedAt: now, tosVersion: TERMS_VERSION }) },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
@@ -113,7 +154,8 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
   }
   if (!user.email) return { success: true }
 
-  const fullName = (user.user_metadata?.full_name ?? '') as string
+  const meta     = user.user_metadata ?? {}
+  const fullName = (meta.full_name ?? '') as string
   const now      = new Date().toISOString()
 
   // Ensure profile row exists. user_metadata is client-controlled (anyone can
@@ -125,6 +167,14 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     .upsert({ id: user.id, full_name: fullName, role: 'player' }, { onConflict: 'id', ignoreDuplicates: true })
   if (profileError) {
     console.error('[linkPlayerRow] profile upsert failed', { code: profileError.code, message: profileError.message })
+    return { error: LINK_FAILED }
+  }
+  // The signup age answer and Terms acceptance, only if signed by
+  // signUpPlayer for this email. Forged metadata (age_band, adult_confirmed,
+  // tos_accepted_at, a bad signup_age) is ignored: the player answers the age
+  // screen on their first visit instead.
+  const signup = verifySignupAge(meta.signup_age, user.email)
+  if (signup && !(await recordTosAcceptance(user.id, signup.tosAcceptedAt, signup.tosVersion))) {
     return { error: LINK_FAILED }
   }
 
@@ -153,6 +203,15 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     return { error: LINK_FAILED }
   }
 
+  // The verified self-signup answer (band only) for an invited email: stored
+  // as the player's answer; the younger of it and the coach's wins (037). If
+  // it can't be stored, the age screen asks again at the next page load.
+  const selfBand: AgeBand | null = signup?.band ?? null
+  if (linked && linked.length > 0 && selfBand) {
+    const answered = await recordOwnAgeAnswer(supabaseAdmin, user.id, selfBand)
+    if ('error' in answered) console.warn('[linkPlayerRow] signup age answer not stored', { userId: user.id, error: answered.error })
+  }
+
   // No invite — create a standalone player row
   if (!linked || linked.length === 0) {
     const { data: existing, error: existingError } = await supabaseAdmin
@@ -166,13 +225,15 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
 
     if (!existing || existing.length === 0) {
-      // 18+ confirmation from the self-signup form (RP-041). No guardian
-      // consent is recorded here.
-      // Before migration 023 the adult columns don't exist; the row is then
-      // created without them (see writeWithAdultFields).
-      const adultConfirmed = user.user_metadata?.adult_confirmed === true
-      const { error: insertError } = await writeWithAdultFields(
-        adultConfirmed ? { adult_confirmed_at: now, adult_confirmed_by: user.id } : {},
+      // The verified self-signup answer (band only; RP-041, 037). Before
+      // 037/023 the row is created with the columns that exist (see
+      // writeWithAgeFields).
+      const band: AgeBand | null = selfBand
+      const fields = band ? ageAnswerFields('self', band, user.id, {}, now) : null
+      if (fields && signup) fields.age.age_screen_at = signup.answeredAt
+      const { result: { error: insertError } } = await writeWithAgeFields(
+        fields?.age ?? {},
+        band === '18_plus' && fields ? fields.adult : {},
         (adultFields) => supabaseAdmin.from('players').insert({
           user_id:     user.id,
           full_name:   fullName,
@@ -188,6 +249,25 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
   }
   return { success: true }
+}
+
+/**
+ * Stores when the account accepted the Terms and which version
+ * (profiles.tos_accepted_at / tos_version, 037), once. Before 037 the columns
+ * don't exist and nothing is stored. Returns false only on a real write failure.
+ */
+async function recordTosAcceptance(userId: string, acceptedAt: string, version: string): Promise<boolean> {
+  if (Number.isNaN(Date.parse(acceptedAt))) return true
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ tos_accepted_at: acceptedAt, ...(version ? { tos_version: version } : {}) })
+    .eq('id', userId)
+    .is('tos_accepted_at', null)
+  if (error && !isMissingAgeBandColumn(error)) {
+    console.error('[recordTosAcceptance] failed', { code: error.code, message: error.message })
+    return false
+  }
+  return true
 }
 
 /**
