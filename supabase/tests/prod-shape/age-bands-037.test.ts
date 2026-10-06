@@ -11,7 +11,7 @@ import { prodShapeDb, freshDb, as, tryFile, u, migration } from './prod-fixture'
 import { coreFlows } from './flows'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ageGroupIsPlainYouth, ageGroupIsUnder13 } from '../../../src/lib/age-band'
+import { ageGroupIsPlainYouth } from '../../../src/lib/age-band'
 
 const M035 = migration('035_drop_legacy_policies.sql')
 const M037 = migration('037_age_bands.sql')
@@ -199,14 +199,26 @@ test('prod + 035 with core-flow data, then 037 twice: data kept, consent-only pl
   assert.equal((await as(db, C, `INSERT INTO clips (id, player_id, uploaded_by, storage_path, title) VALUES ($1,$2,$3,$4,'x')`, [u(9201), P, C, `${P}/x.mp4`])).err, '', 'coach clip for a 13-17 player')
 })
 
-test('SQL age_group_is_under_13 matches ageGroupIsUnder13 in src/lib/age-band.ts', async () => {
+// 037's own rule (any range with a top of 12 or less). Migration 039 narrows it
+// (grade ranges don't count); one-screen-038-039.test.ts checks 039 against the app.
+function ageGroupIsUnder13_037(group: string | null | undefined): boolean {
+  const g = (group ?? '').toLowerCase()
+  let m = g.match(/(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})/)
+  if (m && Number(m[2]) <= 12) return true
+  m = g.match(/(?:^|[^a-z0-9])(?:u|under)\s*-?\s*(\d{1,2})(?:[^0-9]|$)/)
+  if (m && Number(m[1]) <= 12) return true
+  m = g.match(/(?:^|[^0-9])(\d{1,2})\s*-?\s*u(?:[^a-z]|$)/)
+  return !!m && Number(m[1]) <= 12
+}
+
+test('037 SQL age_group_is_under_13: 037\'s rule (039 changes it; see one-screen-038-039.test.ts)', async () => {
   const db = await db037('fresh')
   const cases = ['Youth 10-12', '10-12', '8 to 10', '11–12', '12U', '12 U', 'U12', 'u-12', 'Under 12', '13U', 'U13', '13-15', 'High School', 'Youth', 'College', 'Adult', '18+', '', 'Varsity 2026', '9u', '14-18', 'U8', '10U-12U']
   for (const c of cases) {
     const sql = (await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13($1) x`, [c])).rows[0].x
-    assert.equal(sql, ageGroupIsUnder13(c), `"${c}"`)
+    assert.equal(sql, ageGroupIsUnder13_037(c), `"${c}"`)
   }
-  assert.equal((await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13(NULL) x`)).rows[0].x, ageGroupIsUnder13(null))
+  assert.equal((await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13(NULL) x`)).rows[0].x, false)
 })
 
 test('SQL age_group_is_plain_youth matches ageGroupIsPlainYouth', async () => {

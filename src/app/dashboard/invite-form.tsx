@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
-import AgeBandFields from '@/app/dashboard/age-band-fields'
 
 interface Team { id: string; name: string }
 interface Props { teams: Team[] }
@@ -34,8 +33,6 @@ export default function InviteForm({ teams }: Props) {
               <input type="email" name="player_email" placeholder="Email address" required className={inputClass} />
             </div>
           </div>
-
-          <AgeBandFields labelClass="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" labelStyle={oswald} />
 
           {(teams?.length ?? 0) > 0 && (
             <div>
@@ -74,7 +71,7 @@ export default function InviteForm({ teams }: Props) {
           </button>
         </form>
         <p className="text-[10px] text-[#3D5166] mt-3 leading-relaxed">
-          This email gets an invite to set up the player&apos;s account. Video can be added once the player&apos;s age is confirmed; players under 13 also need consent from a parent or guardian.
+          This email gets an invite to set up the player&apos;s account. The player confirms their age when they set up their account; video can be added after that.
         </p>
       </div>
     </div>

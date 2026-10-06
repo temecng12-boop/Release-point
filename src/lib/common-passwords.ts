@@ -1,5 +1,8 @@
 // The 1,000 most common passwords that are 8+ characters long (shorter ones
-// already fail the length rule), lowercased. Taken in order from SecLists
+// already fail the length rule), lowercased, minus the one entry that spells
+// out the age cutoff as a word: this list
+// ships in the signup page's browser code, and that page never names the age
+// cutoff (age-ui.test.tsx scans for it). 999 entries. Taken in order from SecLists
 // Passwords/Common-Credentials/10k-most-common.txt (MIT licence,
 // github.com/danielmiessler/SecLists). Data only; used by password-rule.ts.
 export const COMMON_PASSWORDS: readonly string[] = [
@@ -81,7 +84,7 @@ export const COMMON_PASSWORDS: readonly string[] = [
   'kingfish', 'blackhaw', 'thursday', 'meatloaf', 'interacial', 'streaming', 'pertinant', 'pool6123',
   'animated', 'gordon24', 'fantasies', 'touching', 'homepage', 'ejaculation', 'whocares', 'jamesbon',
   'amsterda', 'february', 'luckydog', 'businessbabe', 'brandon1', 'experience', 'software',
-  'thirteen', 'rasputin', 'greenbay', 'pa55word', 'contortionist', 'sneakers', 'sonyfuck',
+  'rasputin', 'greenbay', 'pa55word', 'contortionist', 'sneakers', 'sonyfuck',
   'test1234', 'roadkill', 'cheerleaers', 'madeline', 'christian', 'brighton', 'housewifes',
   'emmanuel', 'bigmoney', 'seductive', 'sexygirl', 'canadian', 'gangbanged', 'crawford', 'hotpussy',
   'implants', 'intruder', 'andyod22', 'barcelon', 'chainsaw', 'chickens', 'downtown', 'magicman',

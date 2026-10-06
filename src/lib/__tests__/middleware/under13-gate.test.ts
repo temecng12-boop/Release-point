@@ -24,7 +24,7 @@ const rewrite = (r: Response) => r.headers.get('x-middleware-rewrite')
 const quiet = async <R>(fn: () => Promise<R>) => { const w = console.warn; console.warn = () => {}; try { return await fn() } finally { console.warn = w } }
 
 const PLAYER_PAGES = ['/dashboard', '/clips/11111111-1111-4111-8111-111111111111', '/clips/compare', '/profile', '/profile/p1', '/player-settings', '/onboarding', '/onboarding/age', '/guardian', '/dashboard/team/t1']
-const API = ['/api/ai-chat', '/api/debug-clip', '/api/youtube-search']
+const API = ['/api/ai-chat', '/api/youtube-search']
 
 beforeEach(() => { ssrFake.reset(); ssrFake.user = { id: 'u-kid' } })
 

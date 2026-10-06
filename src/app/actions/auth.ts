@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
-import { ageAnswerFields, isMissingAgeBandColumn, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/consent-server'
+import { ageAnswerFields, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/consent-server'
+import { recordTermsAcceptance } from '@/lib/terms-acceptance'
+import { NAME_REQUIRED, TOS_REQUIRED, toTitleCase } from '@/lib/signup-fields'
 import { AGE_STOP_COOKIE, bandFromBirth, type AgeBand } from '@/lib/age-band'
 import { signSignupAge, verifySignupAge } from '@/lib/signup-age-token'
 import { TERMS_VERSION } from '@/lib/terms-version'
@@ -15,14 +17,10 @@ import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
-function toTitleCase(s: string) {
-  return s.trim().replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())
-}
-
 export async function signUp(_prevState: { error?: string; message?: string } | undefined, formData: FormData) {
   const supabase = await createClient()
 
-  if (!formData.get('tos')) return { error: 'You must accept the Terms of Service to continue.' }
+  if (!formData.get('tos')) return { error: TOS_REQUIRED }
 
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
@@ -51,22 +49,32 @@ export async function signUp(_prevState: { error?: string; message?: string } | 
       console.error('[signUp] coach profile upsert failed', data.user.id, profileError.code, profileError.message)
       return { error: 'Your account was created, but we couldn\'t finish setting it up as a coach account. Please try signing in again in a few minutes. If your dashboard shows a player account, contact support.' }
     }
-    await recordTosAcceptance(data.user.id, tosAcceptedAt, TERMS_VERSION)
+    if (!(await recordTermsAcceptance(supabaseAdmin, data.user.id, tosAcceptedAt, TERMS_VERSION))) {
+      return { error: 'Your account was created, but your Terms acceptance couldn\'t be saved. Please sign in again in a few minutes.' }
+    }
   }
 
   redirect('/dashboard')
 }
 
+export type SignUpPlayerState = { error?: string; sent?: boolean; email?: string; stopped?: boolean } | undefined
+
 /**
- * Step 1 of player self-signup: the neutral birth month/year screen, before
- * any other field (spec T1). Nothing is stored. Under 13: the stop message
- * and the session cookie that blocks another answer (hard stop). signUpPlayer
- * checks the same answer again.
+ * Player self-signup, one screen: birth month and year, name, email and the
+ * Terms in one form (spec T1).
+ *
+ * The age is checked first, on the server, before any other field is read:
+ *   * the 24-hour stop cookie refuses every submission, whatever the form
+ *     says (a back-button resubmit included);
+ *   * under 13 (hard stop, src/lib/under13-mode.ts): no Supabase call at all,
+ *     nothing stored or logged (not the name, not the email), and the cookie
+ *     is set. The month and year are never stored for anyone.
+ * 13 or older: a sign-in link is sent. The band, the answer time and the
+ * Terms acceptance travel in the link's metadata as a token signed by the
+ * server and bound to this email; linkPlayerRow stores only what verifies,
+ * once, and it never changes afterwards.
  */
-export async function checkSignupAge(
-  _prevState: { error?: string; ok?: boolean; stopped?: boolean; month?: string; year?: string } | undefined,
-  formData: FormData,
-) {
+export async function signUpPlayer(_prevState: SignUpPlayerState, formData: FormData): Promise<SignUpPlayerState> {
   const jar = await cookies()
   if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
   const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
@@ -75,30 +83,12 @@ export async function checkSignupAge(
     setAgeStopCookie(jar)
     return { stopped: true }
   }
-  return { ok: true, month: String(formData.get('birth_month')), year: String(formData.get('birth_year')).trim() }
-}
 
-export async function signUpPlayer(
-  _prevState: { error?: string; sent?: boolean; email?: string; stopped?: boolean } | undefined,
-  formData: FormData
-) {
-  // Neutral age screen (spec T1): birth month and year, turned into a band
-  // here; the month and year are never stored. Under 13 is a hard stop for
-  // now (src/lib/under13-mode.ts): no account, nothing stored, and a session
-  // cookie blocks trying again with another age.
-  const jar = await cookies()
-  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
-  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
-  if (!parsed.ok) return { error: parsed.error }
-  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
-    setAgeStopCookie(jar)
-    return { stopped: true }
-  }
-  if (formData.get('tos') !== 'yes') return { error: 'You must accept the Terms of Service to continue.' }
-
-  const email = formData.get('email') as string
-  let fullName = formData.get('full_name') as string
-  if (fullName) fullName = toTitleCase(fullName)
+  if (formData.get('tos') !== 'yes') return { error: TOS_REQUIRED }
+  const email = String(formData.get('email') ?? '').trim()
+  const fullName = toTitleCase(String(formData.get('full_name') ?? ''))
+  if (!fullName) return { error: NAME_REQUIRED }
+  if (!email) return { error: 'Enter your email address.' }
 
   const supabase = await createClient()
   const now = new Date().toISOString()
@@ -106,16 +96,16 @@ export async function signUpPlayer(
     email,
     options: {
       shouldCreateUser: true,
-      // The band (never the month/year), when it was answered and the Terms
-      // acceptance, signed by the server and bound to this email: metadata is
-      // client-controlled, so linkPlayerRow stores only what it can verify.
       data: { role: 'player', full_name: fullName, signup_age: signSignupAge(email, { band: parsed.band, answeredAt: now, tosAcceptedAt: now, tosVersion: TERMS_VERSION }) },
       // Same fallback as invite and reset emails: an unset variable never sends links to localhost.
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL}/auth/confirm`,
     },
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[signUpPlayer] sign-in link failed', { code: error.code ?? null, message: error.message })
+    return { error: "We couldn't send your sign-in link. Check the email address and try again." }
+  }
 
   return { sent: true, email }
 }
@@ -174,7 +164,7 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
   // tos_accepted_at, a bad signup_age) is ignored: the player answers the age
   // screen on their first visit instead.
   const signup = verifySignupAge(meta.signup_age, user.email)
-  if (signup && !(await recordTosAcceptance(user.id, signup.tosAcceptedAt, signup.tosVersion))) {
+  if (signup && !(await recordTermsAcceptance(supabaseAdmin, user.id, signup.tosAcceptedAt, signup.tosVersion))) {
     return { error: LINK_FAILED }
   }
 
@@ -249,25 +239,6 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
   }
   return { success: true }
-}
-
-/**
- * Stores when the account accepted the Terms and which version
- * (profiles.tos_accepted_at / tos_version, 037), once. Before 037 the columns
- * don't exist and nothing is stored. Returns false only on a real write failure.
- */
-async function recordTosAcceptance(userId: string, acceptedAt: string, version: string): Promise<boolean> {
-  if (Number.isNaN(Date.parse(acceptedAt))) return true
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ tos_accepted_at: acceptedAt, ...(version ? { tos_version: version } : {}) })
-    .eq('id', userId)
-    .is('tos_accepted_at', null)
-  if (error && !isMissingAgeBandColumn(error)) {
-    console.error('[recordTosAcceptance] failed', { code: error.code, message: error.message })
-    return false
-  }
-  return true
 }
 
 /**

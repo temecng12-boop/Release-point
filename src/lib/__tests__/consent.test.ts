@@ -123,8 +123,8 @@ async function main() {
   section('Blocked copy')
 
   const coachCopy = uploadBlockedCopy('coach')
-  assert(/age isn't confirmed/.test(coachCopy.message), 'coach message: age not confirmed')
-  assert(/under 13, 13 to 17, or 18 or older/.test(coachCopy.nextStep), 'coach next step: pick a band')
+  assert(/confirms their age when they join/.test(coachCopy.message), 'coach message: the player confirms their age when they join')
+  assert(/Edit Player/.test(coachCopy.nextStep), 'coach next step: optional band in Edit Player')
   const coach13 = uploadBlockedCopy('coach', { reason: 'under_13' })
   assert(/under 13/.test(coach13.message) && /coming soon/.test(coach13.nextStep), 'coach under-13 copy: parent consent coming soon')
   const playerCopy = uploadBlockedCopy('player')

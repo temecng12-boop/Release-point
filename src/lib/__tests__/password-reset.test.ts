@@ -129,6 +129,6 @@ test('copy: login says passwords are for coaches; signup error box is an alert; 
   const login = read('app/auth/login/page.tsx')
   assert.doesNotMatch(login, /Works for coaches and players/)
   assert.match(login, /For coaches\. Use the email and password you signed up with\./)
-  assert.match(read('app/auth/signup/page.tsx'), /role="alert" className="rounded-lg px-4 py-3"/)
+  assert.match(read('app/auth/signup/signup-form.tsx'), /role="alert" className="rounded-lg px-4 py-3"/)
   assert.match(read('app/privacy/page.tsx'), /password resets/)
 })

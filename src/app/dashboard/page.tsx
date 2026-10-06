@@ -5,12 +5,8 @@ import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, canSelfConfirmAdult023, canSelfConfirmAgeBand, isFrozenUnder13, needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
-import AgeScreenForm from './age-screen-form'
-import Under13Stop from '@/components/under13-stop'
-import UploadBlockedNotice from '@/components/upload-blocked-notice'
-import PendingPlayersBanner from '@/components/pending-players-banner'
-import { loadPendingPlayers } from '@/lib/pending-players'
+import { canUploadVideo, isFrozenUnder13, needsAgeConfirm, type PlayerConsentFields } from '@/lib/consent'
+import AgeStopNotice from '@/components/age-stop-notice'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -80,8 +76,6 @@ export default async function DashboardPage() {
     : { data: null }
 
   const directPlayerIds = (directPlayers ?? []).map(p => p.id)
-  // This coach's own players who can't have video yet (banner; gone once resolved).
-  const pendingPlayers = isCoach ? await loadPendingPlayers(supabaseAdmin, user.id) : []
   const allPlayerIds = [...new Set([...allTeamPlayerIds, ...directPlayerIds])]
 
   // All clips across all players
@@ -133,22 +127,19 @@ export default async function DashboardPage() {
   const playerNameMap = Object.fromEntries((recentPlayers ?? []).map(p => [p.id, p.full_name]))
 
   // ── Player data ─────────────────────────────────────────────────────────────
-  const { data: playerRow } = !isCoach
-    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null; guardian_id: string | null } & PlayerConsentFields>(
-        'id, full_name, position, coach_id, guardian_id',
-        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).single(),
+  const { data: playerRow, error: playerReadError } = !isCoach
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null } & PlayerConsentFields>(
+        'id, full_name, position, coach_id',
+        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle(),
       )
-    : { data: null }
+    : { data: null, error: null }
 
-  // A coach-invited player (or a new coachless account) answers the age
-  // screen before anything else (037).
-  if (!isCoach && needsFirstAgeScreen(playerRow)) redirect('/onboarding/age')
+  // A player whose age isn't confirmed yet (coach-invited, Google/Apple, no
+  // players row yet) answers the one screen first, once.
+  if (!isCoach && !playerReadError && needsAgeConfirm(playerRow)) redirect('/onboarding/age')
   // Under 13 is a hard stop for now: the account shows only the stop message.
   const frozen = !isCoach && isFrozenUnder13(playerRow)
   if (!isCoach && playerRow && !playerRow.position && !frozen) redirect('/onboarding')
-
-  // A coachless player with no age on file answers once, at the top.
-  const selfConfirm = canSelfConfirmAgeBand(playerRow) || canSelfConfirmAdult023(playerRow)
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
@@ -268,8 +259,6 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </div>
-
-            <PendingPlayersBanner players={pendingPlayers} />
 
             {/* ── Onboarding wizard ── */}
             {teams.length === 0 && allPlayerIds.length === 0 && (
@@ -402,16 +391,7 @@ export default async function DashboardPage() {
         ) : (
           /* ── Player view ── */
           <div className="space-y-6">
-            {frozen && <Under13Stop />}
-            {selfConfirm && playerRow && (
-              <UploadBlockedNotice
-                viewer="player"
-                reason="age_band"
-                selfConfirm
-                testId="player-age-banner"
-                action={<AgeScreenForm compact />}
-              />
-            )}
+            {frozen && <AgeStopNotice />}
             {!frozen && (<>
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
@@ -447,7 +427,6 @@ export default async function DashboardPage() {
                     playerName={playerRow.full_name ?? 'Player'}
                     consent={playerRow}
                     viewer="player"
-                    selfConfirm={selfConfirm}
                   />
                 )}
               </div>

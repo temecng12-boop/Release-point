@@ -2,8 +2,6 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { loadPendingPlayers } from '@/lib/pending-players'
-import PendingPlayersBanner from '@/components/pending-players-banner'
 import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
@@ -102,9 +100,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const playerIds = players?.map((p) => p.id) ?? []
 
-  // Banner of this coach's own players who can't have video yet.
-  const pendingPlayers = await loadPendingPlayers(supabaseAdmin, user.id, ownPlayerIds)
-
   // The edit form saves the player's full set of this coach's teams, so give
   // it all of the coach's teams and every one of them the player is on.
   // Otherwise saving here would drop the player from the coach's other teams.
@@ -198,8 +193,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
         </div>
-
-        <PendingPlayersBanner players={pendingPlayers} />
 
         <TeamInviteForm teamId={id} />
 

@@ -20,6 +20,7 @@ const MARKETING_FILES = [
   'app/waitlist/page.tsx',
   'app/waitlist/waitlist-form.tsx',
   'app/auth/signup/page.tsx',
+  'app/auth/signup/signup-form.tsx',
   'app/layout.tsx',
   'app/manifest.ts',
   'components/SiteFooter.tsx',

@@ -19,7 +19,7 @@ const PUBLIC = [
 ]
 const PROTECTED = [
   '/dashboard', '/dashboard/team/1', '/clips/abc', '/clips/compare', '/profile/1', '/onboarding', '/guardian',
-  '/player-settings', '/api/ai-chat', '/api/debug-clip', '/icons', '/iconography', '/profile/icon', '/manifest',
+  '/player-settings', '/api/ai-chat', '/icons', '/iconography', '/profile/icon', '/manifest',
   '/sw.jsx', '/robots', '/dashboard/opengraph-imagex', '/clips/sw.js.bak',
 ]
 
