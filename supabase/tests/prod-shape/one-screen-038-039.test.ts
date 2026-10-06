@@ -1,13 +1,14 @@
 /**
- * Migrations 038 (grandfather existing players; the CEO's paste file, as is)
- * and 039 (Terms history, Terms columns locked, grade ranges aren't ages) in
+ * Migrations 038 (grandfather existing players: the CEO's prod-sql-038 + prod-sql-038b,
+ * both already run on prod, combined) and 039 (Terms history, Terms columns locked, grade ranges aren't ages) in
  * PGlite (in-memory; never a real database), on the prod shape (035, 036,
- * 037 applied) and on a fresh database (001-037), each run twice.
+ * 037 applied) and on a fresh database (001-037), each run twice. Also the
+ * box-only follow-up paste that clears age_screen_at on pending invites.
  * Run with: npx tsx --test supabase/tests/prod-shape/one-screen-038-039.test.ts
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { prodShapeDb, freshDb, as, tryFile, u, migration } from './prod-fixture'
@@ -66,7 +67,7 @@ async function rows(db: PGlite): Promise<Record<string, Row>> {
 }
 
 for (const shape of ['prod', 'fresh'] as const) {
-  test(`${shape}: 038 applies after 037 as is, runs twice (second run changes nothing), report works`, async () => {
+  test(`${shape}: 038 (038 + 038b) applies after 037, runs twice (second run changes nothing), report works`, async () => {
     const db = await db037(shape)
     await seed(db)
     const before = await rows(db)
@@ -84,9 +85,12 @@ for (const shape of ['prod', 'fresh'] as const) {
     assert.deepEqual(once.solo, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: true, video: true })
     assert.deepEqual(once.nolan, { age_band: '18_plus', source: 'coach', coach: '18_plus', self: null, screened: true, video: true })
     assert.deepEqual(once.pending, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: true, video: true })
-    // Rows that already had a band are untouched.
-    for (const k of ['coachBand', 'frozen', 'grade', 'youthRange', 'u12', 'plainYouth', 'gradeNoBand', 'bareRange'] as const) assert.deepEqual(once[k], before[k], k)
-    assert.equal(once.coachBand.screened, false, 'a band set before 038 keeps age_screen_at empty (038 only touches rows with no band)')
+    // Rows that already had a band keep it; 038b marks them past the age screen too.
+    for (const k of ['coachBand', 'frozen', 'grade', 'youthRange', 'u12', 'plainYouth', 'gradeNoBand', 'bareRange'] as const) {
+      assert.deepEqual(once[k], { ...before[k], screened: true }, k)
+    }
+    assert.equal(before.coachBand.screened, false)
+    assert.deepEqual(Object.values(once).filter((r) => !r.screened), [], '038b: every existing player is past the age screen')
     // The report (its last statement) runs on its own.
     const report = (await db.query<{ full_name: string }>(readFileSync(M038, 'utf8').split('COMMIT;')[1])).rows
     assert.equal(report.length, 12)
@@ -99,9 +103,9 @@ for (const shape of ['prod', 'fresh'] as const) {
     assert.equal(await tryFile(db, M039), '')
     assert.equal(await tryFile(db, M039), '', 'runs twice')
     const r = await rows(db)
-    assert.deepEqual(r.grade, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: false, video: true }, '"9-12" (grades): the coach band now stands')
-    assert.deepEqual(r.bareRange, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: false, video: true }, 'bare "10-12" no longer counts')
-    assert.deepEqual(r.gradeNoBand, { age_band: null, source: null, coach: null, self: null, screened: false, video: false }, 'no answers, grade team: unknown (sees the one screen), still no video')
+    assert.deepEqual(r.grade, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: true, video: true }, '"9-12" (grades): the coach band now stands')
+    assert.deepEqual(r.bareRange, { age_band: '13_17', source: 'coach', coach: '13_17', self: null, screened: true, video: true }, 'bare "10-12" no longer counts')
+    assert.deepEqual(r.gradeNoBand, { age_band: null, source: null, coach: null, self: null, screened: true, video: false }, 'no answers, grade team: unknown, still no video (038b marked it past the screen, so only the coach can set a band, in Edit Player)')
     assert.equal(r.youthRange.age_band, 'under_13', '"Youth 10-12" still under 13')
     assert.equal(r.youthRange.source, 'age_group')
     assert.equal(r.u12.age_band, 'under_13', 'U12 still under 13 (younger wins over the coach\'s 18+)')
@@ -206,9 +210,9 @@ test('SQL age_group_is_under_13 (039) matches ageGroupIsUnder13 in src/lib/age-b
   assert.equal((await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13(NULL) x`)).rows[0].x, ageGroupIsUnder13(null))
 })
 
-test('paste files are byte-identical to migrations 038 and 039', () => {
+test('038 matches its DO-NOT-PASTE reference copy; 039 matches its paste file (byte-identical)', () => {
   const pairs: [string, string][] = [
-    [M038, join(ROOT, 'prod-sql-038-grandfather-existing-players.sql')],
+    [M038, join(ROOT, 'prod-sql-038-combined.reference.sql')],
     [M039, join(ROOT, 'prod-sql-039-terms-history-tos-lock-grade-ranges.sql')],
   ]
   for (const [m, paste] of pairs) {
@@ -216,4 +220,85 @@ test('paste files are byte-identical to migrations 038 and 039', () => {
     try { pasteBytes = readFileSync(paste) } catch { continue } // paste files live outside the repo (box only)
     assert.ok(readFileSync(m).equals(pasteBytes), `${paste} differs from ${m}`)
   }
+  assert.match(readFileSync(M038, 'utf8').split('\n').slice(0, 3).join(' '), /prod-sql-038[\s\S]*prod-sql-038b[\s\S]*ALREADY RUN ON PROD[\s\S]*DO NOT PASTE/)
+  const sql = readFileSync(M038, 'utf8')
+  assert.equal(sql.match(/^COMMIT;$/gm)?.length, 1, 'one transaction')
+  assert.ok(sql.indexOf('WHERE age_band IS NULL;') < sql.indexOf('UPDATE public.players SET age_screen_at = now() WHERE age_screen_at IS NULL;'), "038b's UPDATE after 038's")
+  assert.ok(sql.indexOf('UPDATE public.players SET age_screen_at = now()') < sql.indexOf('COMMIT;'), 'inside the transaction')
+  assert.equal(sql.split('COMMIT;')[1].trim().match(/^SELECT/gm)?.length, 1, 'one read-only report at the end')
+})
+
+// What prod actually ran: the two paste files, one after the other (box only).
+const P038 = join(ROOT, 'prod-sql-038-grandfather-existing-players.sql')
+const P038B = join(ROOT, 'prod-sql-038b-no-age-screen.sql')
+test('prod: combined 038 leaves the same rows as prod-sql-038 then prod-sql-038b', { skip: !existsSync(P038) || !existsSync(P038B) }, async () => {
+  const state = async (db: PGlite) => (await db.query(`SELECT id, age_band, age_band_source, age_band_coach, age_band_self, age_confirmed_by, age_confirmed_at IS NOT NULL c, age_screen_at IS NOT NULL s, public.player_has_video_consent(id) v FROM players ORDER BY id`)).rows
+  const a = await db037('prod'); await seed(a)
+  assert.equal(await tryFile(a, M038), '')
+  const b = await db037('prod'); await seed(b)
+  assert.equal(await tryFile(b, P038), '')
+  assert.equal(await tryFile(b, P038B), '')
+  assert.deepEqual(await state(a), await state(b))
+})
+
+// Follow-up paste (box only): pending invites that 038/038b marked past the screen see the one screen again.
+const PENDING_Q = join(ROOT, 'pending-invites-age-screen.sql')
+const RESET = join(ROOT, 'prod-sql-reset-pending-invite-age-screen.sql')
+test('prod: the pending-invite query counts by coach; the reset clears only those rows, twice, and blocks nothing for active players', { skip: !existsSync(PENDING_Q) || !existsSync(RESET) }, async () => {
+  const db = await db037('prod')
+  await seed(db)
+  assert.equal(await tryFile(db, M038), '')
+  assert.equal(await tryFile(db, M039), '')
+  // After 038/038b: eight pending invites (no user_id); the signed-in players are not counted.
+  const query = readFileSync(PENDING_Q, 'utf8')
+  const where = (f: string) => readFileSync(f, 'utf8').match(/WHERE\s+(?:p\.)?user_id IS NULL[\s\S]*?age_band_self IS NULL/)![0].replace(/p\./g, '').replace(/\s+/g, ' ')
+  assert.equal(where(PENDING_Q), where(RESET), 'same WHERE clause in the query and the paste')
+  const counts = (await db.query<{ coach_email: string; pending_invites_marked_past_screen: number }>(query)).rows
+  assert.deepEqual(counts.map((r) => [r.coach_email, Number(r.pending_invites_marked_past_screen)]), [['c@x', 8]])
+  assert.ok(counts.every((r) => Object.keys(r).length === 2), 'counts by coach email only, no player names')
+
+  const snap = async () => (await db.query<Record<string, unknown>>(`SELECT id, user_id, age_band, age_band_coach, age_band_self, age_band_source, age_confirmed_at, age_screen_at, public.player_has_video_consent(id) video FROM players ORDER BY id`)).rows
+  const before = await snap()
+  assert.equal(await tryFile(db, RESET), '')
+  const once = await snap()
+  assert.equal(await tryFile(db, RESET), '', 'runs twice')
+  assert.deepEqual(await snap(), once, 'second run changes nothing')
+  for (const [i, r] of once.entries()) {
+    const was = before[i]
+    if (was.user_id === null && was.age_band_self === null) {
+      assert.equal(r.age_screen_at, null, `pending ${String(r.id)}: sees the one screen`)
+      assert.deepEqual({ ...r, age_screen_at: null }, { ...was, age_screen_at: null }, 'nothing else changes (band, video)')
+    } else {
+      assert.deepEqual(r, was, `signed-in or answered ${String(r.id)}: untouched`)
+    }
+  }
+  assert.deepEqual((await db.query(query)).rows, [], 'the query now finds none')
+  const report = (await db.query<Record<string, number>>(readFileSync(RESET, 'utf8').split('COMMIT;')[1])).rows[0]
+  assert.equal(Number(report.pending_still_marked_expect_0), 0)
+  assert.equal(Number(report.pending_will_see_one_screen), 8)
+  assert.equal(Number(report.signed_in_without_screen), 0)
+
+  // Grandfathered active players: nothing blocked. Video still allowed, own clip and coach clip writes work,
+  // the one screen isn't shown to them (age_screen_at kept).
+  const nolan = once.find((r) => r.id === P.nolan)!, invited = once.find((r) => r.id === P.invited)!
+  assert.equal(nolan.video, true); assert.equal(invited.video, true)
+  assert.ok(nolan.age_screen_at && invited.age_screen_at)
+  assert.equal((await as(db, COACH, `INSERT INTO clips (id, player_id, uploaded_by, storage_path, title) VALUES ($1,$2,$3,$4,'x')`, [u(9301), P.nolan, COACH, `${P.nolan}/a.mp4`])).err, '', 'coach clip for an active 18+ player')
+  // A player's own upload goes through createClip (service role, after the same video check).
+  assert.equal((await as(db, 'service', `INSERT INTO clips (id, player_id, uploaded_by, storage_path, title) VALUES ($1,$2,$3,$4,'x')`, [u(9302), P.invited, KID, `${P.invited}/b.mp4`])).err, '', 'own clip for an active 13-17 player')
+  assert.equal((await as(db, KID, `UPDATE profiles SET full_name = 'Kid K' WHERE id = auth.uid()`)).n, 1)
+
+  // A pending invite accepting afterwards: links, answers the one screen once (younger wins), accepts the Terms.
+  const PU = u(9401)
+  await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'pendinginvite@x','{}')`, [PU])
+  assert.equal((await as(db, 'service', `UPDATE players SET user_id=$1, accepted_at=now() WHERE email='pendinginvite@x' AND user_id IS NULL`, [PU])).n, 1, 'link on accept')
+  assert.equal((await as(db, 'service', `UPDATE players SET age_band_self='13_17', age_screen_at=now() WHERE id=$1 AND age_screen_at IS NULL AND age_band_self IS NULL`, [P.pending])).n, 1, 'the one screen answer is accepted')
+  assert.equal((await as(db, 'service', `INSERT INTO terms_acceptances (user_id, tos_version) VALUES ($1,'2026-10-03')`, [PU])).err, '')
+  const after = (await db.query<{ age_band: string; video: boolean }>(`SELECT age_band, public.player_has_video_consent(id) video FROM players WHERE id=$1`, [P.pending])).rows[0]
+  assert.deepEqual(after, { age_band: '13_17', video: true })
+  assert.equal((await as(db, 'service', `UPDATE players SET age_band_self='18_plus', age_screen_at=now() WHERE id=$1 AND age_screen_at IS NULL AND age_band_self IS NULL`, [P.pending])).n, 0, 'only once')
+
+  // Guard: before 037 the paste refuses and changes nothing.
+  const old = (await prodShapeDb()).db
+  assert.match(await tryFile(old, RESET), /migration 037 is not applied/)
 })
