@@ -115,7 +115,7 @@ export default function LoginPage() {
           </div>
 
           <div className="rounded-2xl overflow-hidden bg-white" style={{ border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-            <div className="h-px bg-[#E8102A]" />
+            <div className="h-px bg-[#C8031E]" />
             <div className="p-8">
               <div className="mb-6">
                 <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Sign In</h1>
@@ -137,7 +137,7 @@ export default function LoginPage() {
                       style={{
                         ...os,
                         background: active ? '#ffffff' : 'transparent',
-                        color: active ? '#0f172a' : '#94a3b8',
+                        color: active ? 'var(--rp-navy, #023167)' : '#94a3b8',
                         border: active ? '1px solid #e2e8f0' : '1px solid transparent',
                         boxShadow: active ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
                       }}
@@ -149,8 +149,8 @@ export default function LoginPage() {
               </div>
 
               {urlError && (
-                <div role="alert" className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
-                  <p className="text-sm text-[#E8102A]">
+                <div role="alert" className="rounded-lg px-4 py-3 mb-4" style={{ background: 'rgba(200,3,30,0.06)', border: '1px solid rgba(200,3,30,0.2)' }}>
+                  <p className="text-sm text-[#C8031E]">
                     {urlError === 'confirmation_failed'
                       ? 'That sign-in link has expired or already been used. Request a new one below.'
                       : 'Sign-in failed. Please try again.'}
@@ -179,8 +179,8 @@ export default function LoginPage() {
                     />
                   </div>
                   {forgotState.error && (
-                    <div id="forgot-error" role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
-                      <p className="text-sm text-[#E8102A]">{forgotState.error}</p>
+                    <div id="forgot-error" role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(200,3,30,0.06)', border: '1px solid rgba(200,3,30,0.2)' }}>
+                      <p className="text-sm text-[#C8031E]">{forgotState.error}</p>
                     </div>
                   )}
                   {forgotState.success && (
@@ -227,8 +227,8 @@ export default function LoginPage() {
                   </div>
                   <p className="text-[11px] text-slate-400">Players: use the <button type="button" onClick={() => setMagicMode(true)} className="text-slate-600 underline underline-offset-2 max-sm:min-h-11 max-sm:min-w-11">Email Link</button> tab instead.</p>
                   {state?.error && (
-                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
-                      <p className="text-sm text-[#E8102A]">{state.error}</p>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(200,3,30,0.06)', border: '1px solid rgba(200,3,30,0.2)' }}>
+                      <p className="text-sm text-[#C8031E]">{state.error}</p>
                     </div>
                   )}
                   <button
@@ -254,8 +254,8 @@ export default function LoginPage() {
                     />
                   </div>
                   {magicState.error && (
-                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
-                      <p className="text-sm text-[#E8102A]">{magicState.error}</p>
+                    <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(200,3,30,0.06)', border: '1px solid rgba(200,3,30,0.2)' }}>
+                      <p className="text-sm text-[#C8031E]">{magicState.error}</p>
                     </div>
                   )}
                   {magicState.success && (

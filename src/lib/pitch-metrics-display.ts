@@ -21,14 +21,14 @@ export type PitchMetricTile = {
   /** Optional secondary label under the name (Axis only). */
   subtitle: string | null
   unit: string
-  /** Accent bar / number color — existing app palette (brand tokens not live yet). */
+  /** Accent bar / number color — promo brand primary for velo; other tiles keep distinct accents. */
   accent: string
   /** Display string for the big number, or null when empty (UI shows an em dash). */
   value: string | null
 }
 
 const ACCENT = {
-  velocity: '#C8102E',
+  velocity: '#C8031E',
   spin_rate: '#3B82F6',
   vertical_break: '#10B981',
   horizontal_break: '#8B5CF6',

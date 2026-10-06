@@ -32,7 +32,7 @@ const HITTING_PHASES = [
 const RATINGS: { value: Rating; label: string; color: string }[] = [
   { value: 'good',       label: 'Good',       color: '#16a34a' },
   { value: 'needs_work', label: 'Needs Work', color: '#d97706' },
-  { value: 'critical',   label: 'Focus',      color: '#E8102A' },
+  { value: 'critical',   label: 'Focus',      color: '#C8031E' },
 ]
 
 interface PhaseRow {
@@ -95,12 +95,12 @@ export default function PhaseChecklist({
       {/* Summary strip */}
       {ratedCount > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-          <div className="h-px" style={{ background: 'linear-gradient(to right, #16a34a, #d97706, #E8102A)' }} />
+          <div className="h-px" style={{ background: 'linear-gradient(to right, #16a34a, #d97706, #C8031E)' }} />
           <div className="grid grid-cols-3 divide-x divide-slate-100">
             {[
               { label: 'Good',       count: goodCount,    color: '#16a34a' },
               { label: 'Needs Work', count: needsCount,   color: '#d97706' },
-              { label: 'Focus',      count: criticalCount, color: '#E8102A' },
+              { label: 'Focus',      count: criticalCount, color: '#C8031E' },
             ].map(s => (
               <div key={s.label} className="px-4 py-3 text-center">
                 <p className="text-xl tracking-tight" style={{ ...os, color: s.color }}>{s.count}</p>
@@ -116,7 +116,7 @@ export default function PhaseChecklist({
         {phases.map((phase, i) => {
           const phaseDef = (isPitcher ? PITCHING_PHASES : HITTING_PHASES)[i]
           const ratingObj = RATINGS.find(r => r.value === phase.rating)
-          const borderColor = phase.rating === 'critical'   ? 'rgba(232,16,42,0.35)'
+          const borderColor = phase.rating === 'critical'   ? 'rgba(200,3,30,0.35)'
                             : phase.rating === 'needs_work' ? 'rgba(217,119,6,0.3)'
                             : phase.rating === 'good'       ? 'rgba(22,163,74,0.3)'
                             : '#e2e8f0'
@@ -201,11 +201,11 @@ export default function PhaseChecklist({
               onClick={handleSave}
               disabled={ratedCount === 0 || saveState === 'saving'}
               className="relative overflow-hidden text-xs text-white rounded-lg transition-all disabled:opacity-40 min-w-[120px] h-9 flex items-center justify-center max-sm:h-11"
-              style={{ ...os, background: saveState === 'done' ? '#16a34a' : '#E8102A' }}
+              style={{ ...os, background: saveState === 'done' ? '#16a34a' : '#C8031E' }}
               whileTap={{ scale: 0.95 }}
               animate={{
                 scale: saveState === 'saving' ? 0.97 : 1,
-                background: saveState === 'done' ? '#16a34a' : '#E8102A',
+                background: saveState === 'done' ? '#16a34a' : '#C8031E',
               }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             >
@@ -255,7 +255,7 @@ export default function PhaseChecklist({
               </AnimatePresence>
             </motion.button>
           </div>
-          {error && <p className="text-xs text-[#E8102A] mt-2">{error}</p>}
+          {error && <p className="text-xs text-[#C8031E] mt-2">{error}</p>}
         </div>
       )}
     </div>

@@ -53,7 +53,7 @@ export default async function AgeConfirmPage() {
   const defaultName = player?.data?.full_name || profile.data?.full_name || (user.user_metadata?.full_name as string | undefined) || ''
   return (
     <Shell>
-      <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-2" style={os}>Welcome</p>
+      <p className="text-[11px] text-[#C8031E] tracking-[0.3em] mb-2" style={os}>Welcome</p>
       <h1 className="text-xl text-slate-950 mb-6 tracking-tight" style={os}>Finish Setting Up</h1>
       <AgeConfirmForm mode="account" action={confirmAgeAndTerms} defaultName={defaultName} email={user.email} next="/onboarding" />
     </Shell>

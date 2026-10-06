@@ -68,7 +68,7 @@ function SessionList({
         </p>
         <button
           onClick={onNew}
-          className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors"
+          className="text-xs bg-[#C8031E] hover:bg-[#A30219] text-white px-3 py-1.5 rounded-md transition-colors"
           style={oswald}
         >
           + New Session
@@ -98,12 +98,12 @@ function SessionList({
               >
                 {confirmDel === s.id ? (
                   <div className="flex items-center justify-between">
-                    <span role={deleteError ? 'alert' : undefined} className={`text-xs ${deleteError ? 'text-[#C8102E]' : 'text-[#456080]'}`}>{deleteError ?? 'Delete this session?'}</span>
+                    <span role={deleteError ? 'alert' : undefined} className={`text-xs ${deleteError ? 'text-[#C8031E]' : 'text-[#456080]'}`}>{deleteError ?? 'Delete this session?'}</span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDelete(s.id)}
                         disabled={deleting === s.id}
-                        className="text-xs bg-[#C8102E] text-white px-2 py-0.5 rounded"
+                        className="text-xs bg-[#C8031E] text-white px-2 py-0.5 rounded"
                       >
                         {deleting === s.id ? '…' : 'Delete'}
                       </button>
@@ -143,7 +143,7 @@ function SessionList({
                       )}
                       <button
                         onClick={() => { setConfirmDel(s.id); setDeleteError(null) }}
-                        className="text-[#3D5166] hover:text-[#C8102E] transition-colors"
+                        className="text-[#3D5166] hover:text-[#C8031E] transition-colors"
                         title="Delete"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,7 +239,7 @@ function BuildSession({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-[10px] tracking-widest text-[#456080]" style={oswald}>Pitches</label>
-            <button onClick={addPitch} className="text-[10px] text-[#1C3A5C] hover:text-[#C8102E] transition-colors" style={oswald}>
+            <button onClick={addPitch} className="text-[10px] text-[#1C3A5C] hover:text-[#C8031E] transition-colors" style={oswald}>
               + Add Pitch
             </button>
           </div>
@@ -267,7 +267,7 @@ function BuildSession({
                     >+</button>
                   </div>
                   {pitches.length > 1 && (
-                    <button onClick={() => removePitch(i)} className="text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0">
+                    <button onClick={() => removePitch(i)} className="text-[#3D5166] hover:text-[#C8031E] transition-colors shrink-0">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -299,11 +299,11 @@ function BuildSession({
         </div>
       </div>
 
-      {error && <p className="text-xs text-[#C8102E] mt-3">{error}</p>}
+      {error && <p className="text-xs text-[#C8031E] mt-3">{error}</p>}
       <button
         onClick={handleSave}
         disabled={saving}
-        className="mt-4 w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
+        className="mt-4 w-full bg-[#C8031E] hover:bg-[#A30219] text-white rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
         style={oswald}
       >
         {saving ? 'Saving…' : 'Save Session Plan'}
@@ -373,7 +373,7 @@ function RunSession({
         <div className="w-20">
           <div className="h-1.5 bg-[#DDE4ED] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#C8102E] rounded-full transition-all"
+              className="h-full bg-[#C8031E] rounded-full transition-all"
               style={{ width: `${target > 0 ? Math.min(100, (thrown / target) * 100) : 0}%` }}
             />
           </div>
@@ -402,7 +402,7 @@ function RunSession({
               <div className="h-1 bg-[#DDE4ED] rounded-full overflow-hidden mb-3">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, backgroundColor: done ? '#22c55e' : '#C8102E' }}
+                  style={{ width: `${pct}%`, backgroundColor: done ? '#22c55e' : '#C8031E' }}
                 />
               </div>
               <div className="flex items-center justify-center gap-6">
@@ -416,7 +416,7 @@ function RunSession({
                 <span className="text-3xl text-[#0F1F33] w-12 text-center" style={oswald}>{p.thrown}</span>
                 <button
                   onClick={() => increment(i)}
-                  className="w-11 h-11 rounded-full border-2 border-[#C8102E] text-[#C8102E] text-xl flex items-center justify-center active:scale-95 transition-transform active:bg-[#C8102E] active:text-white"
+                  className="w-11 h-11 rounded-full border-2 border-[#C8031E] text-[#C8031E] text-xl flex items-center justify-center active:scale-95 transition-transform active:bg-[#C8031E] active:text-white"
                 >
                   +
                 </button>
@@ -426,7 +426,7 @@ function RunSession({
         })}
       </div>
 
-      {error && <p className="text-xs text-[#C8102E] mt-3">{error}</p>}
+      {error && <p className="text-xs text-[#C8031E] mt-3">{error}</p>}
       <button
         onClick={handleComplete}
         disabled={saving}
@@ -503,7 +503,7 @@ export default function BullpenModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#DDE4ED] shrink-0">
           <div>
-            <p className="text-[10px] tracking-[0.25em] text-[#C8102E]" style={oswald}>Bullpen</p>
+            <p className="text-[10px] tracking-[0.25em] text-[#C8031E]" style={oswald}>Bullpen</p>
             <p className="text-sm text-[#0F1F33]" style={oswald}>{playerName}</p>
           </div>
           <button onClick={onClose} className="text-[#3D5166] hover:text-[#0F1F33] transition-colors">

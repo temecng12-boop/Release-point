@@ -106,8 +106,8 @@ export default function ClipTabs({
             <button
               key={tab}
               onClick={() => setActive(tab)}
-              className="relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center max-sm:min-h-11"
-              style={{ ...os, color: isActive ? '#0f172a' : '#94a3b8' }}
+              className={`relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center max-sm:min-h-11 ${isActive ? 'rp-tab-active' : ''}`}
+              style={{ ...os, color: isActive ? 'var(--rp-navy, #023167)' : '#94a3b8' }}
             >
               <span className="hidden sm:inline">{TAB_LABEL[tab](isPitcher)}</span>
               <span className="sm:hidden">{TAB_SHORT[tab](isPitcher)}</span>
@@ -115,8 +115,8 @@ export default function ClipTabs({
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator"
-                  className="absolute bottom-0 inset-x-0 h-px"
-                  style={{ background: '#E8102A' }}
+                  className="rp-tab-indicator absolute bottom-0 inset-x-0 h-0.5"
+                  style={{ background: 'var(--rp-navy, #023167)' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                 />
               )}

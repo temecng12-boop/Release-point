@@ -24,7 +24,7 @@ test('every unlayered header display rule skips .hidden', () => {
 
 test('the header still hides the wordmark and secondary links on phones', () => {
   const header = readFileSync(join(__dirname, '..', '..', 'components', 'app-header.tsx'), 'utf8')
-  assert.match(header, /wordmarkClass="hidden md:inline"/)
+  assert.match(header, /wordmarkClass="hidden min-\[480px\]:inline/)
   assert.match(header, /hidden sm:inline/)
 })
 

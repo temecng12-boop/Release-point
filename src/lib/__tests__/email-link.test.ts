@@ -67,8 +67,8 @@ test('login page: Email Link uses requestEmailLink and shows its result', () => 
 
 test('login page: every error box is announced (role="alert")', () => {
   const login = read('app/auth/login/page.tsx')
-  // Each red error container (the rgba(232,16,42,...) box) carries role="alert".
-  const boxes = [...login.matchAll(/<div\b[^>]*background: 'rgba\(232,16,42,0\.06\)'[^>]*>/g)].map(m => m[0])
+  // Each red error container (the rgba(200,3,30,...) box) carries role="alert".
+  const boxes = [...login.matchAll(/<div\b[^>]*background: 'rgba\(200,3,30,0\.06\)'[^>]*>/g)].map(m => m[0])
   assert.equal(boxes.length, 4, 'url error, password error, forgot-password error, email-link error')
   for (const box of boxes) assert.match(box, /role="alert"/, box)
   for (const cond of ['urlError', 'state\\?\\.error', 'forgotState\\.error', 'magicState\\.error']) {
