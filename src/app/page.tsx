@@ -35,11 +35,11 @@ export default async function HomePage() {
             </Link>
           ) : (
             <>
-              <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2" style={os}>
-                Sign In
+              <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center" style={os}>
+                Sign in
               </Link>
-              <Link href="/auth/signup" className="text-xs bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
-                Get Started
+              <Link href="/waitlist" className="text-xs bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white px-5 py-2 rounded-lg transition-all max-sm:min-h-11 max-sm:inline-flex max-sm:items-center" style={os}>
+                Join the waitlist
               </Link>
             </>
           )}
@@ -87,26 +87,30 @@ export default async function HomePage() {
               <div className="flex flex-col sm:flex-row gap-3 mb-8">
                 <MagneticButton>
                   <Link
-                    href="/auth/signup"
-                    className="block px-8 py-4 bg-[#C8031E] hover:bg-[#A30219] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(200,3,30,0.25)] hover:shadow-[0_8px_32px_rgba(200,3,30,0.35)]"
+                    href="/waitlist"
+                    className="block px-8 py-4 bg-[#C8031E] hover:bg-[#A30219] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(200,3,30,0.25)] hover:shadow-[0_8px_32px_rgba(200,3,30,0.35)] max-sm:min-h-11"
                     style={os}
                   >
-                    Get Started: Coaches
+                    Join the waitlist
                   </Link>
                 </MagneticButton>
                 <MagneticButton>
                   <Link
                     href="/auth/login"
-                    className="block px-8 py-4 text-sm rounded-xl transition-all text-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
+                    className="block px-8 py-4 text-sm rounded-xl transition-all text-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 max-sm:min-h-11"
                     style={os}
                   >
-                    Player Login
+                    Already testing? Sign in
                   </Link>
                 </MagneticButton>
               </div>
 
+              <p className="text-sm text-slate-500 leading-relaxed max-w-md mb-6">
+                Release Point is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
+                get AI Coach insights, and share it all with their players, from youth to pro.
+              </p>
               <div className="flex items-center gap-5 flex-wrap">
-                {['Built for coaches', 'All levels'].map((t) => (
+                {['Pitching and hitting', 'Youth through pro'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5 text-[#C8031E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -450,11 +454,11 @@ export default async function HomePage() {
                 </svg>
               </div>
               <div>
-                <p className="text-white text-sm mb-1" style={os}>Join the Waitlist</p>
+                <p className="text-white text-sm mb-1" style={os}>Join the waitlist</p>
                 <p className="text-[#8096AE] text-xs leading-relaxed">Be first in line for early access. We&apos;ll reach out when your spot is ready.</p>
               </div>
               <span className="text-[10px] text-[#C8031E] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
-                Get Early Access
+                Join the waitlist
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>
@@ -494,27 +498,29 @@ export default async function HomePage() {
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 110%, rgba(200,3,30,0.15) 0%, transparent 65%)' }} />
         <div className="relative max-w-4xl mx-auto px-6 py-36 md:py-52 text-center">
-          <p className="text-[10px] tracking-[0.35em] text-white/30 mb-6" style={os}>Join the platform</p>
-          <h2 className="text-[clamp(44px,8vw,88px)] leading-[0.88] text-white mb-10 tracking-tight" style={os}>
-            Upgrade Your<br />Program<br /><span className="text-[#C8031E]">Today.</span>
+          <p className="text-[10px] tracking-[0.35em] text-white/30 mb-6" style={os}>Early access</p>
+          <h2 className="text-[clamp(44px,8vw,88px)] leading-[0.88] text-white mb-6 tracking-tight" style={os}>
+            Join the<br />waitlist
           </h2>
+          <p className="text-sm text-white/50 max-w-lg mx-auto mb-10 leading-relaxed">
+            We&apos;re in internal testing, so new coaches start on the waitlist.
+          </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href="/auth/signup"
-              className="inline-block px-12 py-4 bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(200,3,30,0.3)] hover:shadow-[0_8px_40px_rgba(200,3,30,0.4)]"
+              href="/waitlist"
+              className="inline-block px-12 py-4 bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(200,3,30,0.3)] hover:shadow-[0_8px_40px_rgba(200,3,30,0.4)] max-sm:min-h-11"
               style={os}
             >
-              Get Started: Coaches
+              Join the waitlist
             </Link>
             <Link
               href="/auth/login"
-              className="inline-block px-12 py-4 text-sm rounded-xl transition-all text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5"
+              className="inline-block px-12 py-4 text-sm rounded-xl transition-all text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 max-sm:min-h-11"
               style={os}
             >
-              Player Login
+              Already testing? Sign in
             </Link>
           </div>
-          <p className="text-xs text-white/20 mt-6">Built for coaches and players</p>
         </div>
       </section>
 

@@ -312,18 +312,13 @@ export default function LoginPage() {
 
               <div className="mt-5 pt-5 space-y-2 text-center" style={{ borderTop: '1px solid #e2e8f0' }}>
                 <p className="text-[10px] text-slate-400 tracking-widest mb-3" style={os}>New here?</p>
-                <div className="flex gap-2">
-                  {['Coach Account', 'Player Account'].map(l => (
-                    <Link
-                      key={l}
-                      href="/auth/signup"
-                      className="flex-1 py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all text-center max-sm:min-h-11 max-sm:flex max-sm:items-center max-sm:justify-center"
-                      style={{ ...os, border: '1px solid #e2e8f0' }}
-                    >
-                      {l}
-                    </Link>
-                  ))}
-                </div>
+                <Link
+                  href="/waitlist"
+                  className="inline-flex items-center justify-center w-full py-2.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all max-sm:min-h-11"
+                  style={{ ...os, border: '1px solid #e2e8f0' }}
+                >
+                  New here? Join the waitlist
+                </Link>
               </div>
             </div>
           </div>
