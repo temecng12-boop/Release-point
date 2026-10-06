@@ -149,7 +149,7 @@ export default function RecordButton({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-6 w-[22rem] space-y-4">
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Name This Clip</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#C8031E]" style={oswald}>Name This Clip</p>
           <input
             autoFocus
             value={title}
@@ -200,7 +200,7 @@ export default function RecordButton({
           {/* Recording indicator */}
           {phase === 'recording' && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 rounded-full px-4 py-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#C8102E] animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#C8031E] animate-pulse" />
               <span className="text-white text-sm font-mono">{fmtElapsed(elapsed)}</span>
             </div>
           )}
@@ -230,7 +230,7 @@ export default function RecordButton({
               {phase === 'preview' ? (
                 <button
                   onClick={startRecording}
-                  className="w-16 h-16 rounded-full bg-[#C8102E] hover:bg-[#9E0E24] flex items-center justify-center transition-colors shadow-lg"
+                  className="w-16 h-16 rounded-full bg-[#C8031E] hover:bg-[#A30219] flex items-center justify-center transition-colors shadow-lg"
                   title="Start recording"
                 >
                   <span className="w-5 h-5 rounded-full bg-white" />
@@ -241,14 +241,14 @@ export default function RecordButton({
                   className="w-16 h-16 rounded-full bg-white flex items-center justify-center transition-colors shadow-lg"
                   title="Stop recording"
                 >
-                  <span className="w-5 h-5 rounded-sm bg-[#C8102E]" />
+                  <span className="w-5 h-5 rounded-sm bg-[#C8031E]" />
                 </button>
               )}
             </div>
 
             <div className="w-16 text-right">
               {phase === 'preview' && <span className="text-white/40 text-xs" style={oswald}>Ready</span>}
-              {phase === 'recording' && <span className="text-[#C8102E] text-xs animate-pulse" style={oswald}>REC</span>}
+              {phase === 'recording' && <span className="text-[#C8031E] text-xs animate-pulse" style={oswald}>REC</span>}
             </div>
           </div>
         )}
@@ -259,12 +259,12 @@ export default function RecordButton({
   // ── Idle trigger ─────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-end gap-1">
-      {error && <p className="text-xs text-[#C8102E]">{error}</p>}
+      {error && <p className="text-xs text-[#C8031E]">{error}</p>}
       <button
         onClick={openCamera}
         className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 max-sm:min-h-11"
       >
-        <span className="w-2 h-2 rounded-full bg-[#C8102E] shrink-0" />
+        <span className="w-2 h-2 rounded-full bg-[#C8031E] shrink-0" />
         Record
       </button>
     </div>

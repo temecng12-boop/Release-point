@@ -29,7 +29,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
       }}
     >
       <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
-        <Logo size="sm" href="/" className="shrink-0 max-sm:min-h-11" wordmarkClass="hidden md:inline" />
+        <Logo size="sm" href="/" className="shrink-0 max-sm:min-h-11" wordmarkClass="hidden min-[480px]:inline whitespace-nowrap" />
         {breadcrumbs?.map((crumb, i) => (
           // A linked crumb is hidden on phones together with its "/".
           <span key={i} className={`${crumb.href ? 'hidden sm:inline-flex' : 'flex'} items-center gap-1.5 sm:gap-2.5 min-w-0`}>

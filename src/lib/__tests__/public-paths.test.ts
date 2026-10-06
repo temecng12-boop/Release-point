@@ -14,7 +14,7 @@ const PUBLIC = [
   '/manifest.webmanifest', '/icon', '/icon1', '/icon-abc123', '/icon/small', '/apple-icon', '/apple-icon-x1',
   '/sw.js', '/robots.txt', '/sitemap.xml', '/favicon.ico',
   '/opengraph-image', '/twitter-image', '/about/opengraph-image', '/about/opengraph-image-1a2b', '/twitter-image2',
-  '/logo.png', '/rp-icon.png', '/media/nolan-release.jpg', '/file.svg', '/annotation-test.html', '/fonts/x.woff2',
+  '/logo.png', '/rp-icon.png', '/rp-mark-small-color.svg', '/rp-mark-color.svg', '/media/nolan-release.jpg', '/file.svg', '/annotation-test.html', '/fonts/x.woff2',
   '/_next/static/chunks/main.js', '/_next/image',
 ]
 const PROTECTED = [

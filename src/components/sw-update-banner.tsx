@@ -28,7 +28,7 @@ export default function SwUpdateBanner() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="min-h-11 px-4 rounded-md bg-[#C8102E] hover:bg-[#A50D26] text-sm tracking-wider focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="min-h-11 px-4 rounded-md bg-[#C8031E] hover:bg-[#A30219] text-sm tracking-wider focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
           style={oswald}
         >
           Reload

@@ -205,7 +205,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <TeamLeaderboard entries={leaderboardEntries} />
 
         <div>
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-3" style={oswald}>
+          <p className="text-[10px] tracking-[0.3em] text-[color:var(--rp-navy,#023167)] mb-3" style={oswald}>
             Roster ({rosterCount})
           </p>
 

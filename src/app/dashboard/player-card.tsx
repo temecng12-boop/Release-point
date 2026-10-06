@@ -21,17 +21,18 @@ export default function PlayerCard({ player, clipCount }: Props) {
   return (
     <Link
       href={`/profile/${player.id}`}
-      className="flex items-center gap-3 bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 hover:bg-[#F0F4F8] hover:border-[#456080] transition-all shadow-sm group cursor-pointer"
+      className="rp-roster-card flex items-center gap-3 bg-white border rounded-lg px-4 py-3 transition-all shadow-sm group cursor-pointer max-sm:min-h-11"
+      aria-label={`Open ${player.full_name}'s profile`}
     >
       <div
-        className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#1C3A5C] to-[#456080] flex items-center justify-center text-xs text-white shrink-0"
-        style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-xs text-white shrink-0"
+        style={{ background: 'linear-gradient(to bottom right, var(--rp-navy, #023167), #456080)', fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}
       >
         {initials(player.full_name)}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-[#0F1F33] group-hover:text-[#1C3A5C] truncate font-medium">
+        <p className="text-sm text-[#0F1F33] group-hover:text-[color:var(--rp-navy,#023167)] truncate font-medium">
           {player.full_name}
         </p>
         <p className="text-[11px] text-[#3D5166] truncate capitalize">

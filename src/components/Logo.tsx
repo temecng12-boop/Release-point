@@ -5,6 +5,7 @@ interface Props {
   size?: 'sm' | 'md' | 'lg'
   href?: string
   className?: string
+  /** Tailwind classes for the wordmark span. Default: mark-only below 480px. */
   wordmarkClass?: string
   dark?: boolean
 }
@@ -15,24 +16,24 @@ const oswald: React.CSSProperties = {
   fontWeight: 700,
 }
 
-// rp-icon.png native dimensions: 937 × 582 (ratio 1.610)
+// rp-mark-small-color.svg viewBox aspect ≈ 1.61 (same family as the old PNG).
 const iconH  = { sm: 28, md: 34, lg: 48 }
-const wordSz = { sm: 11, md: 13, lg: 18 }
 
 export default function Logo({
   size = 'sm',
   href,
   className = '',
-  wordmarkClass = 'hidden sm:inline',
+  // Design: mark-only <480px; one-line wordmark from 480 up (mobile-wordmark-fix.md).
+  wordmarkClass = 'hidden min-[480px]:inline whitespace-nowrap',
   dark = false,
 }: Props) {
   const h = iconH[size]
   const w = Math.round(h * 1.610)
 
   const mark = (
-    <div className={`inline-flex items-center gap-2.5 ${className}`}>
+    <div className={`inline-flex items-center gap-2.5 shrink-0 ${className}`}>
       <Image
-        src="/rp-icon.png"
+        src="/rp-mark-small-color.svg"
         alt="Release Point"
         width={w}
         height={h}
@@ -40,12 +41,13 @@ export default function Logo({
         priority
       />
       <span
+        aria-hidden="true"
         className={wordmarkClass}
         style={{
           ...oswald,
-          fontSize: wordSz[size],
+          fontSize: 'clamp(12px, 2.4vw, 14px)',
           letterSpacing: '0.15em',
-          color: dark ? '#94a3b8' : '#0f172a',
+          color: dark ? '#94a3b8' : 'var(--rp-navy, #023167)',
         }}
       >
         Release Point

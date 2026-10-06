@@ -295,7 +295,7 @@ const oswald  = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }
 const divider = { borderTop: '1px solid #DDE4ED' }
 const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors max-sm:min-h-11 max-sm:min-w-11'
 const btnIdle = 'text-[#456080] hover:bg-[#EEF2F7] hover:text-[#0F1F33]'
-const btnOn   = 'bg-[#C8102E] text-white'
+const btnOn   = 'rp-cta'
 const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border border-[#DDE4ED]'
 
 // ── component ──────────────────────────────────────────────────────────────
@@ -1230,7 +1230,7 @@ export default function VideoPlayer({
           ref={scrubRef}
           type="range" min="0" max="1000" defaultValue="0" step="1"
           onInput={onScrubInput} onChange={onScrubChange}
-          className="flex-1 accent-[#C8102E] cursor-pointer h-1 max-sm:h-11"
+          className="flex-1 accent-[#C8031E] cursor-pointer h-1 max-sm:h-11"
         />
       </div>
 
@@ -1346,7 +1346,7 @@ export default function VideoPlayer({
             </button>
           </div>
           {reframeSaveErr && (
-            <p className="w-full text-[0.65rem] text-[#C8102E] font-mono break-all">{reframeSaveErr}</p>
+            <p className="w-full text-[0.65rem] text-[#C8031E] font-mono break-all">{reframeSaveErr}</p>
           )}
         </div>
       )}
@@ -1354,6 +1354,7 @@ export default function VideoPlayer({
       {/* Stamp input row */}
       {isCoach && stampMode && (
         <div className="mt-2 pt-2 flex items-center gap-2" style={divider}>
+          <span className="rp-callout-navy text-[0.65rem] tracking-wider px-2 py-1 rounded shrink-0 max-sm:min-h-11 inline-flex items-center" style={oswald}>Timestamped notes</span>
           <span className="text-[0.68rem] text-[#8096AE] tabular-nums shrink-0" style={oswald}>{fmtTime(currentTime)}</span>
           <input
             autoFocus
@@ -1366,37 +1367,39 @@ export default function VideoPlayer({
           <button
             onClick={saveStamp}
             disabled={stampSaving || !stampText.trim()}
-            className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0 max-sm:min-h-11"
+            className="rp-cta text-xs px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0 max-sm:min-h-11"
             style={oswald}
           >
             {stampSaving ? 'Saving…' : 'Save'}
           </button>
           <button
             onClick={() => { setStampMode(false); setStampText('') }}
-            className="text-xs text-[#8096AE] hover:text-[#C8102E] transition-colors max-sm:min-h-11 max-sm:min-w-11"
+            className="text-xs text-[#8096AE] hover:text-[#C8031E] transition-colors max-sm:min-h-11 max-sm:min-w-11"
           >
             ✕
           </button>
         </div>
       )}
       {isCoach && stampMode && stampError && (
-        <p role="alert" className="mt-1 text-xs text-[#C8102E]">Stamp not saved: {stampError}</p>
+        <p role="alert" className="mt-1 text-xs text-[#C8031E]">Stamp not saved: {stampError}</p>
       )}
 
       {/* Lesson recording */}
       {canRecord && lessonPhase !== 'idle' ? (
         <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
-          <span className="w-2 h-2 rounded-full bg-[#C8102E] animate-pulse shrink-0" />
-          <span className="text-xs text-[#C8102E]" style={oswald}>
-            Recording · {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
+          <span className="rp-callout-navy inline-flex items-center gap-2 rounded-md px-3 py-1.5 max-sm:min-h-11">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+            <span className="text-xs text-white" style={oswald}>
+              Recording · {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
+            </span>
           </span>
           <button
             onClick={stopLessonRecording}
             disabled={lessonPhase === 'saving'}
-            className={`${btnBase} bg-slate-950 text-white ml-auto disabled:opacity-50`}
+            className={`${btnBase} rp-cta ml-auto disabled:opacity-50`}
             style={oswald}
           >
-            {lessonPhase === 'saving' ? 'Saving…' : 'Stop'}
+            {lessonPhase === 'saving' ? 'Saving…' : 'Stop & save'}
           </button>
         </div>
       ) : canRecord && !canAddMedia ? (
@@ -1413,7 +1416,7 @@ export default function VideoPlayer({
           >
             ● Record Lesson
           </button>
-          {lessonError && <span className="text-xs text-[#C8102E]">{lessonError}</span>}
+          {lessonError && <span className="text-xs text-[#C8031E]">{lessonError}</span>}
           {lessonNotice && !lessonError && (lessonNotice === 'Lesson saved'
             ? <span className="text-xs text-slate-400" style={oswald}>{lessonNotice}</span>
             : <span role="status" className="text-xs text-[#B45309]">{lessonNotice}</span>)}
@@ -1433,7 +1436,7 @@ export default function VideoPlayer({
                 <button
                   onClick={() => removeAnnotation(m.ref)}
                   disabled={!m.ref.id}
-                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none disabled:opacity-40 max-sm:min-h-11 max-sm:min-w-11"
+                  className="ml-auto text-[#8096AE] hover:text-[#C8031E] transition-colors leading-none disabled:opacity-40 max-sm:min-h-11 max-sm:min-w-11"
                   title={m.ref.id ? 'Remove annotation' : 'Saving…'}
                 >
                   ✕
@@ -1448,7 +1451,7 @@ export default function VideoPlayer({
       <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
         {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">· coach annotations</span>}
-        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8102E]">{markError}</p>}
+        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8031E]">{markError}</p>}
       </div>
     </div>
   )

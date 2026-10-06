@@ -132,7 +132,7 @@ export default function AgeConfirmForm({
           required
           checked={tosAccepted}
           onChange={(e) => setTosAccepted(e.target.checked)}
-          className="mt-0.5 w-5 h-5 accent-[#E8102A] shrink-0"
+          className="mt-0.5 w-5 h-5 accent-[#C8031E] shrink-0"
         />
         <span className="text-xs text-slate-500 leading-relaxed">
           I agree to the{' '}
@@ -143,7 +143,7 @@ export default function AgeConfirmForm({
       </label>
       {state?.error && (
         <div role="alert" className="rounded-lg px-4 py-3" style={{ background: 'rgba(232,16,42,0.06)', border: '1px solid rgba(232,16,42,0.2)' }}>
-          <p className="text-sm text-[#E8102A]">{state.error}</p>
+          <p className="text-sm text-[#C8031E]">{state.error}</p>
         </div>
       )}
       <button

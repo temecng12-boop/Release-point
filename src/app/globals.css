@@ -13,20 +13,22 @@
   --text-2: #64748b;
   --text-3: #94a3b8;
 
-  /* Accent */
-  --accent:     #E8102A;
-  --accent-dim: #A50D1E;
+  /* Brand (promo v8 / brand-kit tokens.css) */
+  --accent:     #C8031E;   /* primary CTA / record / stamp */
+  --accent-dim: #A30219;   /* hover/pressed */
+  --rp-navy:    #023167;   /* active tabs, callouts, headers */
+  --rp-navy-50: #EEF3FA;
 
   /* Light surfaces */
   --glass-bg:     rgba(0,0,0,0.02);
   --glass-border: #e2e8f0;
 
-  /* Legacy */
-  --navy:    #0B1E36;
-  --navy-2:  #14304F;
-  --navy-3:  #20486F;
-  --red:     #E8102A;
-  --red-dim: #A50D1E;
+  /* Legacy aliases → brand */
+  --navy:    #023167;
+  --navy-2:  #01264F;
+  --navy-3:  #1C3A5C;
+  --red:     #C8031E;
+  --red-dim: #A30219;
   --white:   #FFFFFF;
   --bone:    #F6F5F1;
   --ink:     #0f172a;
@@ -40,6 +42,8 @@
   --color-navy-2: var(--navy-2);
   --color-navy-3: var(--navy-3);
   --color-red:    var(--red);
+  --color-accent: var(--accent);
+  --color-rp-navy: var(--rp-navy);
   --color-bone:   var(--bone);
   --color-ink:    var(--ink);
   --color-slate:  var(--slate);
@@ -233,4 +237,29 @@ h1, h2, h3, .display {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
   }
+}
+
+/* ─── Promo v8 brand chrome helpers (clip / header) ─────────────────────── */
+.rp-cta {
+  background: var(--accent);
+  color: #fff;
+}
+.rp-cta:hover { background: var(--accent-dim); }
+.rp-tab-active {
+  color: var(--rp-navy) !important;
+}
+.rp-tab-indicator {
+  background: var(--rp-navy);
+}
+.rp-callout-navy {
+  background: var(--rp-navy);
+  color: #fff;
+}
+.rp-roster-card {
+  border-color: #DDE4ED;
+}
+.rp-roster-card:hover,
+.rp-roster-card:focus-visible {
+  border-color: var(--rp-navy);
+  background: var(--rp-navy-50);
 }

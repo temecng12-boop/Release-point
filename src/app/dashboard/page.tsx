@@ -225,17 +225,17 @@ export default async function DashboardPage() {
               className="rounded-2xl overflow-hidden"
               style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
             >
-              <div className="h-px bg-[#E8102A]" />
+              <div className="h-px bg-[#C8031E]" />
               <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white shrink-0 font-bold"
-                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)' }}
+                    style={{ ...os, background: 'linear-gradient(135deg, #C8031E, #A30219)' }}
                   >
                     {(profile?.full_name ?? user.email ?? 'C').split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Head Coach</p>
+                    <p className="text-[10px] text-[color:var(--rp-navy,#023167)] tracking-[0.3em]" style={os}>Head Coach</p>
                     <h1 className="text-lg text-slate-950 truncate leading-tight tracking-tight" style={os}>
                       {profile?.full_name ?? user.email?.split('@')[0] ?? 'Coach'}
                     </h1>
@@ -284,7 +284,7 @@ export default async function DashboardPage() {
             {/* ── Teams grid ── */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Your Teams</p>
+                <p className="text-[11px] tracking-[0.25em] text-[color:var(--rp-navy,#023167)]" style={os}>Your Teams</p>
                 <span className="text-[11px] text-slate-400" style={os}>{teams.length} {teams.length === 1 ? 'team' : 'teams'}</span>
               </div>
 
@@ -302,7 +302,7 @@ export default async function DashboardPage() {
                       className="group rounded-xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
                       style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
                     >
-                      <div className="h-0.5 bg-[#E8102A]" />
+                      <div className="h-0.5 bg-[#C8031E]" />
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div className="min-w-0">
@@ -359,7 +359,7 @@ export default async function DashboardPage() {
             {recentClips.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Recent Activity</p>
+                  <p className="text-[11px] tracking-[0.25em] text-[color:var(--rp-navy,#023167)]" style={os}>Recent Activity</p>
                   <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total clips</span>
                 </div>
                 <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
@@ -375,7 +375,7 @@ export default async function DashboardPage() {
                         style={{ borderBottom: i < recentClips.length - 1 ? '1px solid #f1f5f9' : undefined }}
                       >
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                          <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3.5 h-3.5 text-[#C8031E]" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                           </svg>
                         </div>
@@ -386,7 +386,7 @@ export default async function DashboardPage() {
                           </p>
                         </div>
                         {i === 0 && (
-                          <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
+                          <span className="text-[10px] bg-[#C8031E] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
                         )}
                         <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -409,19 +409,19 @@ export default async function DashboardPage() {
               border: '1px solid #e2e8f0',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              <div className="h-px bg-[#E8102A]" />
+              <div className="h-px bg-[#C8031E]" />
               <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(232,16,42,0.04) 0%, transparent 70%)' }} />
+                style={{ background: 'radial-gradient(circle, rgba(200,3,30,0.04) 0%, transparent 70%)' }} />
 
               <div className="relative px-4 sm:px-7 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <div
                   className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl text-white shrink-0"
-                  style={{ ...os, background: '#E8102A', boxShadow: '0 4px 12px rgba(232,16,42,0.2)' }}
+                  style={{ ...os, background: '#C8031E', boxShadow: '0 4px 12px rgba(200,3,30,0.2)' }}
                 >
                   {(playerRow?.full_name ?? 'P').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
+                  <p className="text-[11px] text-[color:var(--rp-navy,#023167)] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
                   <h1 className="text-2xl text-slate-950 leading-tight truncate tracking-tight" style={os}>
                     {playerRow?.full_name ?? 'Player'}
                   </h1>
@@ -483,9 +483,9 @@ export default async function DashboardPage() {
                 {(myMetrics?.length ?? 0) > 0 && (
                   <>
                     <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <div className="h-0.5 bg-[#E8102A]" />
+                      <div className="h-0.5 bg-[#C8031E]" />
                       <div className="p-5">
-                        <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-4" style={os}>Career Stats</p>
+                        <p className="text-[12px] text-[color:var(--rp-navy,#023167)] tracking-[0.2em] mb-4" style={os}>Career Stats</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           {[
                             { label: 'Pitches Logged', value: myMetrics!.length },
@@ -504,9 +504,9 @@ export default async function DashboardPage() {
 
                     {bestPitch && (
                       <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                        <div className="h-px bg-[#E8102A]" />
+                        <div className="h-px bg-[#C8031E]" />
                         <div className="p-5">
-                          <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
+                          <p className="text-[12px] text-[color:var(--rp-navy,#023167)] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
                           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                             <div>
                               <p className="text-3xl sm:text-4xl text-slate-950 leading-none tracking-tight" style={os}>
@@ -529,7 +529,7 @@ export default async function DashboardPage() {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-[#E8102A] tracking-[0.3em]" style={os}>Your Clips ({myClips.length})</p>
+                  <p className="text-xs text-[color:var(--rp-navy,#023167)] tracking-[0.3em]" style={os}>Your Clips ({myClips.length})</p>
                   <Link href="/player-settings" className="text-xs text-slate-400 hover:text-slate-700 transition-colors max-sm:inline-flex max-sm:items-center max-sm:min-h-11" style={os}>
                     Edit Profile →
                   </Link>
@@ -544,7 +544,7 @@ export default async function DashboardPage() {
                       style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
                     >
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                        <svg className="w-5 h-5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-[#C8031E]" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       </div>
@@ -555,7 +555,7 @@ export default async function DashboardPage() {
                         </p>
                       </div>
                       {i === 0 && (
-                        <span className="text-xs bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>Latest</span>
+                        <span className="text-xs bg-[#C8031E] text-white px-2 py-0.5 rounded shrink-0" style={os}>Latest</span>
                       )}
                       <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

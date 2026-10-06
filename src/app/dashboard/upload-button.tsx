@@ -156,7 +156,7 @@ export default function UploadButton({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-6 w-[22rem] space-y-4">
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Name This Clip</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#C8031E]" style={oswald}>Name This Clip</p>
           <input
             autoFocus
             value={title}
@@ -195,12 +195,12 @@ export default function UploadButton({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-7 w-80 space-y-5">
-          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Optimizing Video</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#C8031E]" style={oswald}>Optimizing Video</p>
           <p className="text-sm text-[#0F1F33]">Compressing to 720p for faster playback…</p>
           <div>
             <div className="h-1.5 bg-[#DDE4ED] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#C8102E] rounded-full transition-all duration-300"
+                className="h-full bg-[#C8031E] rounded-full transition-all duration-300"
                 style={{ width: `${compressPct}%` }}
               />
             </div>
@@ -248,7 +248,7 @@ export default function UploadButton({
           e.target.value = ''
         }}
       />
-      {error && <p className="text-xs text-[#C8102E]">{error}</p>}
+      {error && <p className="text-xs text-[#C8031E]">{error}</p>}
       <button
         onClick={() => phase === 'idle' && inputRef.current?.click()}
         disabled={phase === 'uploading'}

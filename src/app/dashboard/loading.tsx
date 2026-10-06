@@ -12,7 +12,7 @@ export default function DashboardLoading() {
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
         {/* Hero card */}
         <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-          <div className="h-px bg-[#E8102A]" />
+          <div className="h-px bg-[#C8031E]" />
           <div className="px-7 py-7 flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="w-16 h-16 rounded-xl shimmer shrink-0" />
             <div className="flex-1 space-y-2.5">
