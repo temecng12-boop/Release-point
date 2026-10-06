@@ -210,16 +210,16 @@ test('SQL age_group_is_under_13 (039) matches ageGroupIsUnder13 in src/lib/age-b
   assert.equal((await db.query<{ x: boolean }>(`SELECT public.age_group_is_under_13(NULL) x`)).rows[0].x, ageGroupIsUnder13(null))
 })
 
-test('038 matches its DO-NOT-PASTE reference copy; 039 matches its paste file (byte-identical)', () => {
-  const pairs: [string, string][] = [
-    [M038, join(ROOT, 'prod-sql-038-combined.reference.sql')],
-    [M039, join(ROOT, 'prod-sql-039-terms-history-tos-lock-grade-ranges.sql')],
-  ]
-  for (const [m, paste] of pairs) {
-    let pasteBytes: Buffer
-    try { pasteBytes = readFileSync(paste) } catch { continue } // paste files live outside the repo (box only)
-    assert.ok(readFileSync(m).equals(pasteBytes), `${paste} differs from ${m}`)
+// The paste files live next to the repo on the build box only; elsewhere this is reported as skipped, not passed.
+const REF038 = join(ROOT, 'prod-sql-038-combined.reference.sql')
+const PASTE039 = join(ROOT, 'prod-sql-039-terms-history-tos-lock-grade-ranges.sql')
+test('038 matches its DO-NOT-PASTE reference copy; 039 matches its paste file (byte-identical)', { skip: !existsSync(REF038) || !existsSync(PASTE039) }, () => {
+  for (const [m, paste] of [[M038, REF038], [M039, PASTE039]] as const) {
+    assert.ok(readFileSync(m).equals(readFileSync(paste)), `${paste} differs from ${m}`)
   }
+})
+
+test('038 is one transaction: 038 then 038b, then one read-only report; marked DO NOT PASTE', () => {
   assert.match(readFileSync(M038, 'utf8').split('\n').slice(0, 3).join(' '), /prod-sql-038[\s\S]*prod-sql-038b[\s\S]*ALREADY RUN ON PROD[\s\S]*DO NOT PASTE/)
   const sql = readFileSync(M038, 'utf8')
   assert.equal(sql.match(/^COMMIT;$/gm)?.length, 1, 'one transaction')

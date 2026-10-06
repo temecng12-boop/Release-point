@@ -3,10 +3,9 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { needsAgeConfirm, type PlayerConsentFields } from '@/lib/consent'
+import type { PlayerConsentFields } from '@/lib/consent'
 import { AGE_STOP_COOKIE } from '@/lib/age-band'
 import { agePageRoute } from '@/lib/age-gate-routing'
-import { freezeUnder13Account } from '@/lib/under13-freeze'
 import { confirmAgeAndTerms } from '@/app/actions/age'
 import AgeConfirmForm from '@/components/age-confirm-form'
 import AgeStopNotice from '@/components/age-stop-notice'
@@ -40,15 +39,11 @@ export default async function AgeConfirmPage() {
     : null
 
   const route = agePageRoute(stopCookie, profile, player)
-  if (route === 'stop') {
-    // This browser answered under 13 in the last 24 hours. A player account
-    // that hasn't answered yet (e.g. a Google sign-in from the sign-in page
-    // right after) is frozen and blanked the same way as an answer here.
-    if (profile.data?.role === 'player' && player && !player.error && needsAgeConfirm(player.data)) {
-      await freezeUnder13Account(supabaseAdmin, user.id)
-    }
-    return <Shell><AgeStopNotice /></Shell>
-  }
+  // This browser answered under 13 in the last 24 hours: the stop message
+  // only, and confirmAgeAndTerms refuses every submission until it expires.
+  // Nothing is written: an account is frozen and blanked only by its own
+  // under-13 answer (src/lib/under13-freeze.ts), never by the cookie alone.
+  if (route === 'stop') return <Shell><AgeStopNotice /></Shell>
   if (route === 'error') {
     console.error('[onboarding/age] account read failed', { userId: user.id, profile: !!profile.error, player: !!player?.error })
     return <AccountLoadError retryHref="/onboarding/age" />

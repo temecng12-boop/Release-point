@@ -8,6 +8,8 @@
  * - the /onboarding/age fallback: an under-13 answer freezes the account,
  *   blanks the profile (no name left anywhere), deletes the photo, removes
  *   the provider's name and photo from the auth user, marks it for deletion;
+ *   the stop cookie alone (no answer from that account) shows the stop and
+ *   refuses answers but writes and scrubs nothing;
  * - the coach signup refuses while the 24-hour stop cookie is set;
  * - the dashboard / age page loop can't happen.
  * Run with: TSX_TSCONFIG_PATH=src/lib/__tests__/actions/tsconfig.json npx tsx --test src/lib/__tests__/actions/oauth-age-freeze.test.ts
@@ -243,14 +245,42 @@ test('rescrubFrozenAccount: a frozen account signing in again loses the provider
   assert.equal(authAdmin.metadataUpdates.length, 1)
 })
 
-test('age page: the stop cookie with an unanswered player account signed in (Google right after an under-13 answer) freezes and blanks it', async () => {
+test('age page: the stop cookie with an unanswered player signed in shows the stop and refuses the answer, but writes and scrubs nothing', async () => {
+  // E.g. an under-13 answer on the signup page, then Google from the sign-in page in the same browser.
   googleAccount()
   state.cookies.rp_age_stop = { value: '1' }
+  const before = structuredClone({ tables: state.tables, storage: state.storage, user: state.user })
   const el = await quiet(() => AgeConfirmPage()) as { props: { children: { type: unknown } } }
-  assert.equal(el.props.children.type, AgeStopNotice)
+  assert.equal(el.props.children.type, AgeStopNotice, 'the stop screen')
+  // The submission (any date, even an older one) is refused for 24 hours.
+  for (const birth of [UNDER_13, ADULT]) {
+    assert.deepEqual(await quiet(() => confirmAgeAndTerms(undefined, fd({ ...birth, full_name: NAME, tos: 'yes' }))), { stopped: true })
+  }
+  // Nothing written, frozen or scrubbed: same rows, same files, same auth metadata, no sign-out.
+  assert.deepEqual(state.ops.filter((o) => o.action !== 'select'), [], JSON.stringify(state.ops.filter((o) => o.action !== 'select')))
+  assert.deepEqual({ tables: state.tables, storage: state.storage, user: state.user }, before)
+  assert.equal(authAdmin.metadataUpdates.length, 0)
+  assert.equal(state.signOuts, 0)
+  assert.equal(state.tables.players.length, 0, 'no frozen players row')
+  assert.equal(state.tables.profiles[0].full_name, NAME)
+  assert.equal(state.tables.profiles[0].frozen_at ?? null, null)
+  assert.equal(state.tables.profiles[0].deletion_requested_at ?? null, null)
+})
+
+test('age page: without the cookie the same account\'s own under-13 answer freezes and scrubs it (no name left)', async () => {
+  googleAccount()
+  const el = await quiet(() => AgeConfirmPage()) as { props: { children: unknown } }
+  assert.match(JSON.stringify(el.props.children, (_k, v) => (typeof v === 'function' ? v.name : v)), /AgeConfirmForm|account/, 'the form, not the stop')
+  assert.deepEqual(await quiet(() => confirmAgeAndTerms(undefined, fd({ ...UNDER_13, full_name: NAME, tos: 'yes' }))), { stopped: true })
   assert.equal(state.tables.players[0].age_band_self, 'under_13')
   assert.equal(state.tables.profiles[0].full_name, null)
+  assert.ok(state.tables.profiles[0].frozen_at && state.tables.profiles[0].deletion_requested_at)
+  assert.equal(authAdmin.metadataUpdates.length, 1)
   noNameLeft()
+  // From then on the cookie is set: the page shows the stop and further answers are refused.
+  assert.equal(state.cookies.rp_age_stop?.value, '1')
+  const el2 = await quiet(() => AgeConfirmPage()) as { props: { children: { type: unknown } } }
+  assert.equal(el2.props.children.type, AgeStopNotice)
 })
 
 test('age page: the stop cookie never touches an account that already answered, or a coach', async () => {
