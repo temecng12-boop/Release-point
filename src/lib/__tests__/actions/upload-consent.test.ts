@@ -47,15 +47,15 @@ const quiet = async <R>(fn: () => Promise<R>) => {
 test('getSignedUploadUrl: player without consent -> friendly error, no upload URL made', async () => {
   seed()
   const r = await getSignedUploadUrl(VIDEO) as { error?: string }
-  assert.equal(String(r.error), "Your age isn't confirmed yet, so video can't be added yet. Confirm your age at the top of your dashboard.")
+  assert.equal(String(r.error), "Your age isn't confirmed yet, so video can't be added yet. Ask your coach.")
   assert.deepEqual(state.storageOps, [], 'no signed upload URL, so nothing can be uploaded')
 })
 
 test('getSignedUploadUrl: coached player and coach get their own next step', async () => {
   seed({ coach: true })
-  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /Ask your coach to confirm your age\./)
+  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /Ask your coach\./)
   seed({ coach: true, user: COACH })
-  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /Pick their age \(under 13, 13 to 17, or 18 or older\) in Edit Player or on their profile/)
+  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /confirms their age when they join\. You can also set their age in Edit Player\./)
   assert.deepEqual(state.storageOps, [])
 })
 

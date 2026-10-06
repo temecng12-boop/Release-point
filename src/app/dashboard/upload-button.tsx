@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
@@ -57,8 +57,6 @@ export default function UploadButton({
   maxFiles = 20,
   consent,
   viewer = 'coach',
-  blockedAction,
-  selfConfirm = false,
   showBlockedNotice = true,
 }: {
   playerId: string
@@ -67,10 +65,6 @@ export default function UploadButton({
   /** The player's stored consent status (see src/lib/consent.ts). Required. */
   consent: PlayerConsentFields
   viewer?: UploadBlockedViewer
-  /** Optional control shown under the blocked message, e.g. "Mark as 18+". */
-  blockedAction?: ReactNode
-  /** The player confirms 18+ themself (see canSelfConfirmAdult). */
-  selfConfirm?: boolean
   /** Set false when the parent renders its own UploadBlockedNotice. */
   showBlockedNotice?: boolean
 }) {
@@ -154,7 +148,7 @@ export default function UploadButton({
   // ── consent gate ──────────────────────────────────────────────────────────
   if (!canUploadVideo(consent)) {
     if (!showBlockedNotice) return null
-    return <UploadBlockedNotice viewer={viewer} action={blockedAction} selfConfirm={selfConfirm} reason={pendingReason(consent) ?? undefined} className="max-w-xs" />
+    return <UploadBlockedNotice viewer={viewer} reason={pendingReason(consent) ?? undefined} className="max-w-xs" />
   }
 
   // ── naming overlay ───────────────────────────────────────────────────────

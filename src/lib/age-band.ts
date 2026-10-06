@@ -6,7 +6,7 @@
 //     into a band right away and never store the month or year.
 //   * The coach answers with a band. When answers differ, the YOUNGER band
 //     wins (spec T2), and an under-13 age group ("Youth 10-12", "12U") counts
-//     as an under-13 answer. The plain age group "Youth" (no numbers)
+//     as an under-13 answer (grade ranges like "9-12" don't; migration 039). The plain age group "Youth" (no numbers)
 //     counts as under 13 only when no band is known from the coach or the
 //     player. Migration 037's players_set_age_band trigger does
 //     the same; the database result is the one stored.
@@ -35,17 +35,21 @@ export function youngerBand(...bands: (string | null | undefined)[]): AgeBand | 
 }
 
 /**
- * True for an age group whose top age is 12 or less: "Youth 10-12", "8 to 10",
- * "12U", "U12", "under 12". Same rule as public.age_group_is_under_13 (037).
+ * True for an under-13 age group: a U-number group ("U8" to "U12", "12U",
+ * "under 12") or an age range with the word "Youth" ("Youth 10-12"). A bare
+ * range ("9-12", "8 to 10") doesn't count: it usually means grades.
+ * Same rule as public.age_group_is_under_13 (migration 039).
  */
 export function ageGroupIsUnder13(group: string | null | undefined): boolean {
   const g = (group ?? '').toLowerCase()
-  let m = g.match(/(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})/)
-  if (m && Number(m[2]) <= 12) return true
-  m = g.match(/(?:^|[^a-z0-9])(?:u|under)\s*-?\s*(\d{1,2})(?:[^0-9]|$)/)
+  let m = g.match(/(?:^|[^a-z0-9])(?:u|under)\s*-?\s*(\d{1,2})(?:[^0-9]|$)/)
   if (m && Number(m[1]) <= 12) return true
   m = g.match(/(?:^|[^0-9])(\d{1,2})\s*-?\s*u(?:[^a-z]|$)/)
   if (m && Number(m[1]) <= 12) return true
+  if (/(^|[^a-z])youth([^a-z]|$)/.test(g)) {
+    m = g.match(/(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})/)
+    if (m && Number(m[2]) <= 12) return true
+  }
   return false
 }
 
@@ -63,7 +67,7 @@ export function ageGroupIsPlainYouth(group: string | null | undefined): boolean 
 /**
  * The effective band, as 037's trigger works it out: the younger of the
  * player's and the coach's answers (the coach's wins a tie), then under_13
- * if any age group is an under-13 range ("10-12", "12U"), or, when no band
+ * if any age group is under 13 ("Youth 10-12", "12U"), or, when no band
  * is known at all, the plain age group "Youth".
  */
 export function effectiveAgeBand(input: {
@@ -82,7 +86,7 @@ export function effectiveAgeBand(input: {
   return { band, source }
 }
 
-export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const
+export { MONTHS } from './birth-months'
 
 export type BirthAnswer = { ok: true; band: AgeBand } | { ok: false; error: string }
 
@@ -106,5 +110,5 @@ export function bandFromBirth(month: unknown, year: unknown, now: Date = new Dat
   return { ok: true, band: age < 13 ? 'under_13' : age < 18 ? '13_17' : '18_plus' }
 }
 
-/** Session cookie set after an under-13 answer: blocks trying again with another age. */
+/** Cookie set after an under-13 answer: blocks another answer for 24 hours (./age-stop-cookie). */
 export const AGE_STOP_COOKIE = 'rp_age_stop'

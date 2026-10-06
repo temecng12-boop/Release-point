@@ -1,4 +1,4 @@
-import { MONTHS } from '@/lib/age-band'
+import { MONTHS } from '@/lib/birth-months'
 
 // Neutral age screen fields (spec T1): birth month and year, no default and no
 // hint about age limits. The server turns them into a band and drops them.

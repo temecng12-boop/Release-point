@@ -5,6 +5,9 @@ export const signUpCalls: { email: string; password: string }[] = []
 /** Calls to auth.signInWithOtp (player signup links). */
 export const otpCalls: { email: string; options?: { emailRedirectTo?: string } }[] = []
 
+/** Make signInWithOtp fail (raw Supabase error). */
+export const otpFake = { error: null as null | { message: string; code?: string } }
+
 /** Session claims and updateUser behaviour for the password reset tests. */
 export const authFake = {
   claims: null as null | { amr?: unknown[] },
@@ -15,7 +18,11 @@ export const authFake = {
   reset() { this.claims = null; this.claimsError = null; this.updateError = null; this.updateThrows = false; this.updates = [] },
 }
 
+/** How many times createClient() was called (the under-13 signup stop must make none). */
+export const clientCalls = { n: 0 }
+
 export async function createClient() {
+  clientCalls.n++
   return {
     ...fakeClient,
     from: sessionFrom,
@@ -28,6 +35,7 @@ export async function createClient() {
       },
       signInWithOtp: async (args: { email: string; options?: { emailRedirectTo?: string } }) => {
         otpCalls.push(args)
+        if (otpFake.error) return { data: {}, error: otpFake.error }
         return { data: {}, error: null }
       },
       getClaims: async () => authFake.claimsError

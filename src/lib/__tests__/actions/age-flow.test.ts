@@ -1,9 +1,11 @@
 /**
  * Age bands (037) in the server actions:
- * - self-signup: birth month/year first; under 13 is a hard stop (no Supabase
- *   call, nothing stored, a session cookie blocks another answer); ToS required;
- * - the first-sign-in age screen (submitAgeAnswer): one answer, under 13
- *   stores only the band, signs the player out and sets the cookie;
+ * - self-signup, one screen: the age is checked first; under 13 is a hard stop
+ *   (no Supabase call, nothing stored or logged, a 24-hour cookie refuses every
+ *   resubmission); Terms required;
+ * - the same one screen for a signed-in player (confirmAgeAndTerms: invited or
+ *   Google/Apple): one answer, Terms recorded once (history + profile); under
+ *   13 freezes the account (band only, no name), signs out, sets the cookie;
  * - linkPlayerRow stores the signup band (younger answer wins);
  * - setPlayerAgeBand: the player's own coach only; the younger band is kept.
  * Run with: npx tsx --tsconfig src/lib/__tests__/actions/tsconfig.json --test src/lib/__tests__/actions/age-flow.test.ts
@@ -11,9 +13,9 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { resetFake, fail, state } from './fakes/db'
-import { otpCalls } from './fakes/supabase-server'
-import { checkSignupAge, signUpPlayer, linkPlayerRow } from '../../../app/actions/auth'
-import { submitAgeAnswer } from '../../../app/actions/age'
+import { clientCalls, otpCalls, otpFake } from './fakes/supabase-server'
+import { signUpPlayer, linkPlayerRow } from '../../../app/actions/auth'
+import { confirmAgeAndTerms } from '../../../app/actions/age'
 import { setPlayerAgeBand } from '../../../app/actions/player'
 import { signSignupAge, verifySignupAge } from '../../signup-age-token'
 
@@ -32,41 +34,58 @@ const quiet = async <R>(fn: () => Promise<R>) => {
   try { return await fn() } finally { console.error = e; console.warn = w }
 }
 
-beforeEach(() => { resetFake(); otpCalls.length = 0 })
+beforeEach(() => { resetFake(); otpCalls.length = 0; clientCalls.n = 0 })
 
-// ── self-signup ─────────────────────────────────────────────────────────────
-test('checkSignupAge: under 13 -> stopped, 24-hour cookie set (httpOnly, secure, sameSite=lax), nothing written', async () => {
-  assert.deepEqual(await checkSignupAge(undefined, fd(UNDER_13)), { stopped: true })
+// ── self-signup: the one screen ─────────────────────────────────────────────
+const spyConsole = () => {
+  const lines: string[] = []
+  const saved = { log: console.log, info: console.info, warn: console.warn, error: console.error, debug: console.debug }
+  for (const k of Object.keys(saved) as (keyof typeof saved)[]) console[k] = (...a: unknown[]) => { lines.push(a.map((x) => typeof x === 'string' ? x : JSON.stringify(x)).join(' ')) }
+  return { lines, restore: () => Object.assign(console, saved) }
+}
+
+test('signUpPlayer: under 13 -> stopped before any Supabase call; nothing stored or logged (no name, no email); 24-hour cookie', async () => {
+  const spy = spyConsole()
+  let r
+  try { r = await signUpPlayer(undefined, signupForm(UNDER_13)) } finally { spy.restore() }
+  assert.deepEqual(r, { stopped: true })
+  assert.equal(clientCalls.n, 0, 'no Supabase client was even created')
+  assert.equal(otpCalls.length, 0)
+  assert.deepEqual(state.ops, [], 'no database call')
+  assert.deepEqual(spy.lines, [], 'nothing logged')
   assert.equal(state.cookies.rp_age_stop?.value, '1')
   assert.deepEqual(state.cookies.rp_age_stop?.options, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 86400 })
+  assert.ok(!JSON.stringify(state).includes('p@example.com') && !JSON.stringify(state).toLowerCase().includes('pat lee'), 'name and email kept nowhere')
+})
+
+test('signUpPlayer: while the cookie is set, every resubmission is refused whatever the form says (back button, new date, no Terms, empty form)', async () => {
+  await signUpPlayer(undefined, signupForm(UNDER_13))
+  for (const form of [signupForm(ADULT), signupForm(TEEN), signupForm(ADULT, {}), fd({}), fd({ birth_month: '13', birth_year: 'x' })]) {
+    assert.deepEqual(await signUpPlayer({ error: 'old state' }, form), { stopped: true })
+  }
+  assert.equal(otpCalls.length, 0)
+  assert.equal(clientCalls.n, 0)
   assert.deepEqual(state.ops, [])
 })
 
-test('checkSignupAge: the cookie blocks another answer, even an adult one', async () => {
-  await checkSignupAge(undefined, fd(UNDER_13))
-  assert.deepEqual(await checkSignupAge(undefined, fd(ADULT)), { stopped: true })
+test('signUpPlayer: a cookie already set (another tab, a reload) refuses an adult answer before reading anything', async () => {
+  state.cookies.rp_age_stop = { value: '1' }
   assert.deepEqual(await signUpPlayer(undefined, signupForm(ADULT)), { stopped: true })
-  assert.equal(otpCalls.length, 0)
+  assert.equal(clientCalls.n, 0)
 })
 
-test('checkSignupAge: 13 to 17 and 18+ go on to step 2; invalid answers get an error', async () => {
-  assert.equal((await checkSignupAge(undefined, fd(TEEN))).ok, true)
-  assert.equal((await checkSignupAge(undefined, fd(ADULT))).ok, true)
-  assert.equal((await checkSignupAge(undefined, fd({ birth_month: '13', birth_year: '2000' }))).error, 'Enter your birth month and year.')
-  assert.equal((await checkSignupAge(undefined, fd({ birth_month: '1', birth_year: String(Y + 1) }))).error, 'Enter your birth month and year.')
+test('signUpPlayer: Terms not accepted, or no name -> error, no Supabase call', async () => {
+  assert.equal((await signUpPlayer(undefined, signupForm(ADULT, {})))?.error, 'You must accept the Terms of Service to continue.')
+  assert.equal((await signUpPlayer(undefined, fd({ ...ADULT, email: 'p@example.com', full_name: ' ', tos: 'yes' })))?.error, 'Enter your name.')
+  assert.equal(otpCalls.length, 0)
+  assert.equal(clientCalls.n, 0)
+})
+
+test('signUpPlayer: invalid birth month/year -> neutral error, no cookie, no call', async () => {
+  for (const birth of [{ birth_month: '13', birth_year: '2000' }, { birth_month: '1', birth_year: String(Y + 1) }, {}]) {
+    assert.equal((await signUpPlayer(undefined, signupForm(birth as Record<string, string>)))?.error, 'Enter your birth month and year.')
+  }
   assert.equal(state.cookies.rp_age_stop, undefined)
-})
-
-test('signUpPlayer: under 13 makes no Supabase call and stores nothing', async () => {
-  assert.deepEqual(await signUpPlayer(undefined, signupForm(UNDER_13)), { stopped: true })
-  assert.equal(otpCalls.length, 0)
-  assert.deepEqual(state.ops, [])
-  assert.ok(state.cookies.rp_age_stop)
-})
-
-test('signUpPlayer: Terms not accepted -> error, no Supabase call', async () => {
-  const r = await signUpPlayer(undefined, signupForm(ADULT, {}))
-  assert.equal(r.error, 'You must accept the Terms of Service to continue.')
   assert.equal(otpCalls.length, 0)
 })
 
@@ -74,6 +93,7 @@ test('signUpPlayer: 13 to 17 -> the band travels only as a server-signed token b
   assert.deepEqual(await signUpPlayer(undefined, signupForm(TEEN)), { sent: true, email: 'p@example.com' })
   const data = (otpCalls[0].options as { data?: Record<string, unknown> }).data!
   assert.equal(data.role, 'player')
+  assert.equal(data.full_name, 'Pat Lee')
   assert.equal('age_band' in data, false)
   assert.equal('tos_accepted_at' in data, false)
   const claims = verifySignupAge(data.signup_age, 'P@Example.com')
@@ -84,88 +104,155 @@ test('signUpPlayer: 13 to 17 -> the band travels only as a server-signed token b
   assert.ok(!decoded.includes(TEEN.birth_year) && !JSON.stringify(data).includes(TEEN.birth_year), 'birth year is not stored')
 })
 
-// ── first-sign-in age screen ────────────────────────────────────────────────
+test('signUpPlayer: the sign-in link fails -> friendly error, never the raw Supabase message', async () => {
+  otpFake.error = { message: 'Email rate limit exceeded (raw)', code: 'over_email_send_rate_limit' }
+  try {
+    const r = await quiet(() => signUpPlayer(undefined, signupForm(ADULT)))
+    assert.equal(r?.error, "We couldn't send your sign-in link. Check the email address and try again.")
+  } finally { otpFake.error = null }
+})
+
+// ── the one screen for a signed-in player (confirmAgeAndTerms) ──────────────
 const PU = { id: 'u-p', email: 'kid@example.com' }
 const seedPlayer = (row: Record<string, unknown> = {}, extra: Record<string, unknown[]> = {}) => resetFake({
   user: PU,
   tables: {
-    players: [{ id: 'p1', user_id: PU.id, coach_id: 'coach', guardian_id: null, team_id: null, age_group: null,
+    players: [{ id: 'p1', user_id: PU.id, coach_id: 'coach', guardian_id: null, team_id: null, age_group: null, full_name: 'Kid From Coach',
       age_band: null, age_band_coach: null, age_band_self: null, age_screen_at: null, age_confirmed_at: null,
       adult_confirmed_at: null, consent_given_at: null, ...row }],
+    profiles: [{ id: PU.id, role: 'player', full_name: 'Kid From Coach', tos_accepted_at: null, tos_version: null }],
+    terms_acceptances: [],
     player_teams: [], teams: [], ...extra,
   },
 })
 const p1 = () => state.tables.players[0]
+const prof = () => state.tables.profiles[0]
+const screen = (birth: Record<string, string>, extra: Record<string, string> = { tos: 'yes', full_name: 'kid lee' }) => fd({ ...birth, ...extra })
 
-test('submitAgeAnswer: invited player answers 18+, coach said 18+ -> 18+, screen done', async () => {
+test('confirmAgeAndTerms: invited player, one step: band, screen done, Terms on profile + one history row, name saved', async () => {
   seedPlayer({ age_band_coach: '18_plus', age_band: '18_plus', age_confirmed_at: 'x' })
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(ADULT)), { done: true })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(ADULT)), { done: true })
   assert.equal(p1().age_band_self, '18_plus')
   assert.equal(p1().age_band, '18_plus')
   assert.ok(p1().age_screen_at)
+  assert.ok(prof().tos_accepted_at)
+  assert.equal(prof().tos_version, '2026-10-03')
+  assert.equal(state.tables.terms_acceptances.length, 1)
+  assert.deepEqual({ ...state.tables.terms_acceptances[0], id: 'x', accepted_at: 'x' }, { id: 'x', user_id: PU.id, tos_version: '2026-10-03', accepted_at: 'x' })
+  assert.equal(p1().full_name, 'Kid Lee'); assert.equal(prof().full_name, 'Kid Lee')
+  assert.ok(!JSON.stringify(state.tables).includes(ADULT.birth_year), 'birth year not stored')
 })
 
-test('submitAgeAnswer: player answer younger than the coach\'s -> the younger band wins', async () => {
+test('confirmAgeAndTerms: player answer younger than the coach\'s -> the younger band wins', async () => {
   seedPlayer({ age_band_coach: '18_plus', age_band: '18_plus', age_confirmed_at: 'x' })
-  await submitAgeAnswer(undefined, fd(TEEN))
+  await confirmAgeAndTerms(undefined, screen(TEEN))
   assert.equal(p1().age_band, '13_17')
   assert.equal(p1().age_band_source, 'self')
   assert.equal(p1().adult_confirmed_at ?? null, null, '18+ confirmation cleared to match')
 })
 
-test('submitAgeAnswer: only one answer; a second is refused and changes nothing', async () => {
+test('confirmAgeAndTerms: only one answer; a second is refused, the band and Terms never change', async () => {
   seedPlayer({ age_band_coach: '13_17', age_band: '13_17' })
-  await submitAgeAnswer(undefined, fd(TEEN))
-  const before = structuredClone(p1())
-  const r = await submitAgeAnswer(undefined, fd(ADULT))
+  await confirmAgeAndTerms(undefined, screen(TEEN))
+  const before = structuredClone({ band: p1().age_band, self: p1().age_band_self, at: p1().age_screen_at, tos: prof().tos_accepted_at, history: state.tables.terms_acceptances.length })
+  const r = await confirmAgeAndTerms(undefined, screen(ADULT))
   assert.match(String(r?.error), /already answered/)
-  assert.deepEqual(p1(), before)
+  assert.deepEqual({ band: p1().age_band, self: p1().age_band_self, at: p1().age_screen_at, tos: prof().tos_accepted_at, history: state.tables.terms_acceptances.length }, before)
 })
 
-test('submitAgeAnswer: under 13 -> stores only the band, signs out, sets the cookie; retries are stopped', async () => {
+test('confirmAgeAndTerms: under 13 -> account frozen (only the band kept), no name or Terms saved, signed out, cookie set; retries stopped', async () => {
   seedPlayer({ age_band_coach: '13_17', age_band: '13_17', age_confirmed_at: 'x' })
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(UNDER_13)), { stopped: true })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(UNDER_13, { tos: 'yes', full_name: 'Real Child Name' })), { stopped: true })
   assert.equal(p1().age_band_self, 'under_13')
   assert.equal(p1().age_band, 'under_13')
+  assert.equal(p1().full_name, 'Kid From Coach', 'the typed name is not saved')
+  assert.ok(!JSON.stringify(state.tables).includes('Real Child Name'))
   assert.ok(!JSON.stringify(p1()).includes(UNDER_13.birth_year), 'birth year not stored')
+  assert.equal(prof().tos_accepted_at, null)
+  assert.equal(state.tables.terms_acceptances.length, 0)
+  assert.equal(state.signOuts, 1)
+  assert.deepEqual(state.cookies.rp_age_stop?.options, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 86400 })
+  const ops = state.ops.length
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(ADULT)), { stopped: true })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, fd({})), { stopped: true })
+  assert.equal(state.ops.length, ops, 'nothing read or written after the stop')
+})
+
+test('confirmAgeAndTerms: under 13 still signs out and stops if the write fails (and logs it)', async () => {
+  seedPlayer()
+  fail({ table: 'players', action: 'update', error: { message: 'boom' } })
+  assert.deepEqual(await quiet(() => confirmAgeAndTerms(undefined, screen(UNDER_13))), { stopped: true })
   assert.equal(state.signOuts, 1)
   assert.ok(state.cookies.rp_age_stop)
-  const writes = state.ops.filter(o => o.action !== 'select').length
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(ADULT)), { stopped: true })
-  assert.equal(state.ops.filter(o => o.action !== 'select').length, writes, 'nothing written after the stop')
 })
 
-test('submitAgeAnswer: under 13 still signs out and stops if the write fails (and logs it)', async () => {
-  seedPlayer()
-  fail({ table: 'players', action: 'update', error: { message: 'boom' } })
-  assert.deepEqual(await quiet(() => submitAgeAnswer(undefined, fd(UNDER_13))), { stopped: true })
-  assert.equal(state.signOuts, 1)
+test('confirmAgeAndTerms: Google/Apple account with no players row, 13 to 17 -> own row with band, name and email; Terms recorded', async () => {
+  resetFake({ user: PU, tables: { players: [], profiles: [{ id: PU.id, role: 'player', full_name: 'G User', tos_accepted_at: null }], terms_acceptances: [], player_teams: [], teams: [] } })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(TEEN)), { done: true })
+  const row = state.tables.players[0]
+  assert.equal(row.user_id, PU.id); assert.equal(row.age_band, '13_17'); assert.equal(row.age_band_self, '13_17')
+  assert.ok(row.age_screen_at); assert.equal(row.full_name, 'Kid Lee'); assert.equal(row.email, PU.email)
+  assert.equal(state.tables.terms_acceptances.length, 1)
 })
 
-test('submitAgeAnswer: write fails for an older answer -> error, not done', async () => {
+test('confirmAgeAndTerms: Google/Apple account with no players row, under 13 -> frozen row with the band only (no name, no email)', async () => {
+  resetFake({ user: PU, tables: { players: [], profiles: [{ id: PU.id, role: 'player', full_name: 'G User' }], terms_acceptances: [], player_teams: [], teams: [] } })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(UNDER_13)), { stopped: true })
+  const row = state.tables.players[0]
+  assert.equal(row.age_band_self, 'under_13'); assert.equal(row.full_name, ''); assert.equal(row.email, null)
+  const { isFrozenUnder13 } = await import('../../consent')
+  assert.equal(isFrozenUnder13(row as never), true, 'the account stays frozen on every device')
+})
+
+test('confirmAgeAndTerms: Terms not accepted, or no name -> error, nothing written', async () => {
   seedPlayer()
-  fail({ table: 'players', action: 'update', error: { message: 'boom' } })
-  const r = await quiet(() => submitAgeAnswer(undefined, fd(ADULT)))
+  assert.equal((await confirmAgeAndTerms(undefined, screen(ADULT, { full_name: 'Kid' })))?.error, 'You must accept the Terms of Service to continue.')
+  assert.equal((await confirmAgeAndTerms(undefined, screen(ADULT, { tos: 'yes', full_name: '  ' })))?.error, 'Enter your name.')
+  assert.ok(!state.ops.some((o) => o.action !== 'select'))
+})
+
+test('confirmAgeAndTerms: the band write fails -> error, not done, screen still due (Terms kept, once)', async () => {
+  seedPlayer()
+  fail({ table: 'players', action: 'update', error: { message: 'boom' }, when: () => true })
+  const r = await quiet(() => confirmAgeAndTerms(undefined, screen(ADULT)))
   assert.equal(r?.error, "We couldn't save your answer. Please try again.")
   assert.equal(p1().age_screen_at, null)
 })
 
-test('submitAgeAnswer: player on an under-13 age-group team answering 18+ -> under 13', async () => {
-  seedPlayer({ age_band_coach: '18_plus', age_band: '18_plus' }, { player_teams: [{ player_id: 'p1', team_id: 't' }], teams: [{ id: 't', age_group: '10-12' }] })
-  await submitAgeAnswer(undefined, fd(ADULT))
-  assert.equal(p1().age_band, 'under_13')
+test('confirmAgeAndTerms: the Terms history write fails -> error, no band and no profile Terms saved', async () => {
+  seedPlayer()
+  fail({ table: 'terms_acceptances', action: 'insert', error: { message: 'boom', code: '500' } })
+  const r = await quiet(() => confirmAgeAndTerms(undefined, screen(ADULT)))
+  assert.equal(r?.error, "We couldn't save your answer. Please try again.")
+  assert.equal(p1().age_screen_at, null); assert.equal(prof().tos_accepted_at, null)
 })
 
-test('submitAgeAnswer: player with no coach confirms once (13 to 17)', async () => {
+test('confirmAgeAndTerms: before 039 (no terms_acceptances table) the profile still records the Terms', async () => {
+  seedPlayer()
+  fail({ table: 'terms_acceptances', action: 'insert', error: { message: 'relation "public.terms_acceptances" does not exist', code: '42P01' } })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(ADULT)), { done: true })
+  assert.ok(prof().tos_accepted_at)
+})
+
+test('confirmAgeAndTerms: player on a "Youth 10-12" team answering 18+ -> under 13; a grade-range "9-12" team doesn\'t count', async () => {
+  seedPlayer({ age_band_coach: '18_plus', age_band: '18_plus' }, { player_teams: [{ player_id: 'p1', team_id: 't' }], teams: [{ id: 't', age_group: 'Youth 10-12' }] })
+  await confirmAgeAndTerms(undefined, screen(ADULT))
+  assert.equal(p1().age_band, 'under_13')
+  seedPlayer({ age_band_coach: '18_plus', age_band: '18_plus' }, { player_teams: [{ player_id: 'p1', team_id: 't' }], teams: [{ id: 't', age_group: '9-12' }] })
+  await confirmAgeAndTerms(undefined, screen(ADULT))
+  assert.equal(p1().age_band, '18_plus')
+})
+
+test('confirmAgeAndTerms: player with no coach confirms once (13 to 17)', async () => {
   seedPlayer({ coach_id: null })
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(TEEN)), { done: true })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(TEEN)), { done: true })
   assert.equal(p1().age_band, '13_17')
   assert.ok(p1().age_confirmed_at)
 })
 
-test('submitAgeAnswer: signed out -> error', async () => {
+test('confirmAgeAndTerms: signed out -> error', async () => {
   seedPlayer(); state.user = null
-  assert.equal((await submitAgeAnswer(undefined, fd(ADULT)))?.error, 'Your session has expired. Sign in again.')
+  assert.equal((await confirmAgeAndTerms(undefined, screen(ADULT)))?.error, 'Your session has expired. Sign in again.')
 })
 
 // ── linkPlayerRow ───────────────────────────────────────────────────────────
@@ -182,6 +269,9 @@ test('linkPlayerRow: new self-signup with a signed answer gets a row with its ba
   assert.equal(state.tables.profiles[0].role, 'player')
   assert.equal(state.tables.profiles[0].tos_accepted_at, AT)
   assert.equal(state.tables.profiles[0].tos_version, '2026-10-03')
+  assert.deepEqual(state.tables.terms_acceptances.map((r) => ({ user_id: r.user_id, tos_version: r.tos_version, accepted_at: r.accepted_at })), [{ user_id: PU.id, tos_version: '2026-10-03', accepted_at: AT }], 'Terms history row')
+  const { needsAgeConfirm } = await import('../../consent')
+  assert.equal(needsAgeConfirm(row as never), false, 'confirmed once at signup: no screen afterwards')
 })
 
 for (const [label, meta] of [
@@ -191,7 +281,7 @@ for (const [label, meta] of [
   ['a tampered token (band changed)', { signup_age: 'tamper' }],
   ['a token with a made-up signature', { signup_age: 'v1.eyJlIjoia2lkQGV4YW1wbGUuY29tIiwiYmFuZCI6IjE4X3BsdXMifQ.AAAA' }],
 ] as const) {
-  test(`linkPlayerRow: forged metadata (${label}) sets no band and no ToS; the age screen asks instead`, async () => {
+  test(`linkPlayerRow: forged metadata (${label}) sets no band and no ToS; the one screen asks instead`, async () => {
     let m: Record<string, unknown> = { ...meta }
     if (m.signup_age === 'later') m = { signup_age: token('18_plus', 'someone@example.com') }
     if (m.signup_age === 'tamper') {
@@ -204,8 +294,8 @@ for (const [label, meta] of [
     const row = state.tables.players[0]
     for (const c of ['age_band', 'age_band_self', 'age_screen_at', 'adult_confirmed_at']) assert.equal(row[c] ?? null, null, c)
     assert.equal(state.tables.profiles[0].tos_accepted_at ?? null, null)
-    const { needsFirstAgeScreen } = await import('../../consent')
-    assert.equal(needsFirstAgeScreen({ ...row, position: null } as never), true, 'answers the age screen on the first visit')
+    const { needsAgeConfirm } = await import('../../consent')
+    assert.equal(needsAgeConfirm(row as never), true, 'gets the one screen on the first visit')
   })
 }
 
@@ -288,18 +378,18 @@ test('setPlayerAgeBand: write fails -> error, not success', async () => {
   assert.equal((r as { error?: string }).error, "Couldn't save the player's age band. Please try again.")
 })
 
-test('submitAgeAnswer: a Youth team with no band yet -> the player\'s 13 to 17 answer stands (known band says otherwise)', async () => {
-  seedPlayer({ age_band: 'under_13', age_confirmed_at: '2026-10-01T00:00:00Z' }, { player_teams: [{ player_id: 'p1', team_id: 't' }], teams: [{ id: 't', age_group: 'Youth' }] })
-  const { needsAgeScreen, isFrozenUnder13 } = await import('../../consent')
+test('confirmAgeAndTerms: a Youth team with no band yet -> the player\'s 13 to 17 answer stands (known band says otherwise)', async () => {
+  seedPlayer({ age_band: 'under_13', age_band_source: 'age_group', age_confirmed_at: '2026-10-01T00:00:00Z' }, { player_teams: [{ player_id: 'p1', team_id: 't' }], teams: [{ id: 't', age_group: 'Youth' }] })
+  const { needsAgeConfirm, isFrozenUnder13 } = await import('../../consent')
   assert.equal(isFrozenUnder13(p1() as never), false)
-  assert.equal(needsAgeScreen(p1() as never), true)
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(TEEN)), { done: true })
+  assert.equal(needsAgeConfirm(p1() as never), true)
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(TEEN)), { done: true })
   assert.equal(p1().age_band, '13_17')
 })
 
-test('submitAgeAnswer: Youth team, coachless, no band -> may still answer once', async () => {
-  seedPlayer({ coach_id: null, age_band: 'under_13', age_confirmed_at: '2026-10-01T00:00:00Z', age_group: 'Youth' })
-  assert.deepEqual(await submitAgeAnswer(undefined, fd(ADULT)), { done: true })
+test('confirmAgeAndTerms: Youth team, coachless, no band -> may still answer once', async () => {
+  seedPlayer({ coach_id: null, age_band: 'under_13', age_band_source: 'age_group', age_confirmed_at: '2026-10-01T00:00:00Z', age_group: 'Youth' })
+  assert.deepEqual(await confirmAgeAndTerms(undefined, screen(ADULT)), { done: true })
   assert.equal(p1().age_band, '18_plus')
 })
 
@@ -313,6 +403,6 @@ test('POST /auth/signout (the frozen account\'s sign-out; no server action neede
   assert.equal(state.signOuts, 1)
   const { readFileSync } = await import('node:fs')
   const page = readFileSync(new URL('../../../app/under-13/page.tsx', import.meta.url), 'utf8')
-  assert.match(page, /<Under13Stop \/>/)
+  assert.match(page, /<AgeStopNotice \/>/)
   assert.match(page, /action=\{SIGN_OUT_ROUTE\} method="post"/)
 })

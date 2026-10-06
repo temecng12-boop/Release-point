@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { ageGroupIsUnder13, bandFromBirth, effectiveAgeBand, youngerBand, BIRTH_INVALID } from '../age-band'
-import { canSelfConfirmAdult023, canSelfConfirmAgeBand, isConsentPendingError, needsAgeScreen, pendingReason, uploadBlockedCopy, uploadBlockedText } from '../consent'
+import { isConsentPendingError, needsAgeConfirm, pendingReason, uploadBlockedCopy, uploadBlockedText } from '../consent'
 import { UNDER_13_MODE, parentConsentFlowEnabled, UNDER_13_STOP_MESSAGE } from '../under13-mode'
 
 const T = '2026-10-01T00:00:00.000Z'
@@ -44,8 +44,9 @@ test('youngerBand / effectiveAgeBand: the younger answer wins, an under-13 age g
 })
 
 test('ageGroupIsUnder13 (same cases as the SQL function in the PGlite test)', () => {
-  for (const g of ['Youth 10-12', 'youth 10–12', '8 to 10', '12U', 'U12', 'u-10', 'Under 12', '9-12 Rec']) assert.equal(ageGroupIsUnder13(g), true, g)
-  for (const g of ['Youth', '13U', '14-16', 'High School', 'Middle School', 'U14', '18U', '', null, undefined, 'Amateur', 'Professional']) assert.equal(ageGroupIsUnder13(g), false, String(g))
+  // Only U-numbers (U8 to U12) and "Youth" ranges count (039). Plain "Youth" is handled by ageGroupIsPlainYouth.
+  for (const g of ['Youth 10-12', 'youth 10–12', 'Youth 8 to 10', '12U', 'U12', 'U8', 'u-10', 'Under 12']) assert.equal(ageGroupIsUnder13(g), true, g)
+  for (const g of ['8 to 10', '9-12 Rec', '9-12', '10-12', 'Grades 6-8', 'Youth 13-14', 'Youth', '13U', '14-16', 'High School', 'Middle School', 'U14', '18U', '', null, undefined, 'Amateur', 'Professional']) assert.equal(ageGroupIsUnder13(g), false, String(g))
 })
 
 test('the under-13 switch is the hard stop in this build', () => {
@@ -55,38 +56,26 @@ test('the under-13 switch is the hard stop in this build', () => {
   assert.equal(UNDER_13_STOP_MESSAGE, "We need a parent's permission first. Ask your coach.")
 })
 
-test('canSelfConfirmAgeBand: once, only for a coachless player with no answer and no guardian, after 037', () => {
-  const base = { coach_id: null, guardian_id: null, age_band: null, age_band_self: null, age_screen_at: null }
-  assert.equal(canSelfConfirmAgeBand(base), true)
-  assert.equal(canSelfConfirmAgeBand({ ...base, coach_id: 'c1' }), false, 'the coach records age; the age screen asks instead')
-  assert.equal(canSelfConfirmAgeBand({ ...base, guardian_id: 'g1' }), false, 'guardian on file')
-  assert.equal(canSelfConfirmAgeBand({ ...base, age_band: '18_plus', age_confirmed_at: T }), false, 'band on file (e.g. backfilled 18+)')
-  assert.equal(canSelfConfirmAgeBand({ ...base, age_band: 'under_13', age_band_self: 'under_13', age_confirmed_at: T, age_screen_at: T }), false, 'under 13 can\'t switch to an older band')
-  assert.equal(canSelfConfirmAgeBand({ ...base, age_band_pending_migration: true }), false, 'before 037: canSelfConfirmAdult023')
-  assert.equal(canSelfConfirmAgeBand(null), false)
-  assert.equal(canSelfConfirmAdult023({ coach_id: null, guardian_id: null, adult_confirmed_at: null, consent_given_at: null, age_band_pending_migration: true }), true)
-  assert.equal(canSelfConfirmAdult023({ coach_id: null, adult_confirmed_at: T, age_band_pending_migration: true }), false)
-  assert.equal(canSelfConfirmAdult023({ coach_id: null, consent_rules_pending_migration: true, age_band_pending_migration: true }), false, 'before 023 nothing is blocked')
-})
-
-test('needsAgeScreen: coach-invited players who have not answered, not under 13, after 037', () => {
+test('needsAgeConfirm: the one screen, once, for any player account that has not answered, after 037', () => {
   const invited = { coach_id: 'c1', user_id: 'u1', age_screen_at: null, age_band: '18_plus', age_confirmed_at: T }
-  assert.equal(needsAgeScreen(invited), true, 'even with the coach\'s 18+ on file')
-  assert.equal(needsAgeScreen({ ...invited, age_screen_at: T }), false, 'answered')
-  assert.equal(needsAgeScreen({ ...invited, coach_id: null }), false, 'coachless: the dashboard banner asks instead')
-  assert.equal(needsAgeScreen({ ...invited, age_band: 'under_13', age_band_coach: 'under_13' }), false, 'under 13 (coach): the stop message instead')
-  assert.equal(needsAgeScreen({ ...invited, age_band: 'under_13' }), true, 'under 13 from an age group only: answers first')
-  assert.equal(needsAgeScreen({ ...invited, age_band_pending_migration: true }), false, 'before 037')
-  assert.equal(needsAgeScreen(null), false)
+  assert.equal(needsAgeConfirm(invited), true, 'even with the coach\'s 18+ on file')
+  const coachless = { ...invited, coach_id: null, age_band: null }
+  assert.equal(needsAgeConfirm(coachless), true, 'coachless (Google/Apple, or a self-signup whose answer was not stored)')
+  assert.equal(needsAgeConfirm(null), true, 'no players row yet (new Google/Apple account)')
+  assert.equal(needsAgeConfirm({ ...invited, age_screen_at: T }), false, 'answered: never again')
+  assert.equal(needsAgeConfirm({ ...invited, age_band: 'under_13', age_band_coach: 'under_13' }), false, 'frozen under 13: the stop message instead')
+  assert.equal(needsAgeConfirm({ ...invited, age_band: 'under_13' }), true, 'under 13 from an age group only: answers first')
+  assert.equal(needsAgeConfirm({ ...invited, age_band_pending_migration: true }), false, 'before 037')
+  assert.equal(needsAgeConfirm({ ...invited, consent_rules_pending_migration: true }), false, 'before 023')
 })
 
 test('pendingReason and blocked copy', () => {
   assert.equal(pendingReason({ age_band: 'under_13', age_confirmed_at: T }), 'under_13')
   assert.equal(pendingReason({ age_band: null }), 'age_band')
   assert.equal(pendingReason({ age_band: '13_17', age_confirmed_at: T }), null)
-  assert.match(uploadBlockedCopy('player', { selfConfirm: true, confirmShownBelow: true }).nextStep, /^Confirm your age below\.$/)
-  assert.match(uploadBlockedText('player', { selfConfirm: true }), /Confirm your age at the top of your dashboard\.$/)
-  assert.match(uploadBlockedText('player'), /Ask your coach to confirm your age\.$/)
+  assert.equal(uploadBlockedCopy('player').nextStep, 'Ask your coach.')
+  assert.equal(uploadBlockedText('coach'), 'Video can be added once this player confirms their age when they join. You can also set their age in Edit Player.')
+  for (const v of ['coach', 'player'] as const) assert.doesNotMatch(uploadBlockedText(v), /dashboard|below|one tap/i, 'no pointer to the removed banners')
   assert.match(uploadBlockedText('coach', { reason: 'under_13' }), /^This player is under 13, so video can't be added\. Parent consent for players under 13 is coming soon\./)
   for (const v of ['coach', 'player'] as const) for (const reason of ['age_band', 'under_13'] as const) {
     assert.doesNotMatch(uploadBlockedText(v, { reason }), /guardian|email/i, `${v}/${reason}: no guardian-email wording`)
@@ -99,17 +88,6 @@ test('isConsentPendingError: 023\'s and 037\'s trigger errors only', () => {
   assert.equal(isConsentPendingError({ code: '42501', message: 'permission denied for table clips' }), false)
   assert.equal(isConsentPendingError({ code: '23503', message: 'consent pending' }), false)
   assert.equal(isConsentPendingError(null), false)
-})
-
-test('needsFirstAgeScreen: invited players, and new coachless accounts (OAuth) before onboarding', async () => {
-  const { needsFirstAgeScreen } = await import('../consent')
-  const base = { coach_id: null, guardian_id: null, age_band: null, age_band_self: null, age_screen_at: null, age_confirmed_at: null, adult_confirmed_at: null, consent_given_at: null }
-  assert.equal(needsFirstAgeScreen({ ...base, position: null }), true, 'new coachless account')
-  assert.equal(needsFirstAgeScreen({ ...base, position: 'pitcher' }), false, 'onboarded coachless: banner instead')
-  assert.equal(needsFirstAgeScreen({ ...base, position: null, age_band: '18_plus', age_band_self: '18_plus', age_screen_at: T, age_confirmed_at: T }), false)
-  assert.equal(needsFirstAgeScreen({ ...base, coach_id: 'c', position: 'pitcher' }), true, 'invited, not answered')
-  assert.equal(needsFirstAgeScreen({ ...base, coach_id: 'c', age_screen_at: T }), false)
-  assert.equal(needsFirstAgeScreen(null), false)
 })
 
 test('plain "Youth" counts as under 13 only when no band is known; ranges still win', async () => {
@@ -133,5 +111,6 @@ test('frozen vs. under 13 from an age group only', async () => {
   assert.equal(isFrozenUnder13({ ...base, age_band_self: '13_17' }), true, 'answered 13-17 on a 10-12 team: still under 13, frozen')
   assert.equal(isFrozenUnder13({ ...base, age_band: '13_17' }), false)
   assert.equal(isFrozenUnder13(null), false)
-  assert.equal(canSelfConfirmAgeBand({ ...base, coach_id: null, guardian_id: null }), true, 'coachless, Youth only: may still answer')
+  const coachlessYouth = { ...base, coach_id: null, age_screen_at: null }
+  assert.equal(needsAgeConfirm(coachlessYouth), true, 'coachless, Youth only: may still answer on the one screen')
 })

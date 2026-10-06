@@ -137,14 +137,8 @@ export async function updatePlayer(playerId: string, data: {
   return { success: true }
 }
 
-// Coach confirms (or un-confirms) that a player is 18 or older (RP-041).
-// Authorization is checked in setAdultConfirmation.
-export async function setPlayerAdultConfirmed(playerId: string, confirmed: boolean) {
-  return setPlayerAgeBand(playerId, confirmed === true ? '18_plus' : null)
-}
-
 // The player's coach gives their age answer (under 13, 13 to 17, 18+), or
-// clears it (null). The stored band is the younger of the coach's and the
+// clears it (null). Optional, from Edit Player only. The stored band is the younger of the coach's and the
 // player's answers and any under-13 age group (037). Authorization is checked
 // in setCoachAgeBand (players.coach_id = caller); written with the service
 // role because 037 refuses these columns from end users.

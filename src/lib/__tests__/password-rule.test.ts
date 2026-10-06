@@ -34,7 +34,7 @@ test('the list is about 1,000 lowercase entries of 8+ characters, no duplicates'
 })
 
 test('signup form: inline, accessible message and a check before submit', () => {
-  const page = readFileSync(new URL('../../app/auth/signup/page.tsx', import.meta.url), 'utf8')
+  const page = readFileSync(new URL('../../app/auth/signup/signup-form.tsx', import.meta.url), 'utf8')
   assert.match(page, /passwordProblem\(password\)/)
   assert.match(page, /aria-describedby="coach-password-rule"/)
   assert.match(page, /aria-invalid=\{showPwProblem\}/)

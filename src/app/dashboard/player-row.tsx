@@ -4,8 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import UploadButton from './upload-button'
 import RecordButton from './record-button'
-import MarkAdultButton from './mark-adult-button'
-import AgeBandConfirm from './age-band-confirm'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 import { canUploadVideo, pendingReason } from '@/lib/consent'
 import EditPlayerModal from './edit-player-modal'
@@ -149,15 +147,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
 
         {isOwnPlayer && !uploadAllowed && (
           <div className="px-4 py-2 border-b border-[#DDE4ED]">
-            <UploadBlockedNotice
-              viewer="coach"
-              reason={reason ?? undefined}
-              action={reason === 'under_13'
-                ? undefined
-                : player.age_band_pending_migration
-                  ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
-                  : <AgeBandConfirm playerId={player.id} playerName={player.full_name} />}
-            />
+            <UploadBlockedNotice viewer="coach" reason={reason ?? undefined} />
           </div>
         )}
 

@@ -3,36 +3,42 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { needsFirstAgeScreen, type PlayerConsentFields } from '@/lib/consent'
+import { needsAgeConfirm, type PlayerConsentFields } from '@/lib/consent'
 import { AGE_STOP_COOKIE } from '@/lib/age-band'
-import AgeScreenForm from '@/app/dashboard/age-screen-form'
-import Under13Stop from '@/components/under13-stop'
+import { confirmAgeAndTerms } from '@/app/actions/age'
+import AgeConfirmForm from '@/components/age-confirm-form'
+import AgeStopNotice from '@/components/age-stop-notice'
 import Logo from '@/components/Logo'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-// First sign-in for a coach-invited player (or a new account with no coach,
-// e.g. a Google or Apple sign-up): the neutral birth month/year
-// screen, before any other screen (spec T1). The dashboard and onboarding
-// send the player here until they have answered.
-export default async function AgeScreenPage() {
-  if ((await cookies()).get(AGE_STOP_COOKIE)) return <Shell><Under13Stop /></Shell>
+// The one screen for a signed-in player whose age isn't confirmed yet: a
+// coach-invited player accepting the invite, or a Google/Apple sign-up at
+// first sign-in. Same fields as self-signup (birth month and year, name,
+// Terms; the email is the signed-in one). Shown once: the dashboard and
+// onboarding send the player here until it's answered, then never again.
+export default async function AgeConfirmPage() {
+  if ((await cookies()).get(AGE_STOP_COOKIE)) return <Shell><AgeStopNotice /></Shell>
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: player } = await selectPlayersWithConsent<{ id: string; coach_id: string | null; guardian_id: string | null; user_id: string | null; position: string | null } & PlayerConsentFields>(
-    'id, coach_id, guardian_id, user_id, position',
+  const { data: profile } = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'player') redirect('/dashboard')
+
+  const { data: player, error } = await selectPlayersWithConsent<{ id: string; full_name: string | null } & PlayerConsentFields>(
+    'id, full_name',
     (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle(),
   )
-  if (!needsFirstAgeScreen(player)) redirect('/dashboard')
+  if (error || !needsAgeConfirm(player)) redirect('/dashboard')
 
+  const defaultName = player?.full_name || profile?.full_name || (user.user_metadata?.full_name as string | undefined) || ''
   return (
     <Shell>
-      <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-2" style={os}>One Quick Question</p>
-      <h1 className="text-xl text-slate-950 mb-6 tracking-tight" style={os}>Before You Start</h1>
-      <AgeScreenForm next="/dashboard" />
+      <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-2" style={os}>Welcome</p>
+      <h1 className="text-xl text-slate-950 mb-6 tracking-tight" style={os}>Finish Setting Up</h1>
+      <AgeConfirmForm mode="account" action={confirmAgeAndTerms} defaultName={defaultName} email={user.email} next="/onboarding" />
     </Shell>
   )
 }

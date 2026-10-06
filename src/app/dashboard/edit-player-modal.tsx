@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePlayer, deletePlayer, setPlayerAdultConfirmed, setPlayerAgeBand } from '@/app/actions/player'
+import { updatePlayer, deletePlayer, setPlayerAgeBand } from '@/app/actions/player'
 import { runAction } from '@/lib/action-result'
 import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/age-band'
 import { PARENT_CONSENT_COMING_SOON } from '@/lib/under13-mode'
@@ -87,10 +87,8 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
     })
     if (result?.error) { setSaving(false); setError(result.error); return }
     if (band && band !== initialBand) {
-      // Before migration 037 only 18+ can be stored (023's column).
-      const ageResult = await runAction(() => player.age_band_pending_migration
-        ? setPlayerAdultConfirmed(player.id, band === '18_plus')
-        : setPlayerAgeBand(player.id, band))
+      // Optional. Before migration 037 only 18+ can be stored (setCoachAgeBand).
+      const ageResult = await runAction(() => setPlayerAgeBand(player.id, band))
       if (!ageResult.ok) { setSaving(false); setError(ageResult.error); router.refresh(); return }
       const saved = ageResult.value as { band?: string | null; youngerKept?: boolean }
       if (saved.youngerKept && isAgeBand(saved.band)) {
@@ -183,7 +181,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
           </div>
 
           <fieldset>
-            <legend className="block text-xs text-[#456080] mb-1">Player Age</legend>
+            <legend className="block text-xs text-[#456080] mb-1">Player Age <span className="text-[#3D5166]">(optional)</span></legend>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {AGE_BANDS.map((b) => (
                 <label key={b} className="flex items-center gap-1.5 cursor-pointer max-sm:min-h-11">
@@ -195,7 +193,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             <p className="text-xs text-[#3D5166] mt-1">
               {band === 'under_13'
                 ? `Video can't be added for players under 13. ${PARENT_CONSENT_COMING_SOON}`
-                : 'Video can be added once the age is confirmed (13 or older).'}
+                : 'The player confirms their age when they join. Set it here only if you need to.'}
             </p>
             {selfBand && (
               <p className="text-xs text-[#3D5166] mt-1" data-testid="self-band-note">

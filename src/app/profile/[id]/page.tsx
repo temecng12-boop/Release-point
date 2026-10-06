@@ -4,10 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { profilePageAccess } from '@/lib/auth/roster-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
-import MarkAdultButton from '@/app/dashboard/mark-adult-button'
-import { canUploadVideo, pendingReason } from '@/lib/consent'
-import AgeBandConfirm from '@/app/dashboard/age-band-confirm'
-import { canManagePlayerAge, selectPlayersWithConsent } from '@/lib/consent-server'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 
@@ -62,15 +59,6 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   const access = profilePageAccess(user.id, profile?.role, player)
   if (access === 'redirect-dashboard') redirect('/dashboard')
   if (access !== 'view' || !player) notFound()
-
-  // Offer "Mark as 18+" only when uploads are blocked and this coach may change the player's age status.
-  const showMarkAdult = !canUploadVideo(player) && (await canManagePlayerAge(supabaseAdmin, user.id, player.id))
-  const reason = pendingReason(player)
-  // Under 13: no action (parent consent is coming soon; the notice says so).
-  const blockedAction = !showMarkAdult || reason === 'under_13' ? undefined
-    : player.age_band_pending_migration
-      ? <MarkAdultButton playerId={player.id} playerName={player.full_name} />
-      : <AgeBandConfirm playerId={player.id} playerName={player.full_name} />
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -201,7 +189,6 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 playerName={player.full_name}
                 consent={player}
                 maxFiles={50}
-                blockedAction={blockedAction}
               />
               ) : (
                 <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>

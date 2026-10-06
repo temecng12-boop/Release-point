@@ -2,8 +2,9 @@
 //
 // With 037: video may be added for a player only when their effective band
 // (players.age_band) is '13_17' or '18_plus' and age_confirmed_at is set.
-//   * Unknown band (NULL): blocked until a coach picks a band, the player
-//     answers the age screen, or a player with no coach confirms once.
+//   * Unknown band (NULL): blocked until the player confirms their age once
+//     (the one screen at signup or first sign-in) or their coach sets one in
+//     Edit Player.
 //   * 'under_13': blocked. Under 13 is a hard stop for now (see
 //     ./under13-mode.ts); PR B adds admin-approved parent consent.
 //   * consent_given_at no longer allows video on its own: the old one-click
@@ -124,25 +125,18 @@ export type UploadBlockedViewer = 'coach' | 'player'
 
 /**
  * Plain explanation shown wherever upload or record is blocked.
- * `reason`: from pendingReason (defaults to 'age_band'). `selfConfirm`: the
- * player has no coach, so they confirm their age themself (see
- * canSelfConfirmAgeBand); `confirmShownBelow` when the form is shown under it.
+ * `reason`: from pendingReason (defaults to 'age_band').
  */
 export function uploadBlockedCopy(
   viewer: UploadBlockedViewer,
-  opts: { reason?: PendingReason; selfConfirm?: boolean; confirmShownBelow?: boolean } = {},
+  opts: { reason?: PendingReason } = {},
 ): { message: string; nextStep: string } {
   const reason = opts.reason ?? 'age_band'
   if (viewer === 'player') {
     if (reason === 'under_13') {
       return { message: UNDER_13_STOP_MESSAGE, nextStep: "Video can't be added until then." }
     }
-    return {
-      message: "Your age isn't confirmed yet, so video can't be added yet.",
-      nextStep: opts.selfConfirm
-        ? `Confirm your age ${opts.confirmShownBelow ? 'below' : 'at the top of your dashboard'}.`
-        : 'Ask your coach to confirm your age.',
-    }
+    return { message: "Your age isn't confirmed yet, so video can't be added yet.", nextStep: 'Ask your coach.' }
   }
   if (reason === 'under_13') {
     return {
@@ -151,65 +145,30 @@ export function uploadBlockedCopy(
     }
   }
   return {
-    message: "This player's age isn't confirmed yet, so video can't be added yet.",
-    nextStep: 'Pick their age (under 13, 13 to 17, or 18 or older) in Edit Player or on their profile.',
+    message: "Video can be added once this player confirms their age when they join.",
+    nextStep: 'You can also set their age in Edit Player.',
   }
 }
 
 /** The blocked copy as one sentence pair, for an upload action's error. */
 export function uploadBlockedText(
   viewer: UploadBlockedViewer,
-  opts: { reason?: PendingReason; selfConfirm?: boolean } = {},
+  opts: { reason?: PendingReason } = {},
 ): string {
   const { message, nextStep } = uploadBlockedCopy(viewer, opts)
   return `${message} ${nextStep}`
 }
 
-type RosterFields = PlayerConsentFields & { coach_id?: string | null; guardian_id?: string | null; user_id?: string | null }
-
 /**
- * A player who signed up without a coach confirms their own age, once: no
- * coach, no guardian on file, no answer yet, 037 applied. Once a band is on
- * file only a coach can change it, so a coachless under-13 answer can't be
- * switched to an older band. (An under-13 band from an age group alone, with
- * no answer yet, still lets them answer.) guardian_id is read, so it must be selected.
+ * The one-time confirm screen (birth month and year, name, Terms; /onboarding/age):
+ * a player account whose age hasn't been confirmed yet (no age_screen_at),
+ * whether coach-invited, Google/Apple or a self-signup whose signed answer
+ * wasn't stored. `null` = a player account with no players row yet (e.g. a
+ * new Google or Apple sign-up). Not for a frozen under-13 account (it sees
+ * the stop message) or before 037. Answered once, then never again.
  */
-export function canSelfConfirmAgeBand(player: RosterFields | null | undefined): boolean {
-  return !!player && !player.coach_id && !player.guardian_id
-    && !player.age_band_pending_migration && !player.consent_rules_pending_migration
-    && ((player.age_band ?? null) === null || under13FromAgeGroupOnly(player))
-    && (player.age_band_self ?? null) === null
-    && !isSet(player.age_screen_at)
-}
-
-/** Before 037 the self-confirm is 023's 18+ confirmation. */
-export function canSelfConfirmAdult023(player: RosterFields | null | undefined): boolean {
-  return !!player && !player.coach_id && !player.guardian_id && player.age_band_pending_migration === true
-    && uploadConsentStatus(player) === 'pending'
-}
-
-/**
- * A coach-invited player answers the birth month/year screen at their first
- * sign-in, before anything else (spec T1). Not for an under-13 player (they
- * see the stop message instead) or before 037.
- */
-export function needsAgeScreen(player: RosterFields | null | undefined): boolean {
-  return !!player && !!player.coach_id
-    && !player.age_band_pending_migration && !player.consent_rules_pending_migration
+export function needsAgeConfirm(player: PlayerConsentFields | null | undefined): boolean {
+  if (!player) return true
+  return !player.age_band_pending_migration && !player.consent_rules_pending_migration
     && !isSet(player.age_screen_at) && !isFrozenUnder13(player)
-}
-
-/**
- * A new player account with no coach and no age on file (for example a
- * Google or Apple sign-up, which skips the signup age screen) answers the
- * age screen before onboarding. Existing coachless players who already
- * onboarded answer from the dashboard banner instead.
- */
-export function needsFirstAgeScreen(player: (RosterFields & { position?: string | null }) | null | undefined): boolean {
-  return needsAgeScreen(player) || (!!player && !player.position && canSelfConfirmAgeBand(player))
-}
-
-/** Coach-side view: a player needs an action (age band) or is under 13. */
-export function needsCoachAction(player: PlayerConsentFields | null | undefined): boolean {
-  return pendingReason(player) !== null
 }

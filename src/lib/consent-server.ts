@@ -14,7 +14,6 @@ import { isMissingColumnError, type DbErrorLike } from './db-errors'
 import { effectiveAgeBand, type AgeBandSource } from './age-band'
 import {
   AGE_BAND_MIGRATION_COLUMNS,
-  canSelfConfirmAgeBand,
   canUploadVideo,
   CONSENT_MIGRATION_COLUMNS,
   isAgeBand,
@@ -294,11 +293,12 @@ export async function uploadBlockedMessageFor(db: Db, playerId: string, userId: 
   )
   const reason = pendingReason(row) ?? 'age_band'
   if (row?.user_id && row.user_id === userId) {
-    return uploadBlockedText('player', { reason, selfConfirm: canSelfConfirmAgeBand(row) })
+    return uploadBlockedText('player', { reason })
   }
   return uploadBlockedText('coach', { reason })
 }
 
+export const PLAYER_NOT_FOUND = 'Player profile not found.'
 export const SELF_CONFIRM_FAILED = 'We couldn\'t save your answer. Please try again.'
 export const ALREADY_ANSWERED = "You've already answered. Only your coach can change your age."
 const NOT_AVAILABLE_SELF = "Confirming your age isn't available yet: a database update still needs to be applied."
@@ -309,18 +309,18 @@ export type OwnAnswerResult = { success: true; band: AgeBand | null } | { error:
  * Stores the signed-in player's own age answer (from the birth month/year
  * screen; the month and year are not passed here and never stored). One
  * answer per player:
- *   * a coach-invited player: their first-sign-in age screen;
- *   * a player with no coach: the one-time confirm, only while no band is on
- *     file and no guardian is on file (see canSelfConfirmAgeBand).
+ *   * a coach-invited player: the one screen when they accept the invite;
+ *   * a player with no coach (e.g. Google or Apple): the same screen, only
+ *     while no band and no guardian is on file.
  * The stored band is the younger of this answer, the coach's and any
  * under-13 age group. Success only after exactly that row was updated.
  * Before 037 only a coachless 18+ answer can be stored (023's columns).
  */
 export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand): Promise<OwnAnswerResult> {
   if (!isAgeBand(band)) return { error: 'Enter your birth month and year.' }
-  type Row = PlayerConsentFields & { id: string; user_id: string | null; coach_id: string | null; guardian_id: string | null; age_group: string | null; team_id: string | null }
+  type Row = PlayerConsentFields & { id: string; user_id: string | null; coach_id: string | null; guardian_id: string | null; age_group: string | null; team_id: string | null; age_band_source?: string | null }
   const { data, error } = await selectPlayersWithConsent<Row>(
-    'id, user_id, coach_id, guardian_id, age_group, team_id',
+    'id, user_id, coach_id, guardian_id, age_group, team_id, age_band_source',
     (cols) => db.from('players').select(cols).eq('user_id', userId).maybeSingle(),
   )
   if (error) {
@@ -328,7 +328,7 @@ export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand):
     return { error: SELF_CONFIRM_FAILED }
   }
   const row = data
-  if (!row) return { error: 'Player profile not found.' }
+  if (!row) return { error: PLAYER_NOT_FOUND }
 
   if (row.age_band_pending_migration) {
     if (row.consent_rules_pending_migration || band !== '18_plus' || row.coach_id || row.guardian_id) return { error: NOT_AVAILABLE_SELF }
@@ -347,8 +347,10 @@ export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand):
 
   if (row.age_screen_at || row.age_band_self) return { error: ALREADY_ANSWERED }
   if (!row.coach_id) {
+    // No coach: the player's answer is the only one, so it can't replace a
+    // band already on file (a coachless under-13 answer can't be switched).
     if (row.guardian_id) return { error: 'A guardian is on file for your account. Ask your coach.' }
-    if (!canSelfConfirmAgeBand(row)) return { error: ALREADY_ANSWERED }
+    if (row.age_band_coach || (row.age_band && !(row.age_band === 'under_13' && row.age_band_source === 'age_group'))) return { error: ALREADY_ANSWERED }
   }
 
   const fields = ageAnswerFields('self', band, userId, {
@@ -365,4 +367,37 @@ export async function recordOwnAgeAnswer(db: Db, userId: string, band: AgeBand):
     return { error: SELF_CONFIRM_FAILED }
   }
   return { success: true, band: ((updated[0] as { age_band?: string | null }).age_band ?? fields.band) as AgeBand | null }
+}
+
+/**
+ * A player account with no players row yet (a new Google or Apple sign-up)
+ * answers the one screen: create their own row with that answer. An under-13
+ * answer stores no name or email, only the band (the account stays frozen).
+ */
+export async function createOwnPlayerRow(
+  db: Db,
+  user: { id: string; email?: string | null },
+  band: AgeBand,
+  fullName: string,
+): Promise<OwnAnswerResult> {
+  if (!isAgeBand(band)) return { error: 'Enter your birth month and year.' }
+  const now = new Date().toISOString()
+  const fields = ageAnswerFields('self', band, user.id, {}, now)
+  const under13 = band === 'under_13'
+  const { result: { error } } = await writeWithAgeFields(
+    fields.age,
+    band === '18_plus' ? fields.adult : {},
+    (cols) => db.from('players').insert({
+      user_id: user.id,
+      full_name: under13 ? '' : fullName,
+      email: under13 ? null : (user.email ?? null),
+      accepted_at: now,
+      ...cols,
+    }),
+  )
+  if (error) {
+    console.error('[createOwnPlayerRow] insert failed', { userId: user.id, code: error.code ?? null, message: error.message ?? null })
+    return { error: SELF_CONFIRM_FAILED }
+  }
+  return { success: true, band: fields.band }
 }
