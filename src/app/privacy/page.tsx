@@ -69,7 +69,7 @@ We do not share data with any other third parties.`,
           },
           {
             title: '5. Children\'s Privacy (COPPA)',
-            body: `Release Point is used to analyze youth athletes, including players under the age of 13. We do not knowingly create accounts for children under 13. Player accounts are created by their coaches (adults) via invitation. Players do not self-register.
+            body: `Release Point is used to analyze youth athletes, including players under the age of 13. We do not knowingly create accounts for children under 13. Players can create their own accounts, or their coach can invite them.
 
 Coaches are responsible for obtaining appropriate consent from the parents or guardians of any players under 13 before adding them to the platform or uploading video of them.
 

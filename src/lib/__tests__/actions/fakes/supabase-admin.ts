@@ -5,7 +5,10 @@ export const authAdmin = {
   existingEmails: new Set<string>(),
   linkError: null as null | { code?: string; message: string },
   links: [] as string[],
-  reset() { this.existingEmails = new Set(); this.linkError = null; this.links = [] },
+  /** auth.admin.updateUserById calls (the under-13 scrub of provider metadata). */
+  metadataUpdates: [] as { id: string; user_metadata: Record<string, unknown> }[],
+  updateError: null as null | { code?: string; message: string },
+  reset() { this.existingEmails = new Set(); this.linkError = null; this.links = []; this.metadataUpdates = []; this.updateError = null },
 }
 
 export const supabaseAdmin = {
@@ -19,6 +22,10 @@ export const supabaseAdmin = {
           return { data: null, error: { code: 'email_exists', message: 'A user with this email address has already been registered' } }
         }
         return { data: { properties: { action_link: `https://auth.test/invite?e=${email}` } }, error: null }
+      },
+      async updateUserById(id: string, attrs: { user_metadata: Record<string, unknown> }) {
+        authAdmin.metadataUpdates.push({ id, user_metadata: attrs.user_metadata })
+        return { data: { user: { id } }, error: authAdmin.updateError }
       },
       async getUserById(id: string) {
         return { data: { user: { id, email: 'coach@example.com', user_metadata: { full_name: 'Coach C' } } }, error: null }

@@ -3,37 +3,54 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { needsAgeConfirm, type PlayerConsentFields } from '@/lib/consent'
+import type { PlayerConsentFields } from '@/lib/consent'
 import { AGE_STOP_COOKIE } from '@/lib/age-band'
+import { agePageRoute } from '@/lib/age-gate-routing'
 import { confirmAgeAndTerms } from '@/app/actions/age'
 import AgeConfirmForm from '@/components/age-confirm-form'
 import AgeStopNotice from '@/components/age-stop-notice'
+import AccountLoadError from '@/components/account-load-error'
 import Logo from '@/components/Logo'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
+type PlayerRow = { id: string; full_name: string | null } & PlayerConsentFields
+
 // The one screen for a signed-in player whose age isn't confirmed yet: a
-// coach-invited player accepting the invite, or a Google/Apple sign-up at
-// first sign-in. Same fields as self-signup (birth month and year, name,
-// Terms; the email is the signed-in one). Shown once: the dashboard and
-// onboarding send the player here until it's answered, then never again.
+// coach-invited player accepting the invite, or someone who used Google or
+// Apple from the sign-in page. Same fields as self-signup (birth month and
+// year, name, Terms; the email is the signed-in one). Shown once: the
+// dashboard and onboarding send the player here until it's answered.
+// Redirects only on a confirmed state; a failed or missing read shows an
+// error with Try again and Sign out (src/lib/age-gate-routing.ts).
 export default async function AgeConfirmPage() {
-  if ((await cookies()).get(AGE_STOP_COOKIE)) return <Shell><AgeStopNotice /></Shell>
+  const stopCookie = !!(await cookies()).get(AGE_STOP_COOKIE)
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  if (!user) {
+    if (stopCookie) return <Shell><AgeStopNotice /></Shell>
+    redirect('/auth/login')
+  }
 
-  const { data: profile } = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle()
-  if (profile?.role !== 'player') redirect('/dashboard')
+  const profile = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle()
+  const player = profile.data?.role === 'player'
+    ? await selectPlayersWithConsent<PlayerRow>('id, full_name', (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle())
+    : null
 
-  const { data: player, error } = await selectPlayersWithConsent<{ id: string; full_name: string | null } & PlayerConsentFields>(
-    'id, full_name',
-    (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle(),
-  )
-  if (error || !needsAgeConfirm(player)) redirect('/dashboard')
+  const route = agePageRoute(stopCookie, profile, player)
+  // This browser answered under 13 in the last 24 hours: the stop message
+  // only, and confirmAgeAndTerms refuses every submission until it expires.
+  // Nothing is written: an account is frozen and blanked only by its own
+  // under-13 answer (src/lib/under13-freeze.ts), never by the cookie alone.
+  if (route === 'stop') return <Shell><AgeStopNotice /></Shell>
+  if (route === 'error') {
+    console.error('[onboarding/age] account read failed', { userId: user.id, profile: !!profile.error, player: !!player?.error })
+    return <AccountLoadError retryHref="/onboarding/age" />
+  }
+  if (route === 'dashboard') redirect('/dashboard')
 
-  const defaultName = player?.full_name || profile?.full_name || (user.user_metadata?.full_name as string | undefined) || ''
+  const defaultName = player?.data?.full_name || profile.data?.full_name || (user.user_metadata?.full_name as string | undefined) || ''
   return (
     <Shell>
       <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-2" style={os}>Welcome</p>

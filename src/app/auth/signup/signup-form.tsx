@@ -3,10 +3,11 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import { signUp, signUpPlayer } from '@/app/actions/auth'
+import { signUp, signUpPlayer, startOAuthSignup } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
 import AgeConfirmForm from '@/components/age-confirm-form'
+import AgeStopNotice from '@/components/age-stop-notice'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -23,6 +24,8 @@ function CoachForm({ onBack }: { onBack: () => void }) {
   const [passwordTouched, setPasswordTouched] = useState(false)
   const pwProblem = passwordProblem(password)
   const showPwProblem = passwordTouched && pwProblem !== null
+  // The server refuses while the 24-hour stop cookie is set (same as players).
+  if (state?.stopped) return <AgeStopNotice />
   return (
     <form
       action={action}
@@ -32,7 +35,7 @@ function CoachForm({ onBack }: { onBack: () => void }) {
       }}
       className="space-y-4"
     >
-      <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-2" style={os}>
+      <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-2 min-h-11" style={os}>
         ← Back
       </button>
       <div>
@@ -99,8 +102,8 @@ function CoachForm({ onBack }: { onBack: () => void }) {
 // Player self-signup: the one screen (birth month and year, name, email,
 // Terms). The server checks the age first; under 13 stops here with nothing
 // stored, and the 24-hour cookie keeps showing the stop message.
-function PlayerForm({ onBack, ageStopped }: { onBack: () => void; ageStopped: boolean }) {
-  return <AgeConfirmForm mode="signup" action={signUpPlayer} stopped={ageStopped} onBack={onBack} />
+function PlayerForm({ onBack, onStopped }: { onBack: () => void; onStopped: () => void }) {
+  return <AgeConfirmForm mode="signup" action={signUpPlayer} onBack={onBack} onStopped={onStopped} />
 }
 
 function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void }) {
@@ -151,7 +154,7 @@ function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void
   )
 }
 
-function OAuthButtons() {
+function ProviderButtons() {
   async function signInWithGoogle() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
@@ -167,16 +170,11 @@ function OAuthButtons() {
     })
   }
   return (
-    <div className="mt-5 space-y-2">
-      <div className="relative flex items-center gap-3 mb-4">
-        <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-[10px] text-slate-400 tracking-widest shrink-0" style={os}>Or</span>
-        <div className="flex-1 h-px bg-slate-200" />
-      </div>
+    <div className="space-y-2">
       <button
         type="button"
         onClick={signInWithApple}
-        className="w-full flex items-center justify-center gap-3 bg-slate-950 hover:bg-slate-800 active:scale-95 rounded-lg py-3 text-sm text-white font-medium transition-all"
+        className="w-full flex items-center justify-center gap-3 bg-slate-950 hover:bg-slate-800 active:scale-95 rounded-lg py-3 text-sm text-white font-medium transition-all min-h-11"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.43c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.56-1.32 3.1-2.53 3.96zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -186,7 +184,7 @@ function OAuthButtons() {
       <button
         type="button"
         onClick={signInWithGoogle}
-        className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all active:scale-95"
+        className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all active:scale-95 min-h-11"
         style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -201,8 +199,44 @@ function OAuthButtons() {
   )
 }
 
+// Google and Apple: the birth month and year (and the Terms) come first,
+// checked on the server (startOAuthSignup). Under 13 stops here with no
+// Google or Apple sign-in at all; otherwise the buttons appear, and the
+// answer is stored when the sign-in comes back (no second age screen).
+function OAuthSignup({ onBack, onStopped }: { onBack: () => void; onStopped: () => void }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-950 tracking-tight" style={os}>Sign Up With Google or Apple</p>
+      <AgeConfirmForm mode="oauth" action={startOAuthSignup} onBack={onBack} onStopped={onStopped} readyContent={<ProviderButtons />} />
+    </div>
+  )
+}
+
+function OAuthChoice({ onSelect }: { onSelect: () => void }) {
+  return (
+    <div className="mt-5">
+      <div className="relative flex items-center gap-3 mb-4">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-[10px] text-slate-400 tracking-widest shrink-0" style={os}>Or</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all active:scale-95 min-h-11"
+        style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
+      >
+        Continue with Google or Apple
+      </button>
+    </div>
+  )
+}
+
 export default function SignupForm({ ageStopped = false }: { ageStopped?: boolean }) {
-  const [role, setRole] = useState<'coach' | 'player' | null>(null)
+  const [role, setRole] = useState<'coach' | 'player' | 'oauth' | null>(null)
+  // The 24-hour stop cookie (read on the server), or an under-13 answer just
+  // now: every way to sign up shows only the stop message.
+  const [stopped, setStopped] = useState(ageStopped)
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -245,11 +279,17 @@ export default function SignupForm({ ageStopped = false }: { ageStopped?: boolea
           <div className="rounded-2xl overflow-hidden bg-white" style={{ border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <div className="h-px bg-[#E8102A]" />
             <div className="p-8">
-              {role === null && <RoleSelect onSelect={setRole} />}
-              {role === 'coach'  && <CoachForm  onBack={() => setRole(null)} />}
-              {role === 'player' && <PlayerForm onBack={() => setRole(null)} ageStopped={ageStopped} />}
-
-              {role === null && <OAuthButtons />}
+              {stopped ? (
+                <AgeStopNotice />
+              ) : (
+                <>
+                  {role === null && <RoleSelect onSelect={setRole} />}
+                  {role === 'coach'  && <CoachForm  onBack={() => setRole(null)} />}
+                  {role === 'player' && <PlayerForm onBack={() => setRole(null)} onStopped={() => setStopped(true)} />}
+                  {role === 'oauth'  && <OAuthSignup onBack={() => setRole(null)} onStopped={() => setStopped(true)} />}
+                  {role === null && <OAuthChoice onSelect={() => setRole('oauth')} />}
+                </>
+              )}
 
               <div className="mt-5 pt-5 text-center" style={{ borderTop: '1px solid #e2e8f0' }}>
                 <p className="text-sm text-slate-500">
