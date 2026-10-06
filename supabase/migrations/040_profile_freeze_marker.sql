@@ -12,8 +12,9 @@
 --    through the API). Only the service role (the app) or a SECURITY DEFINER
 --    function can.
 -- 3. Accounts already frozen by their own under-13 answer get both marks
---    (time of their answer). Accounts frozen by a coach's under-13 band
---    aren't marked here: PR B decides what happens to those.
+--    (time of their answer) and their profile blanked. Accounts frozen by a
+--    coach's under-13 band aren't marked or blanked here: PR B decides what
+--    happens to those.
 --
 -- Needs 021 (is_end_user_request), 037 and 039. Idempotent. One
 -- transaction, then a read-only report.
@@ -76,6 +77,22 @@ UPDATE public.profiles pr
  WHERE pr.id = pl.user_id
    AND (pr.frozen_at IS NULL OR pr.deletion_requested_at IS NULL);
 
+-- Their profiles are blanked the way the app now does it (a Google/Apple
+-- account may hold the provider's name and photo). Photo files and the
+-- provider data in the auth record are removed by the app on the next
+-- sign-in, or with the account by the deletion job.
+UPDATE public.profiles pr
+   SET full_name = NULL, avatar_url = NULL, team_name = NULL, bio = NULL, college = NULL,
+       playing_career = NULL, coaching_since = NULL, certifications = '{}', location = NULL,
+       social_twitter = NULL, social_instagram = NULL, social_linkedin = NULL
+ WHERE pr.frozen_at IS NOT NULL
+   AND EXISTS (SELECT 1 FROM public.players pl
+                WHERE pl.user_id = pr.id AND pl.age_band = 'under_13' AND pl.age_band_self = 'under_13')
+   AND (pr.full_name IS NOT NULL OR pr.avatar_url IS NOT NULL OR pr.team_name IS NOT NULL OR pr.bio IS NOT NULL
+        OR pr.college IS NOT NULL OR pr.playing_career IS NOT NULL OR pr.coaching_since IS NOT NULL
+        OR coalesce(cardinality(pr.certifications), 0) > 0 OR pr.location IS NOT NULL
+        OR pr.social_twitter IS NOT NULL OR pr.social_instagram IS NOT NULL OR pr.social_linkedin IS NOT NULL);
+
 COMMIT;
 
 NOTIFY pgrst, 'reload schema';
@@ -83,6 +100,9 @@ NOTIFY pgrst, 'reload schema';
 SELECT 'profiles marked for deletion' AS item, count(*) AS n FROM public.profiles WHERE deletion_requested_at IS NOT NULL
 UNION ALL
 SELECT 'frozen profiles', count(*) FROM public.profiles WHERE frozen_at IS NOT NULL
+UNION ALL
+SELECT 'marked profiles still holding a name or photo (expect 0)', count(*) FROM public.profiles
+ WHERE deletion_requested_at IS NOT NULL AND (full_name IS NOT NULL OR avatar_url IS NOT NULL)
 UNION ALL
 SELECT 'freeze guard trigger in place (expect 1)', count(*) FROM pg_trigger
  WHERE tgrelid = 'public.profiles'::regclass AND tgname = 'profiles_guard_freeze';

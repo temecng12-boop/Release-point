@@ -28,15 +28,22 @@ async function db039(shape: 'prod' | 'fresh') {
   return db
 }
 
-const KID = u(11), TEEN = u(12), COACH = u(13), NEW = u(14)
+const KID = u(11), TEEN = u(12), COACH = u(13), NEW = u(14), CKID = u(15)
 async function seed(db: PGlite) {
   await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'k@x','{"full_name":"Kid K"}'),($2,'t@x','{}'),($3,'c@x','{"role":"coach"}') ON CONFLICT DO NOTHING`, [KID, TEEN, COACH])
   await db.query(`UPDATE profiles SET full_name = 'Kid K', avatar_url = $2 WHERE id = $1`, [KID, `avatars/${KID}.jpg`])
+  await db.query(`UPDATE profiles SET full_name = 'Teen T' WHERE id = $1`, [TEEN])
   // KID froze themselves with an under-13 answer before 040; TEEN answered 13-17.
   await db.query(`INSERT INTO players (id, user_id, full_name, email) VALUES ($1,$2,'','k@x'),($3,$4,'Teen T','t@x')`, [u(101), KID, u(102), TEEN])
   await db.query(`UPDATE players SET age_band_self = 'under_13', age_screen_at = '2026-10-04T12:00:00Z' WHERE id = $1`, [u(101)])
   await db.query(`UPDATE players SET age_band_self = '13_17', age_screen_at = now() WHERE id = $1`, [u(102)])
+  // CKID: frozen by the coach's under-13 band, never answered themselves.
+  await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'ck@x','{"full_name":"Coach Kid"}') ON CONFLICT DO NOTHING`, [CKID])
+  await db.query(`UPDATE profiles SET full_name = 'Coach Kid' WHERE id = $1`, [CKID])
+  await db.query(`INSERT INTO players (id, user_id, full_name, email, coach_id) VALUES ($1,$2,'Coach Kid','ck@x',$3)`, [u(103), CKID, COACH])
+  await db.query(`UPDATE players SET age_band_coach = 'under_13', age_band = 'under_13', age_band_source = 'coach' WHERE id = $1`, [u(103)])
 }
+const prof = async (db: PGlite, id: string) => (await db.query<{ full_name: string | null; avatar_url: string | null }>(`SELECT full_name, avatar_url FROM profiles WHERE id = $1`, [id])).rows[0]
 const marks = async (db: PGlite, id: string) => (await db.query<{ f: string | null; d: string | null }>(`SELECT frozen_at::text f, deletion_requested_at::text d FROM profiles WHERE id = $1`, [id])).rows[0]
 
 for (const shape of ['prod', 'fresh'] as const) {
@@ -47,12 +54,21 @@ for (const shape of ['prod', 'fresh'] as const) {
     const k1 = await marks(db, KID)
     assert.ok(k1.f && k1.d, 'own under-13 answer: frozen and marked for deletion')
     assert.equal(new Date(k1.f!.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00')).toISOString(), '2026-10-04T12:00:00.000Z', 'at the time of the answer')
+    assert.deepEqual(await prof(db, KID), { full_name: null, avatar_url: null }, 'own under-13 answer: no name or photo left on the profile')
     assert.deepEqual(await marks(db, TEEN), { f: null, d: null })
     assert.deepEqual(await marks(db, COACH), { f: null, d: null })
+    assert.equal((await db.query<{ age_band: string }>(`SELECT age_band FROM players WHERE id = $1`, [u(103)])).rows[0].age_band, 'under_13', 'control: CKID is coach-frozen')
+    assert.deepEqual(await marks(db, CKID), { f: null, d: null }, 'coach-set freeze: not marked (PR B decides)')
+    assert.equal((await prof(db, CKID)).full_name, 'Coach Kid', 'coach-set freeze: not blanked here')
+    assert.equal((await prof(db, TEEN)).full_name, 'Teen T', 'an older answer keeps the name')
     assert.equal(await tryFile(db, M040), '', 'runs twice')
     assert.deepEqual(await marks(db, KID), k1, 'second run changes nothing')
     const rep = (await db.query<{ item: string; n: number }>(readFileSync(M040, 'utf8').split("NOTIFY pgrst, 'reload schema';")[1])).rows
-    assert.ok(rep.some((r) => r.item === 'freeze guard trigger in place (expect 1)' && Number(r.n) === 1), JSON.stringify(rep))
+    const n = (item: string) => Number(rep.find((r) => r.item === item)?.n)
+    assert.equal(n('freeze guard trigger in place (expect 1)'), 1, JSON.stringify(rep))
+    assert.equal(n('marked profiles still holding a name or photo (expect 0)'), 0)
+    assert.equal(n('profiles marked for deletion'), 1)
+    assert.equal(n('frozen profiles'), 1)
   })
 
   test(`${shape}: 040 guard: users can't set or clear the marks, or edit a frozen profile; the service role (the app's scrub) can`, async () => {
