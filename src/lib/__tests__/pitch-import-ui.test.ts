@@ -42,7 +42,7 @@ test('metrics tab: no browser Supabase writes; both imports call importPitchMetr
 
 test('metrics tab: import and manual entry only when canAdd; 44px touch targets', () => {
   const src = read('app/clips/[id]/metrics-tab.tsx')
-  assert.match(src, /\{canAdd && \(\n\s*<div[^>]*>\n\s*<div>\n\s*<p[^>]*>Import Pitch Analytics/)
+  assert.match(src, /\{canAdd && \(\n\s*<div[^>]*>\n\s*<div>\n\s*<p[^>]*>Add pitch data/)
   assert.match(src, /\{canAdd && \(\n\s*<div[^>]*>\n\s*<div className="flex items-center justify-between mb-3">/)
   for (const b of ['onClick={() => fileRef.current?.click()}', 'onClick={() => pdfRef.current?.click()}', 'onClick={handleSave}', 'onClick={handlePdfSave}', 'onClick={handleManualSave}']) {
     const tag = between(src, b, '>')

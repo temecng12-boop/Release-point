@@ -60,8 +60,9 @@ test('delete buttons are only rendered for the direct coach (canDelete), not for
 
   const pitch = read('app/clips/[id]/metrics-tab.tsx')
   assert.match(pitch, /canDelete = false/)
-  for (const gate of ['{canDelete && !confirmAll && (', '{canDelete && confirmAll && (', '{canDelete && <th', '{canDelete && (\n                      <td'])
+  for (const gate of ['{canDelete && metrics.length > 0 && !confirmAll && (', '{canDelete && confirmAll && (', '{canDelete && (', 'metrics.length === 1 && canDelete && ('])
     assert.ok(pitch.includes(gate), gate)
+  // Delete is gated by canDelete (direct coach), never by a bare isCoach on the pitching tab.
   assert.doesNotMatch(pitch, /isCoach && !confirmAll|isCoach && <th/)
 
   const hit = read('app/clips/[id]/hitting-metrics-tab.tsx')
