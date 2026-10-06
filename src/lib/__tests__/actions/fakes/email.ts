@@ -2,10 +2,13 @@
 export const emailFake = {
   invites: [] as { toEmail: string }[],
   inviteResult: {} as { error?: string } | 'throw',
+  coachInvites: [] as { toEmail: string; coachName?: string; inviteUrl: string }[],
+  coachInviteResult: {} as { error?: string } | 'throw',
   waitlist: [] as { email: string; name?: string | null }[],
   waitlistResult: {} as { error?: string } | 'throw',
   reset() {
     this.invites = []; this.inviteResult = {}
+    this.coachInvites = []; this.coachInviteResult = {}
     this.waitlist = []; this.waitlistResult = {}
   },
 }
@@ -13,6 +16,11 @@ export async function sendPlayerInviteEmail(args: { toEmail: string; playerName?
   if (emailFake.inviteResult === 'throw') throw new Error('network down')
   if (!emailFake.inviteResult.error) emailFake.invites.push({ toEmail: args.toEmail })
   return emailFake.inviteResult
+}
+export async function sendCoachInviteEmail(args: { toEmail: string; coachName?: string; inviterName: string; inviteUrl: string }) {
+  if (emailFake.coachInviteResult === 'throw') throw new Error('network down')
+  if (!emailFake.coachInviteResult.error) emailFake.coachInvites.push({ toEmail: args.toEmail, coachName: args.coachName, inviteUrl: args.inviteUrl })
+  return emailFake.coachInviteResult
 }
 export async function sendClipUploadedEmail() {}
 export async function sendWaitlistNotification(args: { email: string; name?: string | null }) {
