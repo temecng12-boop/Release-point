@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import AgeConfirmForm from '../../components/age-confirm-form'
 import AgeStopNotice from '../../components/age-stop-notice'
+import AccountLoadError from '../../components/account-load-error'
 
 const SRC = new URL('../../', import.meta.url)
 const src = (p: string) => readFileSync(new URL(p, SRC), 'utf8')
@@ -53,6 +54,7 @@ test('cutoff scan: the rendered one screen (signup, account, stop message) never
   const signup = render(h(AgeConfirmForm, { mode: 'signup', action: noop, onBack: () => {} }))
   const account = render(h(AgeConfirmForm, { mode: 'account', action: noop, email: 'kid@example.com', defaultName: 'Sam Lee', next: '/onboarding' }))
   const stopped = render(h(AgeConfirmForm, { mode: 'signup', action: noop, stopped: true, onBack: () => {} }))
+  const oauth = render(h(AgeConfirmForm, { mode: 'oauth', action: noop, onBack: () => {} }))
   const stop = render(h(AgeStopNotice))
   // Positive control: these really are the forms.
   for (const name of ['birth_month', 'birth_year', 'full_name', 'tos']) {
@@ -65,7 +67,8 @@ test('cutoff scan: the rendered one screen (signup, account, stop message) never
   assert.match(stopped, /data-testid="age-stop"/)
   assert.doesNotMatch(stopped, /name="birth_year"/, 'stop message only, no form')
   assert.match(stop, /We need a parent(&#x27;|')s permission first\. Ask your coach\./)
-  for (const [what, html] of [['signup', signup], ['account', account], ['stopped', stopped], ['stop notice', stop]] as const) assertNoCutoff(html, what)
+  assert.match(oauth, /name="birth_year"/)
+  for (const [what, html] of [['signup', signup], ['account', account], ['oauth', oauth], ['stopped', stopped], ['stop notice', stop]] as const) assertNoCutoff(html, what)
   // The year field has no min/max and the month list no hint.
   assert.doesNotMatch(signup, /\s(min|max)="/)
 })
@@ -146,20 +149,40 @@ test('signup page: the stop cookie is read on the server and the player form sho
   assert.match(page, /cookies\(\)\)\.get\(AGE_STOP_COOKIE\)/)
   assert.match(page, /<SignupForm ageStopped=\{ageStopped\} \/>/)
   const form = src('app/auth/signup/signup-form.tsx')
-  assert.match(form, /<AgeConfirmForm mode="signup" action=\{signUpPlayer\} stopped=\{ageStopped\}/)
+  assert.match(form, /useState\(ageStopped\)/)
+  assert.match(form, /\{stopped \? \(\s*<AgeStopNotice \/>/, 'once stopped, only the stop message (no player, coach or Google/Apple path)')
+  assert.match(form, /<AgeConfirmForm mode="signup" action=\{signUpPlayer\} onBack=\{onBack\} onStopped=\{onStopped\} \/>/)
+  assert.match(form, /if \(state\?\.stopped\) return <AgeStopNotice \/>/, 'the coach form shows the same stop message')
   assert.doesNotMatch(form, /checkSignupAge|BirthFields|guardian_email|adult_confirmed/)
+})
+
+test('signup page: the Google/Apple buttons only appear after the birth month/year and Terms pass the server check', () => {
+  const form = src('app/auth/signup/signup-form.tsx')
+  assert.match(form, /<AgeConfirmForm mode="oauth" action=\{startOAuthSignup\} onBack=\{onBack\} onStopped=\{onStopped\} readyContent=\{<ProviderButtons \/>\} \/>/)
+  // signInWithOAuth is only reachable from ProviderButtons, and ProviderButtons only from readyContent.
+  const uses = [...form.matchAll(/<ProviderButtons\b/g)].length
+  assert.equal(uses, 1, 'ProviderButtons is rendered only as the ready content')
+  const pb = form.slice(form.indexOf('function ProviderButtons'), form.indexOf('\nfunction ', form.indexOf('function ProviderButtons') + 10))
+  assert.match(pb, /signInWithOAuth/)
+  assert.equal(form.split('signInWithOAuth').length - 1, (pb.split('signInWithOAuth').length - 1), 'no other OAuth start')
+  const html = render(h(AgeConfirmForm, { mode: 'oauth', action: noop, onBack: () => {}, readyContent: h('p', null, 'BUTTONS') }))
+  assert.match(html, /name="birth_month"/)
+  assert.match(html, /name="tos"/)
+  assert.doesNotMatch(html, /name="full_name"|name="email"|BUTTONS/, 'oauth mode: no name or email (the provider gives those), no buttons until ready')
 })
 
 test('dashboard and onboarding: unanswered players go to the one screen before the position picker; frozen sees the stop message', () => {
   const d = src('app/dashboard/page.tsx')
-  assert.match(d, /needsAgeConfirm\(playerRow\)\) redirect\('\/onboarding\/age'\)/)
+  assert.match(d, /dashboardRoute\(profileRead, isCoach \? null : \{ data: playerRow, error: playerReadError \}\) === 'age'\) redirect\('\/onboarding\/age'\)/)
+  assert.match(d, /dashboardRoute\(profileRead, null\) === 'error'\) \{[\s\S]{0,120}<AccountLoadError retryHref="\/dashboard" \/>/, 'a failed profile read shows the error, no redirect')
   assert.match(d, /frozen && <AgeStopNotice \/>/)
   assert.ok(d.indexOf("redirect('/onboarding/age')") < d.indexOf("redirect('/onboarding')"), 'one screen before the position picker')
   assert.match(src('app/onboarding/page.tsx'), /needsAgeConfirm\(playerRow\)\) redirect\('\/onboarding\/age'\)/)
   const a = src('app/onboarding/age/page.tsx')
   assert.match(a, /<AgeConfirmForm mode="account" action=\{confirmAgeAndTerms\}/)
-  assert.ok(a.indexOf('AGE_STOP_COOKIE') < a.indexOf('getUser()'), 'the cookie is checked before anything else')
-  assert.match(a, /!needsAgeConfirm\(player\)\) redirect\('\/dashboard'\)/, 'answered: never shown again')
+  assert.ok(a.indexOf('AGE_STOP_COOKIE') < a.indexOf('agePageRoute(stopCookie'), 'the cookie decides first')
+  assert.match(a, /route === 'dashboard'\) redirect\('\/dashboard'\)/, 'answered: never shown again')
+  assert.match(a, /<AccountLoadError retryHref="\/onboarding\/age" \/>/, 'a failed read shows the error, never a bounce back to the dashboard')
 })
 
 // ── 3. Removed ───────────────────────────────────────────────────────────────
@@ -191,10 +214,28 @@ test('invite forms: no age band; Edit Player: the band picker is optional', () =
 
 // ── 4. Tap targets ───────────────────────────────────────────────────────────
 test('the one screen\'s controls are at least 44px tall', () => {
-  const html = render(h(AgeConfirmForm, { mode: 'signup', action: noop, onBack: () => {} }))
-  for (const m of html.matchAll(/<(input|select|button)\b[^>]*>/g)) {
-    if (/type="checkbox"/.test(m[0])) continue
-    assert.match(m[0], /min-h-11/, m[0])
+  for (const mode of ['signup', 'oauth'] as const) {
+    const html = render(h(AgeConfirmForm, { mode, action: noop, onBack: () => {} }))
+    for (const m of html.matchAll(/<(input|select|button)\b[^>]*>/g)) {
+      if (/type="checkbox"/.test(m[0])) continue
+      assert.match(m[0], /min-h-11/, `${mode}: ${m[0]}`)
+    }
+    assert.match(html, /<label class="[^"]*min-h-11[^"]*"><input type="checkbox"/, `${mode}: the Terms checkbox row is 44px`)
   }
-  assert.match(html, /<label class="[^"]*min-h-11[^"]*"><input type="checkbox"/, 'the Terms checkbox row is 44px')
+})
+
+test('account load error: friendly copy, Try Again and Sign Out are 44px, no raw error, no cutoff', () => {
+  const html = render(h(AccountLoadError, { retryHref: '/onboarding/age' }))
+  assert.match(html, /data-testid="account-load-error"/)
+  assert.match(html, /<a[^>]*href="\/onboarding\/age"[^>]*min-h-11|<a[^>]*min-h-11[^>]*href="\/onboarding\/age"/)
+  assert.match(html, /<form[^>]*action="\/auth\/signout"[^>]*method="post"|<form[^>]*method="post"[^>]*action="\/auth\/signout"/i)
+  assert.match(html, /<button[^>]*min-h-11[^>]*>Sign Out<\/button>/)
+  assert.doesNotMatch(html, /error:|PGRST|relation|column|permission denied/i)
+  assertNoCutoff(html, 'account load error')
+})
+
+test('privacy page: players can sign up themselves or be invited (no "do not self-register")', () => {
+  const p = src('app/privacy/page.tsx')
+  assert.match(p, /Players can create their own accounts, or their coach can invite them\./)
+  assert.doesNotMatch(p, /self-register|created by their coaches/i)
 })

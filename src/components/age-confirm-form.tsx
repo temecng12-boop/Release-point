@@ -7,13 +7,16 @@ import AgeStopNotice from '@/components/age-stop-notice'
 
 // The one screen: birth month and year, name, email and the Terms, in one
 // step (spec T1). Used for player self-signup (mode 'signup': name and email
-// typed, a sign-in link is sent) and for a signed-in player whose age isn't
+// typed, a sign-in link is sent), for a signed-in player whose age isn't
 // confirmed yet (mode 'account': a coach-invited player accepting the
-// invite, or a Google/Apple sign-up; the email is the signed-in one).
+// invite, or someone who used Google/Apple from the sign-in page; the email
+// is the signed-in one), and before the Google and Apple buttons on the
+// signup page (mode 'oauth': birth month and year and the Terms only; the
+// buttons show once the server has checked the answer, `readyContent`).
 // The server checks the age before anything else; this browser code knows
 // nothing about age limits, and no copy here names one.
 
-export type AgeConfirmFormState = { error?: string; stopped?: boolean; done?: boolean; sent?: boolean; email?: string } | undefined
+export type AgeConfirmFormState = { error?: string; stopped?: boolean; done?: boolean; sent?: boolean; email?: string; ready?: boolean } | undefined
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const label = 'block text-[11px] text-slate-500 mb-1.5 tracking-[0.2em]'
@@ -31,8 +34,10 @@ export default function AgeConfirmForm({
   email,
   next = '/dashboard',
   onBack,
+  onStopped,
+  readyContent,
 }: {
-  mode: 'signup' | 'account'
+  mode: 'signup' | 'account' | 'oauth'
   action: (prev: AgeConfirmFormState, formData: FormData) => Promise<AgeConfirmFormState>
   /** The stop cookie is already set (read on the server): show only the stop message. */
   stopped?: boolean
@@ -42,6 +47,10 @@ export default function AgeConfirmForm({
   /** Account mode: where to go once saved. */
   next?: string
   onBack?: () => void
+  /** Called once the server stops the answer (the parent can hide its other options). */
+  onStopped?: () => void
+  /** OAuth mode: what to show once the answer is accepted (the Google and Apple buttons). */
+  readyContent?: React.ReactNode
 }) {
   const [state, formAction, pending] = useActionState(action, undefined)
   const [tosAccepted, setTosAccepted] = useState(false)
@@ -49,7 +58,8 @@ export default function AgeConfirmForm({
 
   useEffect(() => {
     if (state?.done) router.replace(next)
-  }, [state, next, router])
+    if (state?.stopped) onStopped?.()
+  }, [state, next, router, onStopped])
 
   const back = onBack && (
     <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors min-h-11" style={os}>
@@ -62,6 +72,15 @@ export default function AgeConfirmForm({
       <div className="space-y-4">
         <AgeStopNotice />
         {back}
+      </div>
+    )
+  }
+
+  if (mode === 'oauth' && state?.ready) {
+    return (
+      <div className="space-y-4" data-testid="oauth-ready">
+        {back}
+        {readyContent}
       </div>
     )
   }
@@ -87,10 +106,12 @@ export default function AgeConfirmForm({
     <form action={formAction} className="space-y-4" data-testid="age-confirm-form">
       {back}
       <BirthFields legendClassName={label} legendStyle={os} />
-      <div>
-        <label htmlFor="acf-name" className={label} style={os}>Full Name</label>
-        <input id="acf-name" type="text" name="full_name" required autoComplete="name" defaultValue={defaultName} placeholder="Your name" className={inputCls} />
-      </div>
+      {mode !== 'oauth' && (
+        <div>
+          <label htmlFor="acf-name" className={label} style={os}>Full Name</label>
+          <input id="acf-name" type="text" name="full_name" required autoComplete="name" defaultValue={defaultName} placeholder="Your name" className={inputCls} />
+        </div>
+      )}
       {mode === 'signup' ? (
         <div>
           <label htmlFor="acf-email" className={label} style={os}>Email Address</label>
@@ -133,7 +154,9 @@ export default function AgeConfirmForm({
       >
         {mode === 'signup'
           ? (pending ? 'Sending Link…' : 'Send Sign-in Link')
-          : (pending || state?.done ? 'Saving…' : 'Continue')}
+          : mode === 'oauth'
+            ? (pending ? 'Checking…' : 'Continue')
+            : (pending || state?.done ? 'Saving…' : 'Continue')}
       </button>
     </form>
   )

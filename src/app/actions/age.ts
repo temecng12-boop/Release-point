@@ -9,6 +9,7 @@ import { createOwnPlayerRow, PLAYER_NOT_FOUND, recordOwnAgeAnswer, SELF_CONFIRM_
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { recordTermsAcceptance } from '@/lib/terms-acceptance'
+import { freezeUnder13Account } from '@/lib/under13-freeze'
 import { TERMS_VERSION } from '@/lib/terms-version'
 import { TOS_REQUIRED, NAME_REQUIRED, toTitleCase } from '@/lib/signup-fields'
 
@@ -24,9 +25,10 @@ export type AgeConfirmState = { error?: string; stopped?: boolean; done?: boolea
  *   1. The 24-hour stop cookie refuses every answer, whatever the form says
  *      (a back-button resubmit included).
  *   2. The age is checked before anything is read or saved. Under 13 (hard
- *      stop): the cookie is set, the account is frozen (only the band
- *      'under_13' is kept on the player's row so the block holds on every
- *      device; no name is saved) and signed out.
+ *      stop): the cookie is set, the account is frozen (band 'under_13' on
+ *      the player's row so the block holds on every device), its profile is
+ *      blanked (name, photo, provider data; src/lib/under13-freeze.ts) and
+ *      marked for deletion, and it's signed out. No name is saved.
  *   3. 13 or older: the Terms acceptance (history + profile, once), the
  *      name, then the band (the younger of the player's and the coach's
  *      answers wins). One answer only: a second one is refused.
@@ -43,11 +45,8 @@ export async function confirmAgeAndTerms(_prev: AgeConfirmState, formData: FormD
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const saved = await recordOwnAgeAnswer(supabaseAdmin, user.id, 'under_13')
-      const frozen = 'error' in saved && saved.error === PLAYER_NOT_FOUND
-        ? await createOwnPlayerRow(supabaseAdmin, { id: user.id }, 'under_13', '')
-        : saved
-      if ('error' in frozen) console.error('[confirmAgeAndTerms] freeze not stored', { userId: user.id, error: frozen.error })
+      // Freeze, blank the profile (name, photo, provider data), mark for deletion.
+      await freezeUnder13Account(supabaseAdmin, user.id)
       await supabase.auth.signOut({ scope: 'local' })
     }
     revalidatePath('/', 'layout')

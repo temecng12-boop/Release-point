@@ -5,8 +5,10 @@ import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, isFrozenUnder13, needsAgeConfirm, type PlayerConsentFields } from '@/lib/consent'
+import { canUploadVideo, isFrozenUnder13, type PlayerConsentFields } from '@/lib/consent'
 import AgeStopNotice from '@/components/age-stop-notice'
+import AccountLoadError from '@/components/account-load-error'
+import { dashboardRoute } from '@/lib/age-gate-routing'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import AppHeader from '@/components/app-header'
@@ -30,12 +32,19 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabaseAdmin
+  const profileRead = await supabaseAdmin
     .from('profiles')
     .select('full_name, role, team_name')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+  const profile = profileRead.data
 
+  // A failed or missing profile read: say so (Try again / Sign out). Never
+  // guess a role and redirect: that could bounce between pages.
+  if (dashboardRoute(profileRead, null) === 'error') {
+    console.error('[dashboard] profile read failed', { userId: user.id, missing: !profileRead.error })
+    return <AccountLoadError retryHref="/dashboard" />
+  }
   if (profile?.role === 'guardian') redirect('/guardian')
 
   // Role comes from profiles only; user_metadata is set by the client at signup.
@@ -136,7 +145,8 @@ export default async function DashboardPage() {
 
   // A player whose age isn't confirmed yet (coach-invited, Google/Apple, no
   // players row yet) answers the one screen first, once.
-  if (!isCoach && !playerReadError && needsAgeConfirm(playerRow)) redirect('/onboarding/age')
+  // Only on a confirmed state (both rows read fine); see src/lib/age-gate-routing.ts.
+  if (dashboardRoute(profileRead, isCoach ? null : { data: playerRow, error: playerReadError }) === 'age') redirect('/onboarding/age')
   // Under 13 is a hard stop for now: the account shows only the stop message.
   const frozen = !isCoach && isFrozenUnder13(playerRow)
   if (!isCoach && playerRow && !playerRow.position && !frozen) redirect('/onboarding')

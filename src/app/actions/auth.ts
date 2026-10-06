@@ -8,7 +8,7 @@ import { ageAnswerFields, recordOwnAgeAnswer, writeWithAgeFields } from '@/lib/c
 import { recordTermsAcceptance } from '@/lib/terms-acceptance'
 import { NAME_REQUIRED, TOS_REQUIRED, toTitleCase } from '@/lib/signup-fields'
 import { AGE_STOP_COOKIE, bandFromBirth, type AgeBand } from '@/lib/age-band'
-import { signSignupAge, verifySignupAge } from '@/lib/signup-age-token'
+import { OAUTH_AGE_COOKIE, OAUTH_AGE_MAX_AGE_SECONDS, signOAuthAge, signSignupAge, verifySignupAge } from '@/lib/signup-age-token'
 import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
@@ -17,7 +17,10 @@ import { passwordProblem } from '@/lib/password-rule'
 import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
-export async function signUp(_prevState: { error?: string; message?: string } | undefined, formData: FormData) {
+export async function signUp(_prevState: { error?: string; message?: string; stopped?: boolean } | undefined, formData: FormData) {
+  // Same 24-hour stop as player signup (an under-13 answer in this browser):
+  // refused before anything else, nothing read, stored or logged.
+  if ((await cookies()).get(AGE_STOP_COOKIE)) return { stopped: true }
   const supabase = await createClient()
 
   if (!formData.get('tos')) return { error: TOS_REQUIRED }
@@ -108,6 +111,41 @@ export async function signUpPlayer(_prevState: SignUpPlayerState, formData: Form
   }
 
   return { sent: true, email }
+}
+
+export type OAuthSignupState = { error?: string; ready?: boolean; stopped?: boolean } | undefined
+
+/**
+ * The step before the Google and Apple buttons on the signup page: birth
+ * month and year and the Terms, checked here first. Same order as
+ * signUpPlayer:
+ *   * the 24-hour stop cookie refuses every submission;
+ *   * under 13: the cookie is set and the stop message shown. No Supabase
+ *     call, no OAuth, nothing stored or logged;
+ *   * 13 or older: the answer and the Terms acceptance go in a signed,
+ *     15-minute, httpOnly cookie that the OAuth callback stores once (so the
+ *     age screen isn't shown again), and the buttons appear.
+ */
+export async function startOAuthSignup(_prev: OAuthSignupState, formData: FormData): Promise<OAuthSignupState> {
+  const jar = await cookies()
+  if (jar.get(AGE_STOP_COOKIE)) return { stopped: true }
+  const parsed = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!parsed.ok) return { error: parsed.error }
+  if (parsed.band === 'under_13' && !parentConsentFlowEnabled()) {
+    setAgeStopCookie(jar)
+    return { stopped: true }
+  }
+  if (formData.get('tos') !== 'yes') return { error: TOS_REQUIRED }
+
+  const now = new Date().toISOString()
+  const token = signOAuthAge({ band: parsed.band, answeredAt: now, tosAcceptedAt: now, tosVersion: TERMS_VERSION })
+  if (!token) {
+    // No server key: the person answers the one screen after signing in instead.
+    console.warn('[startOAuthSignup] no signing key; the age screen will ask after sign-in')
+    return { ready: true }
+  }
+  jar.set(OAUTH_AGE_COOKIE, token, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: OAUTH_AGE_MAX_AGE_SECONDS })
+  return { ready: true }
 }
 
 export async function signIn(_prevState: { error?: string } | undefined, formData: FormData) {

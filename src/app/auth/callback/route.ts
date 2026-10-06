@@ -6,6 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendPlayerJoinedEmail } from '@/lib/email'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
+import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
+import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -48,13 +50,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(failed)
     }
     // Link player row to this auth account (for invited players)
+    let updatedPlayers: { id: string; full_name: string; coach_id: string | null }[] | null = null
     if (user.email) {
-      const { data: updatedPlayers } = await supabaseAdmin
+      const { data: linked } = await supabaseAdmin
         .from('players')
         .update({ user_id: user.id, accepted_at: new Date().toISOString() })
         .eq('email', user.email)
         .is('user_id', null)
         .select('id, full_name, coach_id')
+      updatedPlayers = linked
 
       // Notify coach that player accepted invite
       for (const player of updatedPlayers ?? []) {
@@ -77,6 +81,20 @@ export async function GET(request: NextRequest) {
           } catch { /* email is non-critical */ }
         }
       }
+    }
+    // Google/Apple from the signup page: the birth month/year and Terms were
+    // asked before the buttons (startOAuthSignup). Store that answer once, so
+    // the age screen isn't shown again; read the cookie once, then clear it.
+    const oauthAge = cookieStore.get(OAUTH_AGE_COOKIE)?.value
+    if (oauthAge) {
+      cookieStore.delete(OAUTH_AGE_COOKIE)
+      const outcome = await applyOAuthSignupAge(supabaseAdmin, user, oauthAge)
+      if (outcome === 'failed') console.warn('[auth/callback] signup age answer not stored; the age screen will ask', { userId: user.id })
+    }
+    // A frozen under-13 account signing in again: Supabase copies the
+    // provider's name and photo back into the auth metadata; remove them.
+    if (code) await rescrubFrozenAccount(supabaseAdmin, user.id)
+    if (user.email) {
       // New invited player — send to onboarding to pick position + give consent
       if ((updatedPlayers ?? []).length > 0 && next !== RESET_PATH) {
         return NextResponse.redirect(`${origin}/onboarding`)
