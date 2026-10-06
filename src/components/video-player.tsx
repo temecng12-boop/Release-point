@@ -11,6 +11,7 @@ import { runAction } from '@/lib/action-result'
 import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
+import { applyPlaybackAction, nextPlaybackAction, type PlaybackIntent } from '@/lib/video-playback'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -338,6 +339,11 @@ export default function VideoPlayer({
 
   // UI state
   const [playing,         setPlaying]         = useState(false)
+  // Intent for play/pause: video.paused can lag behind play() (promise still
+  // settling), so a second click would call play() again. Track what the user
+  // asked for and pause whenever we already wanted to play or the element is
+  // actually playing (src/lib/video-playback.ts).
+  const wantPlayingRef = useRef<PlaybackIntent>({ wantPlaying: false })
   const [currentTime,     setCurrentTime]     = useState(0)
   const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
@@ -661,9 +667,9 @@ export default function VideoPlayer({
       setCurrentTime(video!.currentTime)
       if (video!.paused) { updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
     }
-    function onPlay()  { setPlaying(true); tlRecRef.current?.play(video!.currentTime) }
-    function onPause() { setPlaying(false); tlRecRef.current?.pause(video!.currentTime); updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
-    function onEnded() { setPlaying(false) }
+    function onPlay()  { wantPlayingRef.current.wantPlaying = true; setPlaying(true); tlRecRef.current?.play(video!.currentTime) }
+    function onPause() { wantPlayingRef.current.wantPlaying = false; setPlaying(false); tlRecRef.current?.pause(video!.currentTime); updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
+    function onEnded() { wantPlayingRef.current.wantPlaying = false; setPlaying(false) }
     // Scrubs, jumps and frame steps (stepFlagRef marks the frame buttons).
     function onSeeking() { tlRecRef.current?.seek(video!.currentTime, stepFlagRef.current); stepFlagRef.current = false }
     function onRateChange() { tlRecRef.current?.rate(video!.playbackRate) }
@@ -738,7 +744,14 @@ export default function VideoPlayer({
   // ── controls ─────────────────────────────────────────────────────────────
   function togglePlay() {
     const v = videoRef.current; if (!v) return
-    if (v.paused) { clearStampOverlay(); v.play() } else { v.pause() }
+    const action = nextPlaybackAction(wantPlayingRef.current, v.paused)
+    if (action === 'play') {
+      clearStampOverlay()
+      setPlaying(true) // optimistic: label flips to Pause before play settles
+    } else {
+      setPlaying(false)
+    }
+    applyPlaybackAction(v, wantPlayingRef.current, action, () => setPlaying(false))
   }
   function stepBack() {
     const v = videoRef.current; if (!v) return
@@ -1224,7 +1237,14 @@ export default function VideoPlayer({
       {/* Transport + speed */}
       <div className="mt-3 pt-3 flex flex-wrap gap-2 items-center" style={divider}>
         <div className={tgroup} style={oswald}>
-          <button onClick={togglePlay} className={`${btnBase} ${playing ? btnOn : btnIdle}`}>
+          <button
+            type="button"
+            data-testid="clip-play-pause"
+            aria-label={playing ? 'Pause' : 'Play'}
+            aria-pressed={playing}
+            onClick={togglePlay}
+            className={`${btnBase} ${playing ? btnOn : btnIdle}`}
+          >
             {playing ? 'Pause' : 'Play'}
           </button>
           <button onClick={stepBack} className={`${btnBase} ${btnIdle}`}>
