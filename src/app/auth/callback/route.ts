@@ -8,6 +8,7 @@ import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
 import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
 import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
+import { acceptCoachInvite } from '@/lib/coach-invite-accept'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -80,6 +81,15 @@ export async function GET(request: NextRequest) {
             }
           } catch { /* email is non-critical */ }
         }
+      }
+    }
+    // Early-access coach invite: mark it used and finish the coach setup
+    // (role + Terms). Best-effort: sign-in itself is never blocked.
+    if (user.email) {
+      try {
+        await acceptCoachInvite(supabaseAdmin, user)
+      } catch (err) {
+        console.error('[auth/callback] coach invite accept failed', { userId: user.id, error: err instanceof Error ? err.message : err })
       }
     }
     // Google/Apple from the signup page: the birth month/year and Terms were

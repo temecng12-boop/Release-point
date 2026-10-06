@@ -11,6 +11,8 @@ import AccountLoadError from '@/components/account-load-error'
 import { dashboardRoute } from '@/lib/age-gate-routing'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
+import CoachInvitePanel from './coach-invite-panel'
+import { isMissingColumnError } from '@/lib/db-errors'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -46,6 +48,21 @@ export default async function DashboardPage() {
     return <AccountLoadError retryHref="/dashboard" />
   }
   if (profile?.role === 'guardian') redirect('/guardian')
+
+  // Platform admins get the early-access coach invite panel. Read separately
+  // so a database behind migration 041 never breaks the dashboard: a missing
+  // column just hides the panel (the invite action gates itself too).
+  let isPlatformAdmin = false
+  const adminRead = await supabaseAdmin
+    .from('profiles')
+    .select('is_platform_admin')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!adminRead.error) {
+    isPlatformAdmin = (adminRead.data as { is_platform_admin?: boolean | null } | null)?.is_platform_admin === true
+  } else if (!isMissingColumnError(adminRead.error, 'is_platform_admin')) {
+    console.error('[dashboard] platform admin read failed', { userId: user.id, code: adminRead.error.code })
+  }
 
   // Role comes from profiles only; user_metadata is set by the client at signup.
   const isCoach = profile?.role === 'coach'
@@ -218,6 +235,7 @@ export default async function DashboardPage() {
       <AppHeader right={dashNav} showSignOut />
 
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
+        {isPlatformAdmin && <CoachInvitePanel />}
         {isCoach ? (
           <>
             {/* ── Compact coach hero ── */}
