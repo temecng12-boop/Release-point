@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, Fragment } from 'react'
+import { aiCoachAudienceBadge, aiCoachAudienceEyebrow } from '@/lib/ai-coach-badge'
 
 type Agent   = 'randy' | 'barry'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -52,6 +53,7 @@ const AGENTS = {
 export default function AIChat({
   clipId,
   available = true,
+  role,
 }: {
   clipId: string
   /** False for viewers the server won't serve (guardians): show a notice instead of the chat. */
@@ -155,7 +157,10 @@ export default function AIChat({
     return (
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-5 space-y-4">
         <div>
-          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os}>AI Coach</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os} data-ai-badge={role}>
+            {aiCoachAudienceBadge(role)}
+          </p>
+          <p className="text-[10px] text-[#8096AE] mb-1">{aiCoachAudienceEyebrow(role)}</p>
           <p className="text-sm text-[#0F1F33]">Pick who you want to talk to.</p>
         </div>
 
@@ -164,7 +169,7 @@ export default function AIChat({
             <button
               key={key}
               onClick={() => chooseAgent(key)}
-              className="text-left rounded-xl border-2 p-4 transition-all hover:shadow-md active:scale-[0.98] space-y-2"
+              className="text-left rounded-xl border-2 p-4 min-h-11 transition-all hover:shadow-md active:scale-[0.98] space-y-2"
               style={{ borderColor: ag.border, background: ag.bg }}
             >
               <div className="flex items-center gap-2">
@@ -198,14 +203,20 @@ export default function AIChat({
   return (
     <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold" style={{ color: ag.color, ...os }}>{ag.name}</span>
-          <span className="text-[9px] text-[#8096AE] tracking-wide" style={os}>{ag.role}</span>
+      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166]" style={os} data-ai-badge={role}>
+            {aiCoachAudienceBadge(role)}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs font-bold" style={{ color: ag.color, ...os }}>{ag.name}</span>
+            <span className="text-[9px] text-[#8096AE] tracking-wide" style={os}>{ag.role}</span>
+          </div>
         </div>
         <button
+          type="button"
           onClick={() => { setAgent(null); setMessages([]) }}
-          className="text-[10px] text-[#8096AE] hover:text-[#456080] transition-colors"
+          className="shrink-0 min-h-11 px-3 text-[10px] text-[#8096AE] hover:text-[#456080] transition-colors"
           style={os}
         >
           Switch Agent
@@ -254,7 +265,7 @@ export default function AIChat({
         <button
           onClick={sendMessage}
           disabled={isLoading || !input.trim()}
-          className="px-4 py-2 rounded-md text-sm text-white font-medium transition-colors disabled:opacity-40"
+          className="min-h-11 px-4 py-2 rounded-md text-sm text-white font-medium transition-colors disabled:opacity-40"
           style={{ background: ag.color }}
         >
           Send
