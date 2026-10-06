@@ -18,13 +18,13 @@ export default function AboutPage() {
           <Link href="/home"><Logo size="sm" /></Link>
           <nav className="flex items-center gap-6">
             <Link href="/home" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>Home</Link>
-            <Link href="/auth/login" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors" style={os}>Log In</Link>
+            <Link href="/auth/login" className="text-xs text-[#456080] hover:text-[#0F1F33] transition-colors max-sm:min-h-11 max-sm:inline-flex max-sm:items-center" style={os}>Sign in</Link>
             <Link
-              href="/auth/signup"
-              className="text-xs text-white px-4 py-2 rounded-md transition-colors"
+              href="/waitlist"
+              className="text-xs text-white px-4 py-2 rounded-md transition-colors max-sm:min-h-11 max-sm:inline-flex max-sm:items-center"
               style={{ ...os, backgroundColor: '#C8102E' }}
             >
-              Get Started
+              Join the waitlist
             </Link>
           </nav>
         </div>
@@ -243,14 +243,14 @@ export default function AboutPage() {
 
         {/* CTA */}
         <section className="text-center">
-          <h2 className="text-4xl text-[#0F1F33] mb-4" style={os}>Ready to get started?</h2>
-          <p className="text-[#456080] mb-8">Built for coaches and players.</p>
+          <h2 className="text-4xl text-[#0F1F33] mb-4" style={os}>Join the waitlist</h2>
+          <p className="text-[#456080] mb-8">We&apos;re in internal testing, so new coaches start on the waitlist.</p>
           <Link
-            href="/auth/signup"
-            className="inline-block text-sm text-white px-10 py-4 rounded-lg transition-colors"
+            href="/waitlist"
+            className="inline-block text-sm text-white px-10 py-4 rounded-lg transition-colors max-sm:min-h-11"
             style={{ ...os, backgroundColor: '#C8102E' }}
           >
-            Create a Coach Account
+            Join the waitlist
           </Link>
         </section>
 

@@ -48,8 +48,8 @@ export default function SiteFooter({ variant = 'marketing' }: Props) {
         <div className="flex flex-col gap-3.5">
           <p className="text-xs text-slate-400 tracking-widest mb-1" style={os}>Links</p>
           {[
-            { href: '/auth/signup', label: 'Coach Sign Up' },
-            { href: '/auth/login',  label: 'Player Login'  },
+            { href: '/waitlist',    label: 'Join the waitlist' },
+            { href: '/auth/login',  label: 'Sign in'  },
             { href: '/home',        label: 'Home'           },
             { href: '/about',       label: 'About'          },
             { href: '/privacy',     label: 'Privacy'        },
