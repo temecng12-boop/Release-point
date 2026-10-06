@@ -14,7 +14,7 @@ import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
 import { passwordProblem } from '@/lib/password-rule'
-import { PRODUCTION_SITE_URL } from '@/lib/password-reset'
+import { isRateLimited, PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 
 export async function signUp(_prevState: { error?: string; message?: string; stopped?: boolean } | undefined, formData: FormData) {
@@ -41,7 +41,13 @@ export async function signUp(_prevState: { error?: string; message?: string; sto
     options: { data: { role: 'coach', full_name: fullName, tos_accepted_at: tosAcceptedAt } },
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[signUp] coach signup failed', { code: error.code ?? null, message: error.message, status: error.status ?? null })
+    if (isRateLimited(error)) {
+      return { error: "You've tried a few times in a short span. Please wait a minute and try again." }
+    }
+    return { error: "We couldn't create your account. Check your details and try again." }
+  }
 
   if (data.user) {
     // linkPlayerRow writes role 'player' for any profile it touches, so a coach
