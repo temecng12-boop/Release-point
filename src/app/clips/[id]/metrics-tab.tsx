@@ -7,17 +7,9 @@ import { addPitchMetric, deletePitchMetric, deleteAllPitchMetrics, importPitchMe
 import { csvImportFrom, importTooBig, pdfFileProblem, type PitchImport } from '@/lib/pitch-import'
 import { runAction } from '@/lib/action-result'
 import { parseTrackmanPDF, type ParsedPitchRow } from '@/app/actions/import-pdf'
+import PitchMetricsTiles from './pitch-metrics-tiles'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-
-// ── Spin axis → clock-face string ──────────────────────────────────────────
-function axisToClock(degrees: number): string {
-  const normalized = ((degrees % 360) + 360) % 360
-  const totalMinutes = Math.round(normalized / 0.5)
-  const h = Math.floor(totalMinutes / 60) % 12 || 12
-  const m = totalMinutes % 60
-  return `${h}:${String(m).padStart(2, '0')}`
-}
 
 // ── Velocity benchmarks by level ────────────────────────────────────────────
 const VELOCITY_BENCHMARKS: Record<string, { avg: number; good: number; elite: number }> = {
@@ -88,10 +80,13 @@ export default function MetricsTab({
   const pdfRef  = useRef<HTMLInputElement>(null)
 
   const [metrics, setMetrics] = useState<MetricRow[]>(initialMetrics)
+  // Tiles show one pitch at a time; default to the most recently added.
+  const [selectedId, setSelectedId] = useState<string | null>(() => initialMetrics.at(-1)?.id ?? null)
   function updateMetrics(updater: (prev: MetricRow[]) => MetricRow[]) {
     setMetrics(prev => {
       const next = updater(prev)
       onMetricsChange?.(next)
+      setSelectedId(cur => (cur && next.some(m => m.id === cur) ? cur : next.at(-1)?.id ?? null))
       return next
     })
   }
@@ -268,8 +263,8 @@ export default function MetricsTab({
       {canAdd && (
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-4 space-y-4">
         <div>
-          <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Import Pitch Analytics</p>
-          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Works with TrackMan pitch tracking files</p>
+          <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Add pitch data</p>
+          <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Manual entry, or a CSV / PDF from your pitch tracker</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -281,7 +276,7 @@ export default function MetricsTab({
               className="w-full max-sm:min-h-11 border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors"
             >
               <span className="block font-medium" style={oswald}>CSV</span>
-              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan</span>
+              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">Spreadsheet</span>
             </button>
           </div>
 
@@ -294,7 +289,7 @@ export default function MetricsTab({
               className="w-full max-sm:min-h-11 border-2 border-dashed border-[#DDE4ED] rounded-md py-3 text-xs text-[#456080] hover:border-[#C8102E] hover:text-[#0F1F33] transition-colors disabled:opacity-50"
             >
               <span className="block font-medium" style={oswald}>{isParsing ? 'Reading…' : 'PDF'}</span>
-              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">TrackMan report card</span>
+              <span className="block text-[10px] text-[#3D5166]/60 mt-0.5">Pitch report</span>
             </button>
           </div>
         </div>
@@ -416,138 +411,101 @@ export default function MetricsTab({
       </div>
       )}
 
-      {/* ── Saved metrics table ──────────────────────────────────────────── */}
-      {metrics.length > 0 ? (
-        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md overflow-hidden">
-          <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between">
-            <div>
-              <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Pitch Analytics</p>
-              <p className="text-[10px] text-[#3D5166]/50 mt-0.5">Compatible with TrackMan exports</p>
-            </div>
-            <div className="flex items-center gap-2">
+      {/* ── Pitch metrics: six tiles (primary) + pitch list when several ─── */}
+      <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md overflow-hidden">
+        <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <p className="text-xs text-[#3D5166] tracking-widest" style={oswald}>Pitch metrics</p>
+            <p className="text-[10px] text-[#3D5166]/50 mt-0.5">
+              {metrics.length === 0 ? 'No data yet' : 'Entered for this clip'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {metrics.length > 0 && (
               <p className="text-[10px] text-[#3D5166]/50">{metrics.length} pitch{metrics.length !== 1 ? 'es' : ''}</p>
-              {canDelete && !confirmAll && (
-                <button type="button" onClick={() => { setConfirmAll(true); setMetricDeleteError(null) }}
-                  className="!min-h-11 px-2 text-[10px] tracking-widest text-[#3D5166] hover:text-[#C8102E] transition-colors" style={oswald}>
-                  Delete all
-                </button>
-              )}
+            )}
+            {canDelete && metrics.length > 0 && !confirmAll && (
+              <button type="button" onClick={() => { setConfirmAll(true); setMetricDeleteError(null) }}
+                className="!min-h-11 px-2 text-[10px] tracking-widest text-[#3D5166] hover:text-[#C8102E] transition-colors" style={oswald}>
+                Delete all
+              </button>
+            )}
+          </div>
+        </div>
+        {canDelete && confirmAll && (
+          <div role="alertdialog" aria-label="Delete all pitches" className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] bg-[#FFF5F5]">
+            <span className="text-xs text-[#456080]">Delete all {metrics.length} pitch{metrics.length !== 1 ? 'es' : ''} on this clip? This can&apos;t be undone.</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={handleDeleteAllMetrics} disabled={deletingAll}
+                className="!min-h-11 px-3 rounded text-xs text-white bg-[#C8102E] hover:bg-red-700 transition-colors disabled:opacity-50">
+                {deletingAll ? 'Deleting…' : 'Delete all'}
+              </button>
+              <button type="button" onClick={() => setConfirmAll(false)} disabled={deletingAll}
+                className="!min-h-11 px-3 text-xs text-[#3D5166] hover:text-[#456080] transition-colors">
+                Cancel
+              </button>
             </div>
           </div>
-          {canDelete && confirmAll && (
-            <div role="alertdialog" aria-label="Delete all pitches" className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-[#DDE4ED] bg-[#FFF5F5]">
-              <span className="text-xs text-[#456080]">Delete all {metrics.length} pitch{metrics.length !== 1 ? 'es' : ''} on this clip? This can&apos;t be undone.</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={handleDeleteAllMetrics} disabled={deletingAll}
-                  className="!min-h-11 px-3 rounded text-xs text-white bg-[#C8102E] hover:bg-red-700 transition-colors disabled:opacity-50">
-                  {deletingAll ? 'Deleting…' : 'Delete all'}
-                </button>
-                <button type="button" onClick={() => setConfirmAll(false)} disabled={deletingAll}
-                  className="!min-h-11 px-3 text-xs text-[#3D5166] hover:text-[#456080] transition-colors">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          {metricDeleteError && <p role="alert" className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#C8102E]">{metricDeleteError}</p>}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#DDE4ED] bg-[#F9FAFB]">
-                  {[
-                    { key: 'pitch_type',       label: 'Pitch' },
-                    { key: 'velocity',          label: 'Velo (mph)' },
-                    { key: 'spin_rate',         label: 'Spin (rpm)' },
-                    { key: 'spin_axis',         label: 'Axis / Tilt' },
-                    { key: 'vertical_break',    label: 'IVB (in)' },
-                    { key: 'horizontal_break',  label: 'H-Break (in)' },
-                    { key: 'extension',         label: 'Ext (ft)' },
-                    { key: 'vaa',               label: 'VAA (°)' },
-                  ].map(h => (
-                    <th key={h.key} className="px-3 py-2 text-left text-[10px] text-[#3D5166] tracking-widest font-medium whitespace-nowrap" style={oswald}>
-                      {h.label}
-                    </th>
-                  ))}
-                  {canDelete && <th className="px-1 py-2"><span className="sr-only">Delete</span></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-[#DDE4ED] hover:bg-[#F0F4F8] transition-colors">
-                    <td className="px-3 py-2.5 text-[#0F1F33] font-medium">{m.pitch_type ?? '—'}</td>
-                    <td className="px-3 py-2.5">
-                      {m.velocity != null ? (
-                        <span className="flex items-center gap-1.5">
-                          <span className="text-[#0F1F33] font-mono">{m.velocity.toFixed(1)}</span>
-                          <VelocityIndicator velocity={m.velocity} ageGroup={playerAgeGroup} />
-                        </span>
-                      ) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[#0F1F33] font-mono">
-                      {m.spin_rate != null ? m.spin_rate.toLocaleString() : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {m.spin_axis != null ? (
-                        <span className="flex flex-col">
-                          <span className="text-[#0F1F33] font-mono text-xs">{axisToClock(m.spin_axis)}</span>
-                          <span className="text-[#3D5166]/50 text-[10px]">{m.spin_axis}°</span>
-                        </span>
-                      ) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 font-mono">
-                      {m.vertical_break != null ? (
-                        <span className={m.vertical_break > 0 ? 'text-emerald-600' : 'text-blue-600'}>
-                          {m.vertical_break > 0 ? '+' : ''}{m.vertical_break.toFixed(1)}&quot;
-                        </span>
-                      ) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 font-mono">
-                      {m.horizontal_break != null ? (
-                        <span className={m.horizontal_break > 0 ? 'text-violet-600' : 'text-orange-500'}>
-                          {m.horizontal_break > 0 ? '+' : ''}{m.horizontal_break.toFixed(1)}&quot;
-                        </span>
-                      ) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[#0F1F33] font-mono">
-                      {m.extension != null ? m.extension.toFixed(1) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[#0F1F33] font-mono">
-                      {m.vaa != null ? m.vaa.toFixed(1) : <span className="text-[#3D5166]/40">—</span>}
-                    </td>
+        )}
+        {metricDeleteError && <p role="alert" className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#C8102E]">{metricDeleteError}</p>}
+        <div className="p-4 space-y-4">
+          <PitchMetricsTiles
+            row={metrics.find(m => m.id === selectedId) ?? metrics.at(-1) ?? null}
+            emptyHint={
+              canAdd
+                ? 'No data yet — add a pitch above.'
+                : isCoach
+                  ? 'No data yet. Only the player\u2019s own coach can add pitch data.'
+                  : 'No data yet. Your coach will add pitch data when they have it.'
+            }
+          />
+          {metrics.length > 1 && (
+            <div className="space-y-2" role="list" aria-label="Pitches on this clip">
+              <p className="text-[10px] text-[#3D5166] tracking-widest" style={oswald}>Pitches on this clip</p>
+              {metrics.map(m => {
+                const on = m.id === (selectedId ?? metrics.at(-1)?.id)
+                const label = [
+                  m.pitch_type || 'Pitch',
+                  m.velocity != null ? `${m.velocity.toFixed(1)} mph` : null,
+                ].filter(Boolean).join(' · ')
+                return (
+                  <div key={m.id} role="listitem" className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(m.id)}
+                      aria-pressed={on}
+                      className={`flex-1 min-h-11 text-left px-3 py-2 rounded-md border text-sm transition-colors ${on ? 'border-[#1C3A5C] bg-[#F0F4F8] text-[#0F1F33]' : 'border-[#DDE4ED] text-[#456080] hover:border-[#456080]'}`}
+                    >
+                      <span className="font-medium">{label}</span>
+                      {m.spin_rate != null && (
+                        <span className="ml-2 text-xs text-[#8096AE] font-mono">{m.spin_rate.toLocaleString()} rpm</span>
+                      )}
+                    </button>
                     {canDelete && (
-                      <td className="px-1 py-1 text-right">
-                        <button type="button" onClick={() => handleDeleteMetric(m.id)} disabled={deletingId !== null || deletingAll}
-                          aria-label={`Delete pitch ${m.pitch_type ?? ''}${m.velocity != null ? ` ${m.velocity.toFixed(1)} mph` : ''}`.trim()}
-                          title="Delete this pitch"
-                          className="!min-h-11 !min-w-11 inline-flex items-center justify-center rounded text-xs text-[#3D5166] hover:text-[#C8102E] hover:bg-[#FFF5F5] transition-colors disabled:opacity-40">
-                          {deletingId === m.id ? '…' : '✕'}
-                        </button>
-                      </td>
+                      <button type="button" onClick={() => handleDeleteMetric(m.id)} disabled={deletingId !== null || deletingAll}
+                        aria-label={`Delete pitch ${m.pitch_type ?? ''}${m.velocity != null ? ` ${m.velocity.toFixed(1)} mph` : ''}`.trim()}
+                        title="Delete this pitch"
+                        className="!min-h-11 !min-w-11 inline-flex items-center justify-center rounded text-xs text-[#3D5166] hover:text-[#C8102E] hover:bg-[#FFF5F5] transition-colors disabled:opacity-40">
+                        {deletingId === m.id ? '…' : '✕'}
+                      </button>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-6 text-center">
-          <p className="text-sm text-[#456080]">No pitch metrics yet.</p>
-          {canAdd ? (
-            <p className="text-xs text-[#3D5166] mt-1">
-              Upload a CSV or PDF above to add pitch data for this clip.
-            </p>
-          ) : isCoach ? (
-            <p className="text-xs text-[#3D5166] mt-1">
-              Only the player&apos;s own coach can add pitch data.
-            </p>
-          ) : (
-            <p className="text-xs text-[#3D5166] mt-1">
-              Your coach will upload pitch data when available.
-            </p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {metrics.length === 1 && canDelete && (
+            <div className="flex justify-end">
+              <button type="button" onClick={() => handleDeleteMetric(metrics[0].id)} disabled={deletingId !== null || deletingAll}
+                aria-label={`Delete pitch ${metrics[0].pitch_type ?? ''}${metrics[0].velocity != null ? ` ${metrics[0].velocity.toFixed(1)} mph` : ''}`.trim()}
+                title="Delete this pitch"
+                className="!min-h-11 !min-w-11 inline-flex items-center justify-center rounded text-xs text-[#3D5166] hover:text-[#C8102E] hover:bg-[#FFF5F5] transition-colors disabled:opacity-40">
+                {deletingId === metrics[0].id ? '…' : '✕'}
+              </button>
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* ── Benchmark legend ─────────────────────────────────────────────── */}
       {playerAgeGroup && VELOCITY_BENCHMARKS[playerAgeGroup] && (
