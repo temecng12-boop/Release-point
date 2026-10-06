@@ -25,8 +25,9 @@ test('common passwords are rejected in any letter case', () => {
 })
 
 test('the list is about 1,000 lowercase entries of 8+ characters, no duplicates', () => {
-  assert.equal(COMMON_PASSWORDS.length, 1000)
-  assert.equal(new Set(COMMON_PASSWORDS).size, 1000)
+  assert.equal(COMMON_PASSWORDS.length, 999, "SecLists' top 1,000 (8+ chars) minus 'thirteen'")
+  assert.equal(new Set(COMMON_PASSWORDS).size, 999)
+  assert.ok(!COMMON_PASSWORDS.some((pw) => /thirteen|\b13\b/i.test(pw)), 'nothing that names the age cutoff (the list ships to the browser)')
   for (const pw of COMMON_PASSWORDS) {
     assert.ok(pw.length >= 8, pw)
     assert.equal(pw, pw.toLowerCase())

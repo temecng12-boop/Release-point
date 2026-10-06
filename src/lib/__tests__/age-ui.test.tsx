@@ -114,14 +114,12 @@ const CLIENT_ENTRIES = ['app/auth/signup/signup-form.tsx', 'components/age-confi
 
 test('cutoff scan: the one screen\'s browser code has no age rules and no copy naming the cutoff', () => {
   const { files, serverRefs } = clientGraph(CLIENT_ENTRIES)
+  assert.ok(files.includes('lib/common-passwords.ts'), 'the coach form\'s password list is scanned too (no exceptions)')
   assert.ok(files.includes('components/age-confirm-form.tsx') && files.includes('components/birth-fields.tsx'), files.join(', '))
   for (const banned of ['lib/age-band.ts', 'lib/under13-mode.ts', 'lib/consent.ts', 'lib/consent-server.ts', 'lib/terms-acceptance.ts']) {
     assert.ok(!files.includes(banned), `${banned} must not be in the browser code (found via ${CLIENT_ENTRIES.join(', ')})`)
   }
   assert.deepEqual(serverRefs, ['app/actions/auth.ts'], 'only the signup action, as a server reference')
-  // One known exception: the coach password form's common-password blocklist
-  // (a rejected password "thirteen", never shown) rides in the same bundle.
-  const EXCEPT: Record<string, string[]> = { 'lib/common-passwords.ts': ["'thirteen'"] }
   for (const f of files) {
     const code = src(f)
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '') // comments are stripped from the bundle
@@ -130,7 +128,7 @@ test('cutoff scan: the one screen\'s browser code has no age rules and no copy n
     const strings = [...code.matchAll(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g)].map((m) => m[0])
     const jsxText = [...code.matchAll(/>([^<>{}]+)</g)].map((m) => m[1].trim()).filter(Boolean)
     const hits = [...strings, ...jsxText].filter((l) => CUTOFF.test(l))
-    assert.deepEqual(hits, EXCEPT[f] ?? [], `${f}: ${JSON.stringify(hits)}`)
+    assert.deepEqual(hits, [], `${f}: ${JSON.stringify(hits)}`)
     assert.ok(strings.length > 0, `${f}: literals found`)
   }
 })
