@@ -16,7 +16,8 @@ const oswald: React.CSSProperties = {
   fontWeight: 700,
 }
 
-// rp-mark-small-color.svg viewBox aspect ≈ 1.61 (same family as the old PNG).
+// rp-mark-color.svg viewBox aspect ≈ 1.61 (same family as the old PNG);
+// full seamed mark — do NOT swap in the no-stitch small variant.
 const iconH  = { sm: 28, md: 34, lg: 48 }
 
 export default function Logo({
@@ -33,8 +34,8 @@ export default function Logo({
   const mark = (
     <div className={`inline-flex items-center gap-2.5 shrink-0 ${className}`}>
       <Image
-        src="/rp-mark-small-color.svg"
-        alt="Release Point"
+        src="/rp-mark-color.svg"
+        alt="Release Point AI"
         width={w}
         height={h}
         className="object-contain"
@@ -50,7 +51,7 @@ export default function Logo({
           color: dark ? '#94a3b8' : 'var(--rp-navy, #023167)',
         }}
       >
-        Release Point
+        Release Point AI
       </span>
     </div>
   )

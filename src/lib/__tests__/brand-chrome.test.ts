@@ -11,6 +11,7 @@ const root = join(__dirname, '..', '..', '..')
 const css = readFileSync(join(root, 'src', 'app', 'globals.css'), 'utf8')
 const logo = readFileSync(join(root, 'src', 'components', 'Logo.tsx'), 'utf8')
 const header = readFileSync(join(root, 'src', 'components', 'app-header.tsx'), 'utf8')
+const footer = readFileSync(join(root, 'src', 'components', 'SiteFooter.tsx'), 'utf8')
 const tabs = readFileSync(join(root, 'src', 'app', 'clips', '[id]', 'clip-tabs.tsx'), 'utf8')
 const player = readFileSync(join(root, 'src', 'components', 'video-player.tsx'), 'utf8')
 
@@ -33,11 +34,19 @@ test('SVG wordmark assets ship with seams-readable mark', () => {
   assert.ok(svg.length > 200)
 })
 
-test('Logo uses SVG mark and mark-only below 480px', () => {
-  assert.match(logo, /rp-mark-small-color\.svg/)
+test('Logo uses seamed full mark and mark-only below 480px', () => {
+  assert.match(logo, /rp-mark-color\.svg/)
+  assert.doesNotMatch(logo, /rp-mark-small-color\.svg/)
+  assert.match(logo, /Release Point AI/)
   assert.match(logo, /hidden min-\[480px\]:inline/)
   assert.match(logo, /--rp-navy/)
   assert.match(header, /wordmarkClass="hidden min-\[480px\]:inline/)
+})
+
+test('footer lockup uses seamed mark and Release Point AI wordmark', () => {
+  assert.match(footer, /rp-icon\.png/)
+  assert.doesNotMatch(footer, /rp-mark-small-color\.svg/)
+  assert.match(footer, /Release Point AI/)
 })
 
 test('clip tabs active state is navy', () => {
