@@ -30,5 +30,5 @@ test('the header still hides the wordmark and secondary links on phones', () => 
 
 test('a linked breadcrumb hides with its separator on phones (no "/ /")', () => {
   const header = readFileSync(join(__dirname, '..', '..', 'components', 'app-header.tsx'), 'utf8')
-  assert.match(header, /crumb\.href \? 'hidden sm:inline-flex' : 'flex'/)
+  assert.match(header, /crumb\.href \|\| backHref \? 'hidden sm:inline-flex' : 'flex'/)
 })
