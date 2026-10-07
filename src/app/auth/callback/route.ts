@@ -9,6 +9,7 @@ import { RESET_PATH } from '@/lib/password-reset'
 import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
 import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
 import { acceptCoachInvite } from '@/lib/coach-invite-accept'
+import { findInviteForEmail, findUnlinkedPlayerIds, isBrandNewUser } from '@/lib/invite-gate'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -50,15 +51,39 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(failed)
     }
-    // Link player row to this auth account (for invited players)
+    // Invite-only gate (defense in depth behind the Before User Created
+    // hook): an account created by THIS request with no matching invite
+    // (unlinked players row or pending coach_invites row, matched on
+    // lower(trim(email))) is removed and sent to the waitlist. Existing
+    // users -- coaches, current players, open-beta accounts without roster
+    // rows -- have old created_at values and never reach the rejection.
+    if (user.email && isBrandNewUser(user)) {
+      const invite = await findInviteForEmail(supabaseAdmin, user.email)
+      if (invite === 'none') {
+        try {
+          await supabaseAdmin.from('profiles').delete().eq('id', user.id)
+          await supabaseAdmin.auth.admin.deleteUser(user.id)
+        } catch (err) {
+          console.error('[auth/callback] invite-gate cleanup failed', { userId: user.id, error: err instanceof Error ? err.message : err })
+        }
+        await supabase.auth.signOut({ scope: 'local' })
+        return NextResponse.redirect(`${origin}/waitlist?reason=invite_only`)
+      }
+    }
+    // Link player row to this auth account (for invited players).
+    // Matched on lower(trim(email)): the roster email may differ in case
+    // or whitespace from the auth email (e.g. a Supabase re-invite).
     let updatedPlayers: { id: string; full_name: string; coach_id: string | null }[] | null = null
     if (user.email) {
-      const { data: linked } = await supabaseAdmin
-        .from('players')
-        .update({ user_id: user.id, accepted_at: new Date().toISOString() })
-        .eq('email', user.email)
-        .is('user_id', null)
-        .select('id, full_name, coach_id')
+      const playerIds = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
+      const { data: linked } = playerIds.length > 0
+        ? await supabaseAdmin
+          .from('players')
+          .update({ user_id: user.id, accepted_at: new Date().toISOString() })
+          .in('id', playerIds)
+          .is('user_id', null)
+          .select('id, full_name, coach_id')
+        : { data: [] as { id: string; full_name: string; coach_id: string | null }[] }
       updatedPlayers = linked
 
       // Notify coach that player accepted invite

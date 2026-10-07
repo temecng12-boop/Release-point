@@ -17,7 +17,13 @@ const FEATURES = [
   'Youth through pro',
 ]
 
-export default function WaitlistPage() {
+export default async function WaitlistPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const reason = (await searchParams).reason
+  const inviteOnly = reason === 'invite_only'
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="px-6 md:px-12 h-14 flex items-center justify-between border-b border-[#e2e8f0]">
@@ -39,6 +45,12 @@ export default function WaitlistPage() {
         <h1 className="text-4xl sm:text-5xl md:text-6xl text-[#0F1F33] text-center leading-tight mb-4 max-w-2xl" style={os}>
           Join the waitlist
         </h1>
+
+        {inviteOnly && (
+          <p role="status" className="text-sm text-[#0F1F33] text-center max-w-md mb-4 leading-relaxed rounded-lg px-4 py-3" style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}>
+            Release Point is invite-only right now, so that account wasn&apos;t created. Join the waitlist below and we&apos;ll reach out when your spot is ready.
+          </p>
+        )}
 
         <p className="text-[#456080] text-sm sm:text-base text-center max-w-md mb-8 leading-relaxed">
           Release Point is a web app for coaches to upload and annotate pitching and hitting video frame by frame,

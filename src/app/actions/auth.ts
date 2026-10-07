@@ -13,6 +13,7 @@ import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
+import { findUnlinkedPlayerIds, normalizeEmail } from '@/lib/invite-gate'
 import { passwordProblem } from '@/lib/password-rule'
 import { isRateLimited, PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
@@ -226,12 +227,17 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
 
   // Link to an existing invited player record. Accepting an invite is not
   // guardian consent, and the coach's age choice from the invite stands.
-  const { data: linked, error: linkError } = await supabaseAdmin
-    .from('players')
-    .update({ user_id: user.id, accepted_at: now })
-    .eq('email', user.email)
-    .is('user_id', null)
-    .select('id')
+  // Matched on lower(trim(email)): the roster email may differ in case or
+  // whitespace from the auth email.
+  const invitePlayerIds = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
+  const { data: linked, error: linkError } = invitePlayerIds.length > 0
+    ? await supabaseAdmin
+      .from('players')
+      .update({ user_id: user.id, accepted_at: now })
+      .in('id', invitePlayerIds)
+      .is('user_id', null)
+      .select('id')
+    : { data: [] as { id: string }[], error: null }
   if (linkError) {
     console.error('[linkPlayerRow] invite link failed', { code: linkError.code, message: linkError.message })
     return { error: LINK_FAILED }
@@ -271,7 +277,7 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
         (adultFields) => supabaseAdmin.from('players').insert({
           user_id:     user.id,
           full_name:   fullName,
-          email:       user.email,
+          email:       normalizeEmail(user.email) || user.email,
           accepted_at: now,
           ...adultFields,
         }),
