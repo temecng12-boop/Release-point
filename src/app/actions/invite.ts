@@ -9,9 +9,9 @@ import { sendPlayerInviteEmail } from '@/lib/email'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
 export async function invitePlayer(
-  _prevState: { error?: string; success?: string } | undefined,
+  _prevState: { error?: string; success?: string; inviteUrl?: string } | undefined,
   formData: FormData
-) {
+): Promise<{ error?: string; success?: string; inviteUrl?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -140,10 +140,12 @@ export async function invitePlayer(
   revalidatePath('/', 'layout')
   if (sent.error) {
     console.error('[invite] invite email not sent', sent.error)
-    return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be sent (${sent.error}). Please try again.` }
+    // The sign-in link is still valid: hand it back so the coach can copy
+    // and text it to the player instead of depending on email delivery.
+    return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be sent (${sent.error}). Please try again.`, inviteUrl }
   }
 
-  return { success: `Invite sent to ${playerEmail}. They'll confirm their age when they set up their account.` }
+  return { success: `Invite sent to ${playerEmail}. They'll confirm their age when they set up their account.`, inviteUrl }
 }
 
 /** Start of a partial-failure message: "Player added, but" or, for a player already on the roster, says so. */

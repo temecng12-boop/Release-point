@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { inviteCoach } from '@/app/actions/coach-invites'
+import InviteLinkBox from './invite-link-box'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080]'
@@ -39,6 +40,7 @@ export default function CoachInviteForm() {
           <p className="text-sm text-green-700">{state.success}</p>
         </div>
       )}
+      {state?.inviteUrl && <InviteLinkBox inviteUrl={state.inviteUrl} />}
 
       <button
         type="submit"

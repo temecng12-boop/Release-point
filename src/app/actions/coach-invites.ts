@@ -43,9 +43,9 @@ async function platformAdminCheck(userId: string, email: string | undefined): Pr
  * invite, or an email that already has a coach account, gets no email.
  */
 export async function inviteCoach(
-  _prevState: { error?: string; success?: string } | undefined,
+  _prevState: { error?: string; success?: string; inviteUrl?: string } | undefined,
   formData: FormData,
-): Promise<{ error?: string; success?: string }> {
+): Promise<{ error?: string; success?: string; inviteUrl?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -158,8 +158,10 @@ export async function inviteCoach(
   revalidatePath('/dashboard')
   if (sent.error) {
     console.error('[inviteCoach] invite email not sent', sent.error)
-    return { error: `Invite saved for ${email}, but the email could not be sent (${sent.error}). Resend from the dashboard.` }
+    // The sign-in link is still valid: hand it back so it can be copied
+    // and sent manually instead of depending on email delivery.
+    return { error: `Invite saved for ${email}, but the email could not be sent (${sent.error}). Resend from the dashboard.`, inviteUrl }
   }
 
-  return { success: `Invite sent to ${email}. They\u2019ll set up their own coach account from the email.` }
+  return { success: `Invite sent to ${email}. They\u2019ll set up their own coach account from the email.`, inviteUrl }
 }

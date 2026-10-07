@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
+import InviteLinkBox from './invite-link-box'
 
 interface Team { id: string; name: string }
 interface Props { teams: Team[] }
@@ -60,6 +61,7 @@ export default function InviteForm({ teams }: Props) {
               <p className="text-sm text-green-700">{state.success}</p>
             </div>
           )}
+          {state?.inviteUrl && <InviteLinkBox inviteUrl={state.inviteUrl} />}
 
           <button
             type="submit"

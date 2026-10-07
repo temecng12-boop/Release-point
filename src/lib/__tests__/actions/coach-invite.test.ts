@@ -193,6 +193,28 @@ test('invite email not sent: error that says the invite was saved + resend', asy
   assert.equal(r2.success, undefined)
 })
 
+test('coach invite success returns the invite link so it can be copied', async () => {
+  const r = await inviteCoach(undefined, inviteForm(CASEY, 'Casey Spencer'))
+  assert.equal(r.error, undefined)
+  assert.match(r.inviteUrl ?? '', new RegExp(`^https://auth\\.test/invite\\?e=${CASEY.replace('.', '\\.')}$`))
+})
+
+test('coach invite email failure still returns the invite link', async () => {
+  emailFake.coachInviteResult = { error: 'domain not verified' }
+  const r = await inviteCoach(undefined, inviteForm('x@example.com', 'X'))
+  assert.match(r.error ?? '', /email could not be sent \(domain not verified\)/)
+  assert.equal(r.success, undefined)
+  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=x@example\.com$/)
+  assert.equal(state.tables.coach_invites.length, 1, 'retryable from the dashboard')
+})
+
+test('coach invite form surfaces the copyable invite link', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../../app/dashboard/coach-invite-form.tsx', import.meta.url), 'utf8')
+  assert.match(src, /InviteLinkBox/)
+  assert.match(src, /state\?\.inviteUrl/)
+})
+
 // ── Accept (auth/callback helper) ────────────────────────────────────────────
 test('accept: no invite row means nothing happens', async () => {
   const { supabaseAdmin } = await import('./fakes/supabase-admin')
