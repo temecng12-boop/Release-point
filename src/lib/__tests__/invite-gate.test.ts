@@ -176,6 +176,8 @@ test('waitlist page shows a friendly invite-only note for ?reason=invite_only', 
 test('migration 042: Before User Created hook with the documented grants', () => {
   const sql = readFileSync(new URL('../../../supabase/migrations/042_invite_only_signup_hook.sql', import.meta.url), 'utf8')
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.before_user_created_invite_check\(event jsonb\)/, 'the hook function')
+  assert.match(sql, /SECURITY DEFINER/, 'runs as its owner, past RLS (supabase_auth_admin has no table access)')
+  assert.match(sql, /ALTER FUNCTION public\.before_user_created_invite_check\(jsonb\) OWNER TO postgres/, 'owner is postgres')
   assert.match(sql, /user_id IS NULL/, 'players rows must be unlinked')
   assert.match(sql, /accepted_at IS NULL/, 'coach invites must be pending')
   assert.match(sql, /lower\(btrim\(email\)\)/, 'matching is lower(trim())')

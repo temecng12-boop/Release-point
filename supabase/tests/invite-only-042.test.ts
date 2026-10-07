@@ -129,6 +129,45 @@ test('backfill normalizes unique emails but skips whitespace duplicates (no uniq
   assert.deepEqual(await hook(db, '  DUP@x.test '), {}, 'skipped rows still match the hook at query time')
 })
 
+test('hook reads past RLS as a locked-down caller (supabase_auth_admin stand-in)', async () => {
+  const db = await db042()
+  await seedInvites(db)
+  // RLS is on for both invite tables, as on prod.
+  const rls = (await db.query<{ relname: string; relrowsecurity: boolean }>(
+    `SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('players','coach_invites')`)).rows
+  assert.deepEqual(new Set(rls.map((r) => `${r.relname}:${r.relrowsecurity}`)), new Set(['players:true', 'coach_invites:true']))
+  // The hook runs as its owner (postgres), past RLS.
+  const meta = (await db.query<{ owner: string; definer: boolean }>(
+    `SELECT pg_get_userbyid(proowner) AS owner, prosecdef AS definer FROM pg_proc WHERE proname = 'before_user_created_invite_check'`)).rows[0]
+  assert.equal(meta.owner, 'postgres')
+  assert.equal(meta.definer, true)
+  // A caller with no table privileges and no BYPASSRLS, like
+  // supabase_auth_admin on prod: EXECUTE on the hook only.
+  await db.exec(`CREATE ROLE hook_caller NOLOGIN;
+    GRANT USAGE ON SCHEMA public TO hook_caller;
+    GRANT EXECUTE ON FUNCTION public.before_user_created_invite_check(jsonb) TO hook_caller;`)
+  const call = async (email: string): Promise<Record<string, { http_code?: number }>> => {
+    await db.exec('SET ROLE hook_caller')
+    try {
+      return (await db.query<{ r: unknown }>(
+        `SELECT public.before_user_created_invite_check($1) r`, [{ user: { email } }])).rows[0].r as Record<string, { http_code?: number }>
+    } finally {
+      await db.exec('RESET ROLE')
+    }
+  }
+  assert.deepEqual(await call('kid@x.test'), {}, 'invited player allowed')
+  assert.deepEqual(await call('newcoach@x.test'), {}, 'invited coach allowed')
+  assert.equal((await call('stranger@x.test')).error?.http_code, 403, 'stranger rejected')
+})
+
+test('normalize_invite_email needs no table access (BEFORE trigger on NEW only)', async () => {
+  const db = await db042()
+  const meta = (await db.query<{ definer: boolean; src: string }>(
+    `SELECT prosecdef AS definer, prosrc AS src FROM pg_proc WHERE proname = 'normalize_invite_email'`)).rows[0]
+  assert.equal(meta.definer, false, 'runs as the caller -- safe because it only assigns NEW.email')
+  assert.doesNotMatch(meta.src, /\b(SELECT|FROM|INSERT|UPDATE|DELETE|PERFORM)\b/i, 'no table reads or writes')
+})
+
 test('hook grants: anon/authenticated/public cannot execute; function exists', async () => {
   const db = await db042()
   const r = (await db.query<{ anon: boolean; authd: boolean; pub: boolean; exists: boolean }>(`

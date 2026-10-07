@@ -43,9 +43,19 @@ END
 $$;
 
 -- ── 1. Before User Created hook ──────────────────────────────────────────────
+-- SECURITY DEFINER owned by postgres (the migration owner): on prod the hook
+-- runs as supabase_auth_admin, which has no SELECT on the invite tables and
+-- does not bypass RLS -- without this, every lookup would see zero rows and
+-- the hook would reject every new user, invited or not. As a definer owned
+-- by postgres it reads past RLS, like the existing definer helpers
+-- (players_set_age_band, rls_*). The function only runs read-only EXISTS
+-- checks with a pinned search_path and no dynamic SQL. EXECUTE stays granted
+-- to supabase_auth_admin alone (the hook docs' requirement), revoked from
+-- everyone else -- so no new table grants or RLS policies are needed.
 CREATE OR REPLACE FUNCTION public.before_user_created_invite_check(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
@@ -72,7 +82,14 @@ $$;
 COMMENT ON FUNCTION public.before_user_created_invite_check(jsonb) IS
   'Auth "Before User Created" hook: only an invited email (unlinked players row or pending coach_invites row, matched case-insensitively) may create an account. Enable at Authentication > Hooks > Before User Created.';
 
--- Hook docs grants: supabase_auth_admin executes; nobody else can.
+-- The function must run as postgres (past RLS), whoever applies this file.
+ALTER FUNCTION public.before_user_created_invite_check(jsonb) OWNER TO postgres;
+
+-- Hook docs grants (auth hooks + before-user-created examples): execute for
+-- supabase_auth_admin, revoked from authenticated, anon and public. The
+-- docs' table-backed hook examples additionally grant on the tables plus RLS
+-- policy changes for supabase_auth_admin; this hook needs neither, because
+-- it is SECURITY DEFINER owned by postgres (see above).
 -- The role lookup is conditional so this file also applies on databases
 -- without the Supabase auth roles (local PGlite tests).
 DO $$
