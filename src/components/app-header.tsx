@@ -14,25 +14,51 @@ interface Props {
   breadcrumbs?: BreadcrumbItem[]
   right?: React.ReactNode
   showSignOut?: boolean
+  /** Optional back control (e.g. the clip viewer links back to /dashboard). */
+  backHref?: string
+  /** Full label for the back control; also its accessible name. */
+  backLabel?: string
 }
 
-export default function AppHeader({ breadcrumbs, right, showSignOut }: Props) {
+export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, backLabel }: Props) {
   return (
     <header
-      className="sticky top-0 z-50 flex items-center justify-between px-5 md:px-8 h-14"
+      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-5 md:px-8 min-h-14"
       style={{
         backgroundColor: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid #e2e8f0',
         viewTransitionName: 'site-header',
+        // The header sits at the very top, so stretch it over the notch /
+        // home-indicator safe areas (0 in mobile Safari, >0 standalone).
+        paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
       <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
         <Logo size="sm" href="/" className="shrink-0 max-sm:min-h-11" wordmarkClass="hidden min-[480px]:inline whitespace-nowrap" />
+        {backHref && (
+          <Link
+            href={backHref}
+            transitionTypes={['nav-back']}
+            aria-label={backLabel ?? 'Back to dashboard'}
+            className="inline-flex shrink-0 items-center gap-1 min-h-11 px-3 rounded-md bg-white border border-[#DDE4ED] text-xs whitespace-nowrap transition-colors hover:border-[color:var(--rp-navy,#023167)] hover:bg-[var(--rp-navy-50)] focus-visible:border-[color:var(--rp-navy,#023167)] focus-visible:bg-[var(--rp-navy-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rp-navy)] focus-visible:ring-offset-2"
+            style={{ ...oswald, color: 'var(--rp-navy, #023167)', letterSpacing: '0.08em' }}
+          >
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <path d="M15 19l-7-7 7-7" />
+            </svg>
+            {/* header's unlayered display rule beats sm:hidden, so swap the
+                labels with sr-only like the Report button does. */}
+            <span aria-hidden="true" className="sr-only sm:not-sr-only">{backLabel ?? 'Back to dashboard'}</span>
+            <span aria-hidden="true" className="not-sr-only sm:sr-only">Dashboard</span>
+          </Link>
+        )}
         {breadcrumbs?.map((crumb, i) => (
-          // A linked crumb is hidden on phones together with its "/".
-          <span key={i} className={`${crumb.href ? 'hidden sm:inline-flex' : 'flex'} items-center gap-1.5 sm:gap-2.5 min-w-0`}>
+          // A linked crumb is hidden on phones together with its "/". When a
+          // back button is shown, the current-page crumb hides on phones too
+          // so the header never wraps at 375px next to Report / Sign Out.
+          <span key={i} className={`${crumb.href || backHref ? 'hidden sm:inline-flex' : 'flex'} items-center gap-1.5 sm:gap-2.5 min-w-0`}>
             <span className="text-slate-300 shrink-0">/</span>
             {crumb.href ? (
               <Link

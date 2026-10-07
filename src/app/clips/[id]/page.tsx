@@ -220,7 +220,9 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <AppHeader
-        breadcrumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: clip.title }]}
+        backHref="/dashboard"
+        backLabel="Back to dashboard"
+        breadcrumbs={[{ label: clip.title }]}
         showSignOut
       />
 
