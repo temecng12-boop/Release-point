@@ -1,7 +1,10 @@
 import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const FROM = 'Release Point <notifications@releasepoint.app>'
+// Verified production sender. Resend only sends from verified domains, so
+// this must stay on releasepointai.com (verified in Resend) — an unverified
+// domain fails every send with "domain not verified".
+const FROM = 'Release Point <notifications@releasepointai.com>'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://releasepointai.com'
 
 // TODO(Compliance): guardian email wording. The coach may enter a guardian's

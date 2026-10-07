@@ -18,7 +18,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
-const FROM = 'Release Point <notifications@releasepoint.app>'
+const FROM = 'Release Point <notifications@releasepointai.com>'
 
 function arg(name) {
   const i = process.argv.indexOf(name)

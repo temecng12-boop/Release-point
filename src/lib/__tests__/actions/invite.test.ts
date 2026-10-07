@@ -170,3 +170,49 @@ test('already on the roster with an account, new team: will see it next time the
   const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com', team_id: 't1' }))
   assert.equal(r.success, "kid@example.com already has an account and is already on your roster. They've been added to the selected team and will see it next time they sign in. No email was sent.")
 })
+
+test('success returns the invite link so the coach can copy it', async () => {
+  const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'sam@example.com' }))
+  assert.equal(r.error, undefined)
+  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=sam@example\.com$/)
+})
+
+test('email failure still returns the invite link so the coach can text it', async () => {
+  emailFake.inviteResult = { error: 'domain not verified' }
+  const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'sam@example.com' }))
+  assert.match(r.error ?? '', /invite email could not be sent \(domain not verified\)/)
+  assert.equal(r.success, undefined)
+  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=sam@example\.com$/)
+})
+
+test('already-on-roster email failure also returns the invite link', async () => {
+  state.tables.players.push({ id: 'p1', coach_id: COACH.id, email: 'kid@example.com', user_id: null })
+  fail({ table: 'players', action: 'insert', error: { code: '23505', message: 'duplicate key' } })
+  emailFake.inviteResult = { error: 'domain not verified' }
+  const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com' }))
+  assert.match(r.error ?? '', /already on your roster/)
+  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=kid@example\.com$/)
+})
+
+test('all app mail sends from the verified releasepointai.com address', async () => {
+  const { readFileSync } = await import('node:fs')
+  for (const f of ['../../../lib/email.ts', '../../../../scripts/invite-coach.mjs']) {
+    const src = readFileSync(new URL(f, import.meta.url), 'utf8')
+    assert.match(src, /Release Point <notifications@releasepointai\.com>/, f)
+    assert.doesNotMatch(src, /releasepoint\.app/, `${f}: no unverified domain`)
+    assert.doesNotMatch(src, /Release Point AI/, `${f}: display name stays "Release Point"`)
+  }
+})
+
+test('invite forms surface a copyable invite link on success and on email failure', async () => {
+  const { readFileSync } = await import('node:fs')
+  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/team/[id]/team-invite-form.tsx']) {
+    const src = readFileSync(new URL(f, import.meta.url), 'utf8')
+    assert.match(src, /InviteLinkBox/, f)
+    assert.match(src, /state\?\.inviteUrl/, `${f}: link shows in both success and error states`)
+  }
+  const box = readFileSync(new URL('../../../app/dashboard/invite-link-box.tsx', import.meta.url), 'utf8')
+  assert.match(box, /Copy/, 'copy button')
+  assert.match(box, /navigator\.clipboard\.writeText\(inviteUrl\)/, 'copies the link')
+  assert.match(box, /aria-label="Invite link"/, 'link is selectable')
+})
