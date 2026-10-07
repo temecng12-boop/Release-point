@@ -1,35 +1,16 @@
 -- ============================================================================
--- Migration 042: invite-only signup enforcement (reliability freeze hotfix)
--- ============================================================================
--- Signup is invite-only: players are invited by coaches (players.email +
--- admin generateLink type 'invite'), coaches through coach_invites, everyone
--- else goes to /waitlist. This migration closes the creation-time holes:
+-- PROD PASTE for ReleasePoint (Supabase project ref: zebjtcamfpqtitkdiiig)
+-- Invite-only signup hotfix (migration 042). Paste-ready for the Supabase
+-- SQL editor. This file is migration 042 verbatim (same statements, same
+-- order, idempotent): the Before User Created hook, its grants,
+-- handle_new_user, the helper indexes, the email-normalization triggers,
+-- and the backfills. Safe to re-run.
 --
--- 1. public.before_user_created_invite_check(event jsonb): the Supabase
---    "Before User Created" auth hook. It runs inside GoTrue's signupNewUser,
---    so it fires for every creation path: public signUp, OAuth (Google/Apple),
---    OTP/magic-link with user creation, and admin generateLink/invite (both
---    invite flows insert their row BEFORE calling generateLink, so invited
---    emails pass). It returns '{}' when the pending auth user's email matches
---    (case-insensitively, trimmed) an unlinked players.email row (no auth
---    user linked yet) or a pending coach_invites.email row (accepted_at IS
---    NULL); otherwise it returns {"error": {"http_code": 403, ...}} and the
---    user is never created. Existing users and sign-ins are unaffected: the
---    hook only runs when a NEW user would be created.
---    Enable it in the dashboard: Authentication > Hooks > Before User Created
---    > Postgres function > public.before_user_created_invite_check.
---    Grants follow the hook docs: execute for supabase_auth_admin only
---    (conditional here so PGlite, which has no such role, still applies).
--- 2. handle_new_user(): always writes role 'player', ignoring any role in
---    signup metadata (raw_user_meta_data is client-controlled). The
---    coach-invite accept path (acceptCoachInvite in auth/callback) upgrades
---    invited coaches player -> coach afterwards.
--- 3. players.email and coach_invites.email are normalized (lower + trim) by
---    a BEFORE trigger on insert/update, plus a backfill, so invite matching
---    can't miss on case or whitespace (e.g. lukeruba27@icloud.com).
---
--- Idempotent. One transaction.
+-- After running this, enable the hook in the dashboard:
+--   Authentication > Hooks > Before User Created > Postgres function
+--   > public.before_user_created_invite_check
 -- ============================================================================
+
 BEGIN;
 
 DO $$

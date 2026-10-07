@@ -13,7 +13,7 @@ import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
-import { findUnlinkedPlayerIds, normalizeEmail } from '@/lib/invite-gate'
+import { findUnlinkedPlayerIds, ilikeLiteral, normalizeEmail } from '@/lib/invite-gate'
 import { passwordProblem } from '@/lib/password-rule'
 import { isRateLimited, PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
@@ -34,6 +34,25 @@ export async function signUp(_prevState: { error?: string; message?: string; sto
   // Same rule as the form; checked here too because the browser check can be skipped.
   const problem = passwordProblem(password)
   if (problem) return { error: problem }
+
+  // Coach accounts are invite-only: only an email with a pending coach_invites
+  // row (matched on lower(trim(email))) may sign up as a coach. Anything
+  // else -- a stranger, or an invited PLAYER email a kid's address -- is
+  // refused BEFORE any account is created, so no role is ever granted here.
+  // (The hook and the auth callback enforce the same rule; this is the
+  // action-level check for the window before the hook is enabled.)
+  const normalized = normalizeEmail(email)
+  const { data: invites } = await supabaseAdmin
+    .from('coach_invites')
+    .select('id, email')
+    .ilike('email', `%${ilikeLiteral(normalized)}%`)
+    .is('accepted_at', null)
+    .limit(50)
+  const coachInvited = (((invites as { email?: string | null }[] | null) ?? []))
+    .some((r) => normalizeEmail(r.email ?? null) === normalized)
+  if (!coachInvited) {
+    return { error: 'Coach accounts are invite-only. If you were invited as a coach, ask for a new invite — otherwise join the waitlist.' }
+  }
 
   const tosAcceptedAt = new Date().toISOString()
   const { data, error } = await supabase.auth.signUp({

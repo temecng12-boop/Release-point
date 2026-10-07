@@ -202,3 +202,22 @@ test('migration 042: invite emails are normalized on write', () => {
 test('email-link login never creates users', () => {
   assert.match(read('lib/email-link.ts'), /shouldCreateUser: false/, 'creation is off')
 })
+
+/** Split SQL into statements: strip full-line comments, collapse whitespace. */
+function sqlStatements(sql: string): string[] {
+  const noComments = sql
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('--'))
+    .join('\n')
+  return noComments
+    .split(';')
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+}
+
+test('prod paste is migration 042 verbatim (same statements, same order)', () => {
+  const migration = readFileSync(new URL('../../../supabase/migrations/042_invite_only_signup_hook.sql', import.meta.url), 'utf8')
+  const paste = readFileSync(new URL('../../../prod-sql-042-invite-only-signup-hook.sql', import.meta.url), 'utf8')
+  assert.match(paste, /Authentication > Hooks > Before User Created/, 'the header keeps the dashboard step')
+  assert.deepEqual(sqlStatements(paste), sqlStatements(migration))
+})

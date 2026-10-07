@@ -10,7 +10,8 @@
  *   the provider's name and photo from the auth user, marks it for deletion;
  *   the stop cookie alone (no answer from that account) shows the stop and
  *   refuses answers but writes and scrubs nothing;
- * - the coach signup refuses while the 24-hour stop cookie is set;
+ * - the coach signup refuses while the 24-hour stop cookie is set, and
+ *   needs a pending coach invite (coach accounts are invite-only);
  * - the dashboard / age page loop can't happen.
  * Run with: TSX_TSCONFIG_PATH=src/lib/__tests__/actions/tsconfig.json npx tsx --test src/lib/__tests__/actions/oauth-age-freeze.test.ts
  */
@@ -305,6 +306,7 @@ test('coach signUp: refused while the 24-hour stop cookie is set, before any Sup
 })
 
 test('coach signUp: without the cookie it still works', async () => {
+  state.tables.coach_invites = [{ id: 'i1', email: 'c@example.com', accepted_at: null }]
   await assert.rejects(signUp(undefined, fd({ email: 'c@example.com', password: 'a-long-unusual-pass', full_name: 'coach c', tos: 'on' })), (e) => e instanceof RedirectSignal && e.url === '/dashboard')
   assert.equal(signUpCalls.length, 1)
 })

@@ -15,7 +15,11 @@ const form = (password: string) => {
   return fd
 }
 
-beforeEach(() => { resetFake({ tables: { profiles: [] } }); signUpCalls.length = 0 })
+beforeEach(() => {
+  // Coach signup is invite-only: the happy path needs a pending invite row.
+  resetFake({ tables: { profiles: [], coach_invites: [{ id: 'i1', email: 'coach@example.com', accepted_at: null }] } })
+  signUpCalls.length = 0
+})
 
 test('server rejects a 7-character password without calling Supabase', async () => {
   const r = await signUp(undefined, form('Tq9#vLm'))
@@ -57,4 +61,29 @@ test('a failed coach profile upsert is reported, not redirected to the dashboard
 test('a saved coach profile still redirects to the dashboard with role coach', async () => {
   await assert.rejects(signUp(undefined, form('Tq9#vLm2')), (e: Error) => e.message === 'NEXT_REDIRECT')
   assert.deepEqual(state.tables.profiles.map(p => p.role), ['coach'])
+})
+
+test('an invited player email through coach signUp stays player and gets an error (no fake success)', async () => {
+  resetFake({
+    tables: {
+      profiles: [],
+      // A player invite only -- no pending coach invite for this email.
+      players: [{ id: 'p1', email: 'kid@example.com', user_id: null, coach_id: 'coach-1' }],
+      coach_invites: [],
+    },
+  })
+  const fd = form('Tq9#vLm2'); fd.set('email', 'kid@example.com')
+  const r = await signUp(undefined, fd)
+  assert.match(r?.error ?? '', /invite-only/, 'a clear error, not a success')
+  assert.doesNotMatch(r?.error ?? '', /dashboard|welcome|check your email/i, 'no fake success')
+  assert.equal(signUpCalls.length, 0, 'no account is created at all')
+  assert.deepEqual(state.tables.profiles, [], 'no coach role is ever written')
+})
+
+test('a stranger email through coach signUp is refused before Supabase is called', async () => {
+  resetFake({ tables: { profiles: [], coach_invites: [] } })
+  const fd = form('Tq9#vLm2'); fd.set('email', 'stranger@example.com')
+  const r = await signUp(undefined, fd)
+  assert.match(r?.error ?? '', /invite-only/)
+  assert.equal(signUpCalls.length, 0)
 })

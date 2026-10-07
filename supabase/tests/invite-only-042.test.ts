@@ -106,6 +106,29 @@ test('invite emails are normalized on write (players + coach_invites)', async ()
   assert.equal(invite.email, 'newcoach@x.test')
 })
 
+test('backfill normalizes unique emails but skips whitespace duplicates (no unique violation)', async () => {
+  const { db, unexpected } = await freshDb('037')
+  assert.deepEqual(unexpected, [])
+  for (const m of NEXT.slice(0, NEXT.length - 1)) {
+    assert.equal(await tryFile(db, migration(m)), '', m)
+  }
+  await db.query(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1,'c@x','{}')`, [COACH])
+  await db.query(`INSERT INTO players (id, coach_id, full_name, email) VALUES ($1,$2,'Kid',' Kid@X.Test ')`, [u(101), COACH])
+  // 'dup@x.test' and ' dup@x.test ' coexist today (unique index is on
+  // lower(email), and the values differ by whitespace). Normalizing both
+  // would collide, so the backfill must skip them instead of erroring.
+  await db.query(`INSERT INTO coach_invites (email, invited_by) VALUES
+    ('MixedCase@X.Test',$1), ('dup@x.test',$1), (' dup@x.test ',$1)`, [COACH])
+  assert.equal(await tryFile(db, migration('042_invite_only_signup_hook.sql')), '')
+  assert.equal(await tryFile(db, migration('042_invite_only_signup_hook.sql')), '', 'runs twice')
+  const player = (await db.query<{ email: string }>(`SELECT email FROM players WHERE id=$1`, [u(101)])).rows[0]
+  assert.equal(player.email, 'kid@x.test', 'unique players email normalized')
+  const rows = (await db.query<{ email: string }>(`SELECT email FROM coach_invites ORDER BY email`)).rows.map((r) => r.email)
+  assert.ok(rows.includes('mixedcase@x.test'), 'unique invite normalized')
+  assert.ok(rows.includes('dup@x.test') && rows.includes(' dup@x.test '), 'whitespace duplicates skipped, left for manual cleanup')
+  assert.deepEqual(await hook(db, '  DUP@x.test '), {}, 'skipped rows still match the hook at query time')
+})
+
 test('hook grants: anon/authenticated/public cannot execute; function exists', async () => {
   const db = await db042()
   const r = (await db.query<{ anon: boolean; authd: boolean; pub: boolean; exists: boolean }>(`
