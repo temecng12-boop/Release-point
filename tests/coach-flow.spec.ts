@@ -45,9 +45,9 @@ test('login page loads and shows both auth modes', async ({ page }) => {
   await expect(modes.getByRole('button', { name: 'Password', exact: true })).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('login page has Apple and Google sign-in buttons', async ({ page }) => {
+test('login page has Google sign-in (Apple hidden until enabled)', async ({ page }) => {
   await page.goto('/auth/login')
-  await expect(page.getByRole('button', { name: /continue with apple/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /continue with apple/i })).toBeHidden()
   await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible()
 })
 
@@ -61,10 +61,9 @@ test('signup page shows role selection', async ({ page }) => {
   await expect(playerBtn).toBeVisible()
 })
 
-test('signup page has Apple and Google buttons on role select screen', async ({ page }) => {
+test('signup page hides Apple button until enabled', async ({ page }) => {
   await page.goto('/auth/signup')
-  await expect(page.getByRole('button', { name: /continue with apple/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /continue with apple/i })).toBeHidden()
 })
 
 test('PWA manifest is served', async ({ page }) => {
@@ -72,7 +71,7 @@ test('PWA manifest is served', async ({ page }) => {
   expect(res?.status()).toBe(200)
   const body = await res?.text() ?? ''
   const manifest = JSON.parse(body)
-  expect(manifest.name).toBe('Release Point')
+  expect(manifest.name).toBe('Release Point AI')
   expect(manifest.display).toBe('standalone')
   expect(manifest.icons?.length).toBeGreaterThan(0)
 })

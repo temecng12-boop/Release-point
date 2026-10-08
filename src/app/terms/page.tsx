@@ -1,8 +1,17 @@
 import Link from 'next/link'
+import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
-import { TERMS_VERSION_LABEL } from '@/lib/terms-version'
+import { LEGAL_ENTITY_PLACEHOLDER, OPERATOR_NAME, pageMetadata } from '@/lib/site-meta'
+import { UNDER_13_POLICY_BODY } from '@/lib/privacy-children'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
+  return pageMetadata('/terms', parent, {
+    title: 'Terms of Service',
+    description: 'The Terms of Service for Release Point AI.',
+  })
+}
 
 export default function TermsPage() {
   return (
@@ -16,38 +25,32 @@ export default function TermsPage() {
         <div>
           <p className="text-xs text-[#C8102E] tracking-widest mb-2" style={oswald}>Legal</p>
           <h1 className="text-4xl text-[#0F1F33] mb-2" style={oswald}>Terms of Service</h1>
-          <p className="text-xs text-[#3D5166]">Last updated: {TERMS_VERSION_LABEL}</p>
-        </div>
-
-        <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-[#456080] leading-relaxed">
-            <strong className="text-[#0F1F33]">Note:</strong> These Terms of Service are provided in good faith. They do not constitute legal advice. For compliance requirements specific to your organization, consult a licensed attorney.
-          </p>
+          <p className="text-xs text-[#3D5166]">Last updated: [EFFECTIVE_DATE]</p>
         </div>
 
         {[
           {
             title: '1. Agreement to Terms',
-            body: `By creating an account or using Release Point, you agree to these Terms of Service. If you are using Release Point on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
+            body: `Release Point AI is operated by ${OPERATOR_NAME} (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada LLC, once formed). By creating an account or using Release Point AI, you agree to these Terms of Service. If you are using Release Point AI on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
 
 If you do not agree to these terms, do not use the platform.`,
           },
           {
-            title: '2. Who Can Use Release Point',
-            body: `**Coaches:** Any adult (18+) who coaches a baseball or softball program may create a coach account. You are responsible for the players you add to your account and any content you upload.
+            title: '2. Who Can Use Release Point AI',
+            body: `**Coaches:** Any adult (18+) who coaches baseball may create a coach account. You are responsible for the players you add to your account and any content you upload.
 
 **Players:** Players join by invitation from their coach, or sign up on their own, to work on pitching or hitting. When you join, you enter your birth month and year and accept these Terms. Players 13 to 17 should read these Terms with a parent or guardian.
 
 **Age information:** Coaches must choose a player's age band (under 13, 13 to 17, or 18 or older) truthfully, and players must enter their own birth month and year truthfully. If the answers don't match, we use the younger band.
 
-**Children under 13** can't use Release Point yet. Coaches may not add players under 13, children under 13 may not sign up, and video can't be added for a player marked under 13. Parent permission for players under 13 is coming soon.`,
+${UNDER_13_POLICY_BODY}`,
           },
           {
             title: '3. Acceptable Use',
             body: `You agree not to:
 
 - Upload content you do not own or have rights to use
-- Upload video of minors without appropriate consent from parents or guardians
+- Upload video of a child under 13, or video you don't have permission to record and share
 - Share your account credentials with others
 - Use the platform for any purpose other than legitimate athletic coaching and analysis
 - Attempt to reverse engineer, scrape, or otherwise misuse the platform
@@ -58,15 +61,15 @@ We reserve the right to suspend or terminate accounts that violate these terms.`
           },
           {
             title: '4. Your Content',
-            body: `You own the videos, metrics, notes, and other content you upload to Release Point. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
+            body: `You own the videos, metrics, notes, and other content you upload to Release Point AI. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
 
-We do not claim ownership of your content. We do not share your content with third parties except as described in our Privacy Policy (Supabase for storage, Anthropic for AI processing).
+We do not claim ownership of your content. A player's video can be seen by the player, the player's direct coach, and the other coaches on teams the player is on. We share content with service providers only as described in our Privacy Policy.
 
-You are solely responsible for the content you upload and for obtaining any necessary rights, permissions, or consents, including from athletes and their parents.`,
+You are responsible for the content you upload and for having the right to upload it. A coach can't give permission on behalf of a parent or guardian.`,
           },
           {
             title: '5. AI Coach Disclaimer',
-            body: `The AI Coach feature is powered by Anthropic's Claude AI and is provided for informational and coaching-support purposes only. AI-generated responses:
+            body: `AI Coach is powered by Anthropic's Claude and is provided for informational and coaching-support purposes only. AI-generated responses:
 
 - Are not a substitute for professional coaching, medical, or biomechanical advice
 - May contain errors or inaccuracies. Always verify important information.
@@ -80,15 +83,15 @@ We are not liable for any decisions made based solely on AI Coach responses.`,
             body: `Coaches are responsible for:
 
 - Ensuring they have the right to upload any video they submit
-- Obtaining written permission from parents or guardians before uploading video of minors
+- Not adding players under 13 or uploading their video (a coach can't give permission for a parent)
 - Complying with any league, school, or organizational policies regarding video recording and sharing
 - Not sharing player performance data without appropriate consent
 
-Release Point provides tools for coaches to manage their content but is not responsible for how coaches use those tools.`,
+Release Point AI provides tools for coaches to manage their content but is not responsible for how coaches use those tools.`,
           },
           {
             title: '7. Availability and Changes',
-            body: `We aim to keep Release Point available and reliable, but we do not guarantee uninterrupted access. We may:
+            body: `We aim to keep Release Point AI available and reliable, but we do not guarantee uninterrupted access. We may:
 
 - Update or change features with or without notice
 - Temporarily suspend the platform for maintenance
@@ -98,7 +101,7 @@ We reserve the right to modify these Terms at any time. Continued use after chan
           },
           {
             title: '8. Limitation of Liability',
-            body: `To the maximum extent permitted by law, Release Point and its operators are not liable for:
+            body: `To the maximum extent permitted by law, Release Point AI and its operators are not liable for:
 
 - Loss of data, revenue, or profits
 - Decisions made based on AI Coach responses
@@ -106,21 +109,21 @@ We reserve the right to modify these Terms at any time. Continued use after chan
 - Service interruptions or data loss
 - Unauthorized access to your account if caused by your failure to secure your credentials
 
-Our total liability for any claim arising from use of the platform is limited to the amount you paid us in the 12 months preceding the claim (or $0 if you used the platform for free).`,
+To the extent the law allows, our total liability for any claim relating to Release Point AI is limited to the amount, if any, you paid us in the 12 months before the claim.`,
           },
           {
             title: '9. Termination',
             body: `You may delete your account at any time. We may suspend or terminate your account if you violate these Terms.
 
-Upon termination, your content will be deleted within 30 days unless we are required by law to retain it.`,
+Upon termination, your content is deleted unless we are required by law to retain it.`,
           },
           {
             title: '10. Governing Law',
-            body: `These Terms are governed by the laws of the United States. Any disputes will be resolved through binding arbitration rather than in court, except for claims that qualify for small claims court.`,
+            body: `These Terms are governed by the laws of the State of Nevada and applicable U.S. federal law. Any disputes will be resolved through binding arbitration rather than in court, except for claims that qualify for small claims court.`,
           },
           {
             title: '11. Contact',
-            body: `Questions about these Terms:\n\nEmail: legal@releasepoint.app\n\nWe respond to legal inquiries within 5 business days.`,
+            body: `Questions about these Terms:\n\nEmail: legal@releasepointai.com\n\nWe'll reply as soon as we can.`,
           },
         ].map((section) => (
           <div key={section.title}>

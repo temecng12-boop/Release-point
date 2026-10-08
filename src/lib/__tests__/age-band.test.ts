@@ -53,7 +53,7 @@ test('the under-13 switch is the hard stop in this build', () => {
   assert.equal(UNDER_13_MODE, 'hard_stop')
   assert.equal(parentConsentFlowEnabled(), false)
   assert.equal(parentConsentFlowEnabled('parent_consent'), true)
-  assert.equal(UNDER_13_STOP_MESSAGE, "We need a parent's permission first. Ask your coach.")
+  assert.equal(UNDER_13_STOP_MESSAGE, "We need a parent's or guardian's permission first. Please ask a parent or guardian, or email privacy@releasepointai.com.")
 })
 
 test('needsAgeConfirm: the one screen, once, for any player account that has not answered, after 037', () => {
@@ -78,6 +78,9 @@ test('pendingReason and blocked copy', () => {
   for (const v of ['coach', 'player'] as const) assert.doesNotMatch(uploadBlockedText(v), /dashboard|below|one tap/i, 'no pointer to the removed banners')
   assert.match(uploadBlockedText('coach', { reason: 'under_13' }), /^This player is under 13, so video can't be added\. Parent consent for players under 13 is coming soon\./)
   for (const v of ['coach', 'player'] as const) for (const reason of ['age_band', 'under_13'] as const) {
+    // The under-13 player message IS the stop message, which names a
+    // parent/guardian and the privacy email by design.
+    if (v === 'player' && reason === 'under_13') continue
     assert.doesNotMatch(uploadBlockedText(v, { reason }), /guardian|email/i, `${v}/${reason}: no guardian-email wording`)
   }
 })

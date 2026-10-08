@@ -1,12 +1,16 @@
 import Link from 'next/link'
+import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
 import SiteFooter from '@/components/SiteFooter'
+import { pageMetadata } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-export const metadata = {
-  title: 'About',
-  description: 'The purpose, technology, and people behind Release Point.',
+export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
+  return pageMetadata('/about', parent, {
+    title: 'About',
+    description: 'The purpose, technology, and people behind Release Point AI.',
+  })
 }
 
 export default function AboutPage() {
@@ -34,12 +38,12 @@ export default function AboutPage() {
 
         {/* Hero */}
         <div className="mb-20">
-          <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>About Release Point</p>
+          <p className="text-xs text-[#C8102E] tracking-[0.3em] mb-4" style={os}>About Release Point AI</p>
           <h1 className="text-5xl sm:text-6xl text-[#0F1F33] leading-[0.95] mb-6" style={os}>
             Built for the way<br />baseball actually works
           </h1>
           <p className="text-lg text-[#456080] max-w-2xl leading-relaxed">
-            Release Point is a player development platform that connects film, metrics, and coaching feedback in one place, so nothing falls through the cracks and players actually get better.
+            Release Point AI is a player development platform that connects film, metrics, and coaching feedback in one place, so nothing falls through the cracks and players actually get better.
           </p>
         </div>
 
@@ -75,7 +79,7 @@ export default function AboutPage() {
             One platform.<br />Film, metrics, and coaching, connected.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point gives coaches a structured place to upload film, add pitching and hitting metrics, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
+            Release Point AI gives coaches a structured place to upload film, add pitching and hitting metrics, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
           </p>
           <div className="space-y-4">
             {[
@@ -124,7 +128,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on large language models trained with deep baseball biomechanics knowledge and pitching and hitting metric frameworks. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
+            Release Point AI has two AI coaching agents, one for pitching and one for hitting. Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -181,25 +185,25 @@ export default function AboutPage() {
             Purpose-built infrastructure<br />for player development data.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point is built on a modern full-stack architecture that lets coaches and players work from the same film, with security and data privacy as a first-class concern.
+            Release Point AI is built on a modern full-stack architecture that lets coaches and players work from the same film, with security and data privacy as a first-class concern.
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
               {
                 label: 'Secure Video Storage',
-                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, their coach, coaches of teams the player is on, and their linked parent or guardian.',
+                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, and the other coaches on teams the player is on.',
               },
               {
                 label: 'Shared Feedback',
                 desc: 'Coach annotations, metrics, and notes are saved with the clip. The player sees them the next time they open or refresh the clip, on any device.',
               },
               {
-                label: 'AI at the Edge',
+                label: 'Built on Claude',
                 desc: 'Both AI agents run on Anthropic\'s Claude, streaming responses in real time. Context from the clip, including metrics, checklist, and coach notes, is sent with every conversation.',
               },
               {
                 label: 'Access Checks',
-                desc: 'The app checks your access on every request before it shows or changes a player\'s data, and database rules add a second layer of protection on most direct access. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
+                desc: 'The app checks your access on every request before it shows or changes a player\'s data. Database rules also limit what a signed-in account can read or write if it talks to the database directly. Most app writes go through the server and are not limited by those rules. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
               },
               {
                 label: 'Cross-Device',
@@ -228,13 +232,13 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-5 max-w-2xl">
             <p className="text-[#456080] leading-relaxed">
-              Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Pitch tracking, swing tracking, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
+              Release Point AI is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Pitch tracking, swing tracking, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
             </p>
             <p className="text-[#456080] leading-relaxed">
               We are building the software layer that connects coaches, players, and data, so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
             </p>
             <p className="text-[#456080] leading-relaxed">
-              Release Point was founded by Nolan George, a pitcher who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects a decade of firsthand experience with what coaches have, what players need, and where the current tools fall short.
+              Release Point AI was founded by Nolan George, a pitcher with a lifetime on the mound, who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects firsthand experience with what coaches have, what players need, and where the current tools fall short.
             </p>
           </div>
         </section>

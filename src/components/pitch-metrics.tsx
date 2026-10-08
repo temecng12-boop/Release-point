@@ -41,7 +41,9 @@ function useScrollReveal() {
 }
 
 function CountUp({ m, active }: { m: Metric; active: boolean }) {
-  const [display, setDisplay] = useState(0)
+  // Start at the real number so the server-rendered HTML (and no-JS) shows
+  // it; the count-up below replays from zero once the card scrolls into view.
+  const [display, setDisplay] = useState(m.num ?? 0)
   const started = useRef(false)
 
   useEffect(() => {
@@ -52,6 +54,7 @@ function CountUp({ m, active }: { m: Metric; active: boolean }) {
     const steps = (duration / 1000) * 60
     const inc = target / steps
     let cur = 0
+    setDisplay(0)
     const tick = () => {
       cur += inc
       if (cur >= target) { setDisplay(target); return }

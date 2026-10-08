@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
+import type { Viewport } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -11,6 +12,14 @@ import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
 import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
+
+// Pinch-zoom stays off on the clip viewer: frame-by-frame annotation needs
+// a fixed canvas. Marketing and legal pages allow zoom (root viewport).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
 import SiteFooter from '@/components/SiteFooter'
 import ClipSkeleton from './clip-skeleton'
 import LessonList from '@/components/lessons/lesson-list'

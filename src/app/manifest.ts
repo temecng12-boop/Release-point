@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Release Point',
-    short_name: 'Release Point',
+    name: 'Release Point AI',
+    short_name: 'Release Point AI',
     description: 'Pitching and hitting mechanics analysis for coaches and players.',
     start_url: '/dashboard',
     scope: '/',

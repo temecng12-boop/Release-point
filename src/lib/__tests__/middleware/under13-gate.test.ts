@@ -43,12 +43,12 @@ for (const [label, row] of [['own answer', FROZEN_SELF], ['coach answer', FROZEN
     for (const p of API) {
       const r = await middleware(req(p, { method: 'POST' }))
       assert.equal(r.status, 403, p)
-      assert.deepEqual(await r.json(), { error: "We need a parent's permission first. Ask your coach." })
+      assert.deepEqual(await r.json(), { error: "We need a parent's or guardian's permission first. Please ask a parent or guardian, or email privacy@releasepointai.com." })
     }
     for (const p of ['/dashboard', '/clips/x', '/under-13', '/']) {
       const r = await middleware(req(p, { action: true }))
       assert.equal(r.status, 403, `action on ${p}`)
-      assert.equal(await r.text(), "We need a parent's permission first. Ask your coach.")
+      assert.equal(await r.text(), "We need a parent's or guardian's permission first. Please ask a parent or guardian, or email privacy@releasepointai.com.")
     }
   })
 }

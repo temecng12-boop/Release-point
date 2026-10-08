@@ -130,7 +130,7 @@ async function main() {
   const playerCopy = uploadBlockedCopy('player')
   assert(/^Your age/.test(playerCopy.message), 'player message addresses the player')
   assert(/coach/.test(playerCopy.nextStep), 'player next step points to the coach')
-  assert(uploadBlockedCopy('player', { reason: 'under_13' }).message === "We need a parent's permission first. Ask your coach.", 'under-13 player copy is the stop message')
+  assert(uploadBlockedCopy('player', { reason: 'under_13' }).message === "We need a parent's or guardian's permission first. Please ask a parent or guardian, or email privacy@releasepointai.com.", 'under-13 player copy is the stop message')
 
   // ───────────────────────────────────────────────────────────────────────────
   section('checkUploadConsent (server refusal path, mocked client)')
