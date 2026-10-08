@@ -38,8 +38,9 @@ test('parsePositionsInput accepts the six tags, dedupes, refuses unknown', () =>
   assert.deepEqual(parsePositionsInput(['catcher', 'hitter', 'catcher']), { ok: true, positions: ['catcher', 'hitter'] })
   assert.deepEqual(parsePositionsInput([]), { ok: true, positions: [] })
   assert.deepEqual(parsePositionsInput(null), { ok: true, positions: [] })
-  assert.equal(parsePositionsInput(['shortstop']).ok, false)
-  assert.equal(parsePositionsInput(['shortstop']).ok === false && parsePositionsInput(['shortstop']).error, INVALID_POSITIONS)
+  const bad = parsePositionsInput(['shortstop'])
+  assert.equal(bad.ok, false)
+  if (!bad.ok) assert.equal(bad.error, INVALID_POSITIONS)
   assert.equal(parsePositionsInput([1]).ok, false)
 })
 

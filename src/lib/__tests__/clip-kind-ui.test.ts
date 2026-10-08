@@ -29,7 +29,7 @@ test('clip kind toggle: save waits for the server; failure shows an error and do
   assert.ok(body.indexOf('if (!result.ok)') < body.indexOf('setKind(next)'))
   assert.match(body, /setError\(result\.error\)/)
   assert.match(body, /return/)
-  assert.doesNotMatch(body, /setKind\(next\).*runAction/s)
+  assert.ok(body.indexOf('setKind(next)') > body.indexOf('runAction'), 'kind flips only after the save')
 })
 
 test('clip tabs pick the tool set from the clip toggle, not the player position', () => {
