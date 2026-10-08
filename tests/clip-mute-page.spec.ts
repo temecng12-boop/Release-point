@@ -25,12 +25,10 @@ async function stubVoiceRecording(page: Page) {
       getAudioTracks() { return [track] },
       getVideoTracks() { return [] },
     }
-    const devices = navigator.mediaDevices ?? (navigator as Navigator & { mediaDevices: MediaDevices }).mediaDevices
     if (!navigator.mediaDevices) {
       Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true })
     }
     navigator.mediaDevices.getUserMedia = async () => stream as unknown as MediaStream
-    void devices
 
     class FakeRecorder {
       mimeType: string
@@ -69,6 +67,13 @@ async function assertNoHorizontalOverflow(page: Page, width: number) {
   expect(overflow.scrollWidth, 'nothing overflowing horizontally').toBeLessThanOrEqual(overflow.clientWidth + 1)
 }
 
+async function openFixture(page: Page, path: string) {
+  const res = await page.goto(path, { waitUntil: 'domcontentloaded' })
+  expect(res?.ok(), `${path} should load`).toBeTruthy()
+}
+
+test.describe.configure({ mode: 'serial' })
+
 test.describe('real clip page mute', () => {
   test('button beside speed, tap, 0.5x, voice note, reload', async ({ page }, info) => {
     mkdirSync(SHOT, { recursive: true })
@@ -76,9 +81,12 @@ test.describe('real clip page mute', () => {
     const width = iphone ? 375 : 1280
     await page.setViewportSize({ width, height: iphone ? 667 : 720 })
     await stubVoiceRecording(page)
-    await page.addInitScript(() => { try { localStorage.removeItem('rp.clipMuted') } catch { /* empty */ } })
 
-    await page.goto(`/clips/${E2E_CLIP_A}`)
+    await openFixture(page, `/clips/${E2E_CLIP_A}`)
+    await expect(page.getByTestId('e2e-clip-page')).toBeVisible()
+    await page.evaluate(() => { try { localStorage.removeItem('rp.clipMuted') } catch { /* empty */ } })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+
     await expect(page.getByTestId('e2e-clip-page')).toBeVisible()
     const btn = page.getByTestId('clip-mute')
     await expect(btn).toBeVisible()
@@ -121,7 +129,8 @@ test.describe('real clip page mute', () => {
 
     await btn.click()
     await expect.poll(async () => videoMuted(page)).toBe(true)
-    await page.reload()
+    await expect(page.getByTestId('clip-mute')).toHaveAttribute('aria-label', 'Unmute')
+    await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('clip-mute')).toBeVisible()
     await expect.poll(async () => videoMuted(page)).toBe(true)
     await expect(page.getByTestId('clip-mute')).toHaveAttribute('aria-label', 'Unmute')
@@ -130,8 +139,7 @@ test.describe('real clip page mute', () => {
   test('compare at 375: button beside speed, nothing overflowing', async ({ page }, info) => {
     mkdirSync(SHOT, { recursive: true })
     await page.setViewportSize({ width: 375, height: 667 })
-    await page.addInitScript(() => { try { localStorage.removeItem('rp.clipMuted') } catch { /* empty */ } })
-    await page.goto(`/clips/compare?a=${E2E_CLIP_A}&b=${E2E_CLIP_B}`)
+    await openFixture(page, `/clips/compare?a=${E2E_CLIP_A}&b=${E2E_CLIP_B}`)
     await expect(page.getByTestId('e2e-compare-page')).toBeVisible()
     const btn = page.getByTestId('clip-mute')
     await expect(btn).toBeVisible()
