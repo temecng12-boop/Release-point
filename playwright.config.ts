@@ -39,6 +39,7 @@ export default defineConfig({
         timeout: 60_000,
         env: {
           ...process.env,
+          ENABLE_DEV_PAGES: '1',
           PLAYWRIGHT_CLIP_FIXTURE: '1',
           NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co',
           NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key',
