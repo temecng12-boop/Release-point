@@ -16,6 +16,7 @@ import {
   canUseAiCoachFor,
   pickBullpenUpdates,
   ownTeamIdsByPlayer,
+  SELF_SIGNED_UP_PLAYER_MESSAGE,
 } from '../auth/roster-access'
 
 let passed = 0
@@ -153,6 +154,10 @@ section('ownTeamIdsByPlayer (team page edit form)')
   assert(m.p3 === undefined, 'player with no own-team links: absent')
   assert(Object.keys(ownTeamIdsByPlayer(links, [])).length === 0, 'coach with no teams: nothing')
 }
+
+section('self-signed-up player message')
+assert(SELF_SIGNED_UP_PLAYER_MESSAGE.includes('Release Point AI account'), 'names Release Point AI')
+assert(!SELF_SIGNED_UP_PLAYER_MESSAGE.includes('Release Point account'), 'no bare brand')
 
 const total = passed + failed
 console.log(`\n  ${passed}/${total} passed${failed > 0 ? `, ${failed} FAILED` : ' ✓'}`)

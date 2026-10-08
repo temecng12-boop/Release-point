@@ -44,7 +44,7 @@ export async function addCoachToTeam(
   // Look up the invited coach on the server (service client), after the organizer check.
   const target = await findAuthUserByEmail(email)
   if (target === 'error') return { error: 'Could not look up that email. Please try again.' }
-  if (!target) return { error: 'No Release Point account found for that email' }
+  if (!target) return { error: 'No Release Point AI account found for that email' }
   if (target.id === user.id) return { error: "That's your own email" }
 
   const { data: targetProfile, error: profileError } = await supabaseAdmin

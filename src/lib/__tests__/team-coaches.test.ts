@@ -4,6 +4,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { mergeTeamCoaches } from '../team-coaches-merge'
 
 test('joins names and emails, organizer first then by name', () => {
@@ -24,4 +25,10 @@ test('coaches without a profile row still appear, named by email', () => {
 
 test('empty staff', () => {
   assert.deepEqual(mergeTeamCoaches([], [], {}), [])
+})
+
+test('add-coach error names Release Point AI', () => {
+  const src = readFileSync(new URL('../../app/actions/team-coaches.ts', import.meta.url), 'utf8')
+  assert.match(src, /No Release Point AI account found for that email/)
+  assert.doesNotMatch(src, /No Release Point account found/)
 })

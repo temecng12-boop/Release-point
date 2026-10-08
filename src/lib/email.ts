@@ -121,7 +121,7 @@ export async function sendClipUploadedEmail({
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">New Clip Uploaded</h1>
         </div>
         <p style="color:#0F1F33;font-size:15px;">Hey ${coachName},</p>
@@ -133,7 +133,7 @@ export async function sendClipUploadedEmail({
           View Clip →
         </a>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
-          You&apos;re receiving this because you&apos;re a coach on Release Point.
+          You&apos;re receiving this because you&apos;re a coach on Release Point AI.
           <a href="${SITE}/profile" style="color:#1C3A5C;">Manage notifications</a>
         </p>
       </div>
@@ -156,13 +156,13 @@ export async function sendWaitlistNotification({
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">New Waitlist Signup</h1>
         </div>
         ${name ? `<p style="color:#0F1F33;font-size:15px;"><strong>Name:</strong> ${name}</p>` : ''}
         <p style="color:#0F1F33;font-size:15px;"><strong>Email:</strong> ${email}</p>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
-          Release Point Waitlist
+          Release Point AI Waitlist
         </p>
       </div>
     `,
@@ -188,7 +188,7 @@ export async function sendPlayerJoinedEmail({
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">Player Joined</h1>
         </div>
         <p style="color:#0F1F33;font-size:15px;">Hey ${coachName},</p>
@@ -200,7 +200,7 @@ export async function sendPlayerJoinedEmail({
           View Player Profile →
         </a>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
-          You&apos;re receiving this because you&apos;re a coach on Release Point.
+          You&apos;re receiving this because you&apos;re a coach on Release Point AI.
         </p>
       </div>
     `,

@@ -246,6 +246,21 @@ test('invite emails use Release Point AI in from-name, subject, and body', async
   assert.doesNotMatch(invites, /\|\| 'Release Point'/)
 })
 
+test('clip-uploaded, waitlist, and player-joined emails use Release Point AI', async () => {
+  const { readFileSync } = await import('node:fs')
+  const email = readFileSync(new URL('../../../lib/email.ts', import.meta.url), 'utf8')
+  for (const name of ['sendClipUploadedEmail', 'sendWaitlistNotification', 'sendPlayerJoinedEmail']) {
+    const start = email.indexOf(`export async function ${name}`)
+    assert.ok(start >= 0, name)
+    const next = email.indexOf('export async function', start + 1)
+    const fn = email.slice(start, next < 0 ? email.length : next)
+    const leftover = fn.replace(/Release Point AI/g, '')
+    assert.ok(!leftover.includes('Release Point'), `${name}: bare brand`)
+  }
+  assert.match(email, /coach on Release Point AI/)
+  assert.match(email, /Release Point AI Waitlist/)
+})
+
 test('invite forms surface a copyable invite link on success and on email failure', async () => {
   const { readFileSync } = await import('node:fs')
   for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/team/[id]/team-invite-form.tsx']) {
