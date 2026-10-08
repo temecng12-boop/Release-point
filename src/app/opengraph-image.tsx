@@ -2,10 +2,10 @@ import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-// Social preview, generated statically at build time: navy/red/white, the
-// mark, the "See Every Pitch Differently." tagline, and a frame from
-// /media. If Design ships a final PNG, replace this file with
-// `opengraph-image.png` (same tags are emitted) and delete this route.
+// Social preview, generated at build time: navy/red/white, the mark
+// lettering, "See Every Pitch Differently.", and a frame from /media.
+// Only the windup frame is embedded (the icon PNG + JPEG together blew
+// the 500KB ImageResponse budget and crashed the route).
 export const alt = 'Release Point AI: video coaching for pitchers and hitters'
 export const size = {
   width: 1200,
@@ -14,16 +14,9 @@ export const size = {
 
 export const contentType = 'image/png'
 
-async function dataUrl(file: string, mime: string): Promise<string> {
-  const buf = await readFile(join(process.cwd(), 'public', file))
-  return `data:${mime};base64,${buf.toString('base64')}`
-}
-
 export default async function Image() {
-  const [frame, mark] = await Promise.all([
-    dataUrl('media/nolan-windup.jpg', 'image/jpeg'),
-    dataUrl('rp-icon.png', 'image/png'),
-  ])
+  const buf = await readFile(join(process.cwd(), 'public', 'media', 'nolan-windup.jpg'))
+  const frame = `data:image/jpeg;base64,${buf.toString('base64')}`
 
   return new ImageResponse(
     (
@@ -37,31 +30,60 @@ export default async function Image() {
           fontFamily: 'sans-serif',
         }}
       >
-        {/* Left: brand + tagline */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             width: 640,
-            padding: '0 0 0 88',
+            paddingLeft: 88,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mark} alt="" width={120} height={75} style={{ marginBottom: 28 }} />
-          <p style={{ fontSize: 26, letterSpacing: 6, color: '#8FA3B8', margin: '0 0 18 0' }}>
-            RELEASE POINT AI
-          </p>
-          <p style={{ fontSize: 84, lineHeight: 0.95, fontWeight: 800, margin: '0 0 26 0' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: 28,
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                background: '#C8031E',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 28,
+                fontWeight: 800,
+                marginRight: 16,
+              }}
+            >
+              RP
+            </div>
+            <p
+              style={{
+                fontSize: 22,
+                letterSpacing: 5,
+                color: '#8FA3B8',
+                margin: 0,
+              }}
+            >
+              RELEASE POINT AI
+            </p>
+          </div>
+          <p style={{ fontSize: 76, lineHeight: 0.95, fontWeight: 800, margin: 0 }}>
             See Every
-            <br />
+          </p>
+          <p style={{ fontSize: 76, lineHeight: 0.95, fontWeight: 800, margin: 0 }}>
             Pitch
-            <br />
+          </p>
+          <p style={{ fontSize: 76, lineHeight: 0.95, fontWeight: 800, margin: '0 0 26px 0' }}>
             Differently.
           </p>
           <div style={{ width: 120, height: 8, background: '#C8031E' }} />
         </div>
-        {/* Right: product frame */}
         <div
           style={{
             display: 'flex',
@@ -71,7 +93,6 @@ export default async function Image() {
             padding: 48,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={frame}
             alt=""
