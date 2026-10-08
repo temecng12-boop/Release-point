@@ -38,7 +38,7 @@ export default function TermsPage() {
         {[
           {
             title: '1. Agreement to Terms',
-            body: `Release Point AI is operated by ${OPERATOR_NAME} (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada limited liability company, once formed). By creating an account or using Release Point, you agree to these Terms of Service. If you are using Release Point on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
+            body: `Release Point AI is operated by ${OPERATOR_NAME} (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada LLC, once formed). By creating an account or using Release Point, you agree to these Terms of Service. If you are using Release Point on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
 
 If you do not agree to these terms, do not use the platform.`,
           },
@@ -70,13 +70,13 @@ We reserve the right to suspend or terminate accounts that violate these terms.`
             title: '4. Your Content',
             body: `You own the videos, metrics, notes, and other content you upload to Release Point. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
 
-We do not claim ownership of your content. A player's video can be seen by the player, the coaches on teams the player is on, and a parent or guardian linked to the player's account (once parent accounts launch). We share content with service providers only as described in our Privacy Policy.
+We do not claim ownership of your content. A player's video can be seen by the player, the player's direct coach, and the other coaches on teams the player is on. We share content with service providers only as described in our Privacy Policy.
 
 You are responsible for the content you upload and for having the right to upload it. A coach can't give permission on behalf of a parent or guardian.`,
           },
           {
             title: '5. AI Coach Disclaimer',
-            body: `AI Coach is built on Claude, made by Anthropic, and set up with pitching and hitting metric frameworks. It is provided for informational and coaching-support purposes only. AI-generated responses:
+            body: `AI Coach is powered by Anthropic's Claude and is provided for informational and coaching-support purposes only. AI-generated responses:
 
 - Are not a substitute for professional coaching, medical, or biomechanical advice
 - May contain errors or inaccuracies. Always verify important information.

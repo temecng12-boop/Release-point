@@ -135,8 +135,8 @@ test('title: Release Point AI, never doubled', () => {
 
 test('legal entity placeholder is one exported constant', () => {
   assert.match(src('lib/site-meta.ts'), /LEGAL_ENTITY_PLACEHOLDER = '\[LEGAL_ENTITY_NAME\]'/)
-  assert.match(read('app/privacy/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada limited liability company, once formed/)
-  assert.match(read('app/terms/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada limited liability company, once formed/)
+  assert.match(read('app/privacy/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada LLC, once formed/)
+  assert.match(read('app/terms/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada LLC, once formed/)
 })
 
 test('governing law is Nevada, operator named', () => {
@@ -215,10 +215,8 @@ test('sport: baseball only on legal pages, baseball-led marketing and meta', () 
 })
 
 test('AI wording is honest; Barry stays; no pro-career claims', () => {
-  const honest = /built on Claude, set up with pitching and hitting metric frameworks/
-  const honestLong = /AI Coach is built on Claude, made by Anthropic, and set up with pitching and hitting metric frameworks/
-  assert.match(read('app/about/page.tsx'), honest)
-  assert.match(read('app/terms/page.tsx'), honestLong)
+  assert.match(read('app/about/page.tsx'), /built on Claude, set up with pitching and hitting metric frameworks/)
+  assert.match(read('app/terms/page.tsx'), /AI Coach is powered by Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /AI Coach runs on Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /Video and audio files are never sent/)
   assert.match(read('app/privacy/page.tsx'), /does not train models on customer content.*anthropic\.com\/legal\/commercial-terms/)
