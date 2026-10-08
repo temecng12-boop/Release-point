@@ -65,7 +65,7 @@ test('an invited player works end to end (mixed-case roster email)', async () =>
       teams: [], players: [], player_teams: [],
     },
   })
-  const invited = await invitePlayer(undefined, form({ full_name: 'Luke Ruba', player_email: '  LukeRuba27@iCloud.com ' }))
+  const invited = await invitePlayer(undefined, form({ full_name: 'Luke Ruba', player_email: '  LukeRuba27@iCloud.com ', ...adultBirth }))
   assert.equal(invited.error, undefined)
   assert.equal(state.tables.players.length, 1)
   assert.equal(state.tables.players[0].email, 'lukeruba27@icloud.com', 'the roster email is stored normalized')
