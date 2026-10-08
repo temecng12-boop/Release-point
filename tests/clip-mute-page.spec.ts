@@ -82,6 +82,8 @@ test.describe('real clip page mute', () => {
     await expect(page.getByTestId('e2e-clip-page')).toBeVisible()
     const btn = page.getByTestId('clip-mute')
     await expect(btn).toBeVisible()
+    // First paint is muted; after localStorage (cleared) the effect unmutes.
+    await expect(btn).toHaveAttribute('aria-label', 'Mute')
     await expect(page.getByRole('button', { name: '1x', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '.5x', exact: true })).toBeVisible()
 

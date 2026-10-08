@@ -12,7 +12,7 @@ import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 import { applyPlaybackAction, nextPlaybackAction, type PlaybackIntent } from '@/lib/video-playback'
-import { applyClipAudio, effectiveMuted, playClip, readClipMuted, writeClipMuted, VOICE_RECORDING_EVENT } from '@/lib/clip-mute'
+import { applyClipAudio, effectiveMuted, initialClipMuted, playClip, readClipMuted, writeClipMuted, VOICE_RECORDING_EVENT } from '@/lib/clip-mute'
 import ClipMuteButton from '@/components/clip-mute-button'
 
 // ── playback ───────────────────────────────────────────────────────────────
@@ -349,7 +349,7 @@ export default function VideoPlayer({
   const [currentTime,     setCurrentTime]     = useState(0)
   const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
-  const [audioMuted,      setAudioMuted]      = useState(false)
+  const [audioMuted,      setAudioMuted]      = useState(initialClipMuted)
   const savedMutedRef    = useRef(false)
   const speedRef         = useRef(1)
   const voiceRecRef      = useRef(false)

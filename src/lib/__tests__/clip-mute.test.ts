@@ -11,6 +11,7 @@ import {
   VOICE_RECORDING_EVENT,
   applyClipAudio,
   effectiveMuted,
+  initialClipMuted,
   playClip,
   readClipMuted,
   writeClipMuted,
@@ -194,6 +195,18 @@ test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1', () => {
   assert.match(comparePage, /isE2eClipFixture\(a\) && isE2eClipFixture\(b\)/)
   assert.match(comparePage, /<E2eComparePage/)
   assert.match(middleware, /isE2eClipFixtureRequest/)
+})
+
+test('first paint: video starts muted so a saved muted choice cannot leak audio', () => {
+  assert.equal(initialClipMuted(), true)
+  const vp = read('../../components/video-player.tsx')
+  const cp = read('../../app/clips/compare/compare-player.tsx')
+  assert.match(vp, /useState\(initialClipMuted\)/)
+  assert.match(cp, /useState\(initialClipMuted\)/)
+  assert.match(vp, /muted=\{audioMuted\}/)
+  assert.match(cp, /muted=\{audioMuted\}/)
+  assert.doesNotMatch(vp, /const \[audioMuted,\s*setAudioMuted\]\s*=\s*useState\(false\)/)
+  assert.doesNotMatch(cp, /const \[audioMuted,\s*setAudioMuted\]\s*=\s*useState\(false\)/)
 })
 
 test('clip mute button: speaker icon, aria-label, 44px tap target', () => {

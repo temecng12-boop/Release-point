@@ -44,6 +44,16 @@ export function readClipMuted(storage?: ClipMuteStorage): boolean {
   }
 }
 
+/**
+ * First-paint <video muted>. Always muted so a saved 'muted' choice cannot
+ * leak audio before localStorage is read, and so SSR matches the first
+ * client render (reading localStorage in useState would hydrate mismatch).
+ * After mount, readClipMuted() + syncAudio() apply the saved choice.
+ */
+export function initialClipMuted(): boolean {
+  return true
+}
+
 export function writeClipMuted(muted: boolean, storage?: ClipMuteStorage): void {
   try {
     storageOrThrow(storage)?.setItem?.(CLIP_MUTED_KEY, muted ? '1' : '0')

@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { applyClipAudio, effectiveMuted, playClip, readClipMuted, writeClipMuted } from '@/lib/clip-mute'
+import { applyClipAudio, effectiveMuted, initialClipMuted, playClip, readClipMuted, writeClipMuted } from '@/lib/clip-mute'
 import ClipMuteButton from '@/components/clip-mute-button'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -29,7 +29,7 @@ export default function ComparePlayer({ clips }: Props) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState<number[]>(clips.map(() => 0))
   const [speed, setSpeed] = useState(1)
-  const [audioMuted, setAudioMuted] = useState(false)
+  const [audioMuted, setAudioMuted] = useState(initialClipMuted)
   const savedMutedRef = useRef(false)
   const speedRef = useRef(1)
   const syncingRef = useRef(false)
