@@ -58,7 +58,7 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
             Players under 13 can&apos;t be added yet. An under-13 date is refused and nothing is saved.
           </p>
           {state?.error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
               <span className="text-[#C8102E] text-sm">✕</span>
               <p className="text-sm text-[#C8102E]">{state.error}</p>
             </div>

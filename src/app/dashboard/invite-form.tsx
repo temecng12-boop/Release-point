@@ -6,13 +6,17 @@ import { MONTHS } from '@/lib/birth-months'
 import InviteLinkBox from './invite-link-box'
 
 interface Team { id: string; name: string }
-interface Props { teams: Team[] }
+interface Props {
+  teams: Team[]
+  /** Pre-filled action state (screenshots / tests). Production callers omit this. */
+  initialState?: { error?: string; success?: string; inviteUrl?: string }
+}
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080]'
+const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] max-sm:min-h-11'
 
-export default function InviteForm({ teams }: Props) {
-  const [state, action, pending] = useActionState(invitePlayer, undefined)
+export default function InviteForm({ teams, initialState }: Props) {
+  const [state, action, pending] = useActionState(invitePlayer, initialState)
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export default function InviteForm({ teams }: Props) {
           )}
 
           {state?.error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
               <span className="text-[#C8102E] text-sm">✕</span>
               <p className="text-sm text-[#C8102E]">{state.error}</p>
             </div>
@@ -84,7 +88,7 @@ export default function InviteForm({ teams }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50"
+            className="w-full bg-[#C8102E] hover:bg-[#9E0E24] text-white rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50 max-sm:min-h-11"
             style={oswald}
           >
             {pending ? 'Adding…' : 'Add Player'}
