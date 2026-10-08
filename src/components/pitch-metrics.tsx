@@ -17,12 +17,12 @@ interface Metric {
 
 const METRICS: Metric[] = [
   { label: 'Velocity',  pct: 80, color: '#E8102A', num: 89,    prefix: '',  suffix: ' mph',  decimals: 0 },
-  { label: 'Spin Rate', pct: 68, color: '#3B82F6', num: 2248,  prefix: '',  suffix: ' rpm',  decimals: 0 },
-  { label: 'IVB',       pct: 88, color: '#10B981', num: 18.7,  prefix: '+', suffix: '"',     decimals: 1 },
-  { label: 'H-Break',   pct: 62, color: '#8B5CF6', num: 8.1,   prefix: '+', suffix: '"',     decimals: 1 },
-  { label: 'Spin Axis', pct: 55, color: '#F59E0B', num: null,  prefix: '',  suffix: '',      decimals: 0, fixed: '1:00' },
-  { label: 'Extension', pct: 74, color: '#06B6D4', num: 6.4,   prefix: '',  suffix: ' ft',   decimals: 1 },
-  { label: 'VAA',       pct: 70, color: '#EC4899', num: 4.2,   prefix: '-', suffix: '°',     decimals: 1 },
+  { label: 'Spin Rate', pct: 68, color: '#1C3A5C', num: 2248,  prefix: '',  suffix: ' rpm',  decimals: 0 },
+  { label: 'IVB',       pct: 88, color: '#C8102E', num: 18.7,  prefix: '+', suffix: '"',     decimals: 1 },
+  { label: 'H-Break',   pct: 62, color: '#284F75', num: 8.1,   prefix: '+', suffix: '"',     decimals: 1 },
+  { label: 'Spin Axis', pct: 55, color: '#1C3A5C', num: null,  prefix: '',  suffix: '',      decimals: 0, fixed: '1:00' },
+  { label: 'Extension', pct: 74, color: '#456080', num: 6.4,   prefix: '',  suffix: ' ft',   decimals: 1 },
+  { label: 'VAA',       pct: 70, color: '#284F75', num: 4.2,   prefix: '-', suffix: '°',     decimals: 1 },
 ]
 
 function useScrollReveal() {

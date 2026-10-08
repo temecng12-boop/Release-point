@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { saveTimestampNote, deleteTimestampNote, getSignedUploadUrl, getClipsSignedUrl } from '@/app/actions/clips'
-import { emitVoiceRecording } from '@/lib/clip-mute'
+import { createClient } from '@/lib/supabase/client'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -75,10 +75,7 @@ export default function TimestampNotes({
       setNotes(prev => [...prev, note].sort((a, b) => a.time_seconds - b.time_seconds))
     }
     window.addEventListener('rp:stamp-created', onStampCreated)
-    return () => {
-      window.removeEventListener('rp:stamp-created', onStampCreated)
-      emitVoiceRecording(false)
-    }
+    return () => window.removeEventListener('rp:stamp-created', onStampCreated)
   }, [])
 
   function seekAndShow(n: TSNote) {
@@ -97,21 +94,14 @@ export default function TimestampNotes({
     const t = v?.currentTime ?? 0
     setAdding(true)
     setError(null)
-
-    try {
-      const result = await saveTimestampNote({ clip_id: clipId, time_seconds: t, body: draft.trim() })
-      if (result?.note) {
-        setNotes(prev => [...prev, result.note!].sort((a, b) => a.time_seconds - b.time_seconds))
-        setDraft('')
-      } else {
-        setError(result?.error ?? 'Could not save this note. Please try again.')
-      }
-    } catch (err) {
-      console.error('[addNote] request failed', err)
-      setError('Could not save this note. Check your connection and try again.')
-    } finally {
-      setAdding(false)
+    const result = await saveTimestampNote({ clip_id: clipId, time_seconds: t, body: draft.trim() })
+    if (result?.error) {
+      setError(result.error)
+    } else if (result?.note) {
+      setNotes(prev => [...prev, result.note!].sort((a, b) => a.time_seconds - b.time_seconds))
+      setDraft('')
     }
+    setAdding(false)
   }
 
   async function startVoice() {
@@ -120,7 +110,6 @@ export default function TimestampNotes({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      emitVoiceRecording(false)
       setVoiceError('Microphone access denied.')
       return
     }
@@ -138,7 +127,6 @@ export default function TimestampNotes({
     recorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop())
       if (timerRef.current) clearInterval(timerRef.current)
-      emitVoiceRecording(false)
       setVoicePhase('uploading')
 
       const ext = mimeType.includes('mp4') ? 'm4a' : 'webm'
@@ -150,10 +138,11 @@ export default function TimestampNotes({
       const urlResult = await getSignedUploadUrl(storagePath)
       if ('error' in urlResult) { setVoiceError('Upload failed.'); setVoicePhase('idle'); return }
 
-      const res = await fetch(urlResult.signedUrl, {
-        method: 'PUT', body: blob, headers: { 'Content-Type': baseMime },
-      })
-      if (!res.ok) { setVoiceError('Upload failed. Try again.'); setVoicePhase('idle'); return }
+      const supabase = createClient()
+      const { error: uploadError } = await supabase.storage
+        .from('clips')
+        .uploadToSignedUrl(urlResult.path, urlResult.token, blob, { contentType: baseMime })
+      if (uploadError) { setVoiceError('Upload failed. Try again.'); setVoicePhase('idle'); return }
 
       const result = await saveTimestampNote({
         clip_id: clipId,
@@ -172,7 +161,6 @@ export default function TimestampNotes({
     recorderRef.current = recorder
     setVoiceSecs(0)
     setVoicePhase('recording')
-    emitVoiceRecording(true)
     timerRef.current = setInterval(() => setVoiceSecs(s => s + 1), 1000)
   }
 
@@ -181,13 +169,8 @@ export default function TimestampNotes({
   }
 
   async function removeNote(id: string) {
-    setError(null)
     const result = await deleteTimestampNote(id)
-    if (result?.error) setError(result.error)
-    else {
-      setNotes(prev => prev.filter(n => n.id !== id))
-      if (result && 'warning' in result && result.warning) setError(result.warning)
-    }
+    if (!result?.error) setNotes(prev => prev.filter(n => n.id !== id))
   }
 
   return (
@@ -206,12 +189,12 @@ export default function TimestampNotes({
               onKeyDown={e => { if (e.key === 'Enter') addNote() }}
               placeholder="Pause video, type a note, click Add…"
               disabled={voicePhase !== 'idle'}
-              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1.5 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-40 max-sm:min-h-11"
+              className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1.5 text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] disabled:opacity-40"
             />
             <button
               onClick={addNote}
               disabled={adding || !draft.trim() || voicePhase !== 'idle'}
-              className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap max-sm:min-h-11"
+              className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap"
               style={oswald}
             >
               {adding ? 'Saving…' : '+ Add'}
@@ -223,7 +206,7 @@ export default function TimestampNotes({
             {voicePhase === 'idle' && (
               <button
                 onClick={startVoice}
-                className="flex items-center gap-1.5 text-xs border border-[#DDE4ED] hover:border-[#C8102E] text-[#3D5166] hover:text-[#C8102E] px-3 py-1.5 rounded-md transition-colors max-sm:min-h-11"
+                className="flex items-center gap-1.5 text-xs border border-[#DDE4ED] hover:border-[#C8102E] text-[#3D5166] hover:text-[#C8102E] px-3 py-1.5 rounded-md transition-colors"
                 style={oswald}
               >
                 <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -241,7 +224,7 @@ export default function TimestampNotes({
                 </span>
                 <button
                   onClick={stopVoice}
-                  className="text-xs bg-[#0F1F33] text-white px-3 py-1.5 rounded-md max-sm:min-h-11"
+                  className="text-xs bg-[#0F1F33] text-white px-3 py-1.5 rounded-md"
                   style={oswald}
                 >
                   Stop & Save
@@ -258,9 +241,7 @@ export default function TimestampNotes({
             )}
           </div>
 
-          {error && (
-            <p role="alert" className="text-xs text-[#C8102E]">Save failed: {error}</p>
-          )}
+          {error && <p className="text-xs text-[#C8102E]">Save failed: {error}</p>}
         </div>
       )}
 
@@ -279,7 +260,7 @@ export default function TimestampNotes({
               <li key={n.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                 <button
                   onClick={() => seekAndShow(n)}
-                  className="shrink-0 flex items-center gap-1 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED] max-sm:min-h-11"
+                  className="shrink-0 flex items-center gap-1 text-xs font-mono bg-[#EEF2F7] text-[#456080] hover:text-[#0F1F33] px-2 py-0.5 rounded-md transition-colors border border-[#DDE4ED]"
                 >
                   {n.drawing_data?.length ? (
                     <svg className="w-3 h-3 text-[#C8102E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,7 +284,7 @@ export default function TimestampNotes({
                 {isCoach && (
                   <button
                     onClick={() => removeNote(n.id)}
-                    className="text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none max-sm:min-h-11 max-sm:min-w-11"
+                    className="text-[#3D5166] hover:text-[#C8102E] transition-colors shrink-0 text-xs leading-none"
                   >
                     ✕
                   </button>

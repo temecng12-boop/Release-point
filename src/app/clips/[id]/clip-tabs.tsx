@@ -4,30 +4,32 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TimestampNotes from './timestamp-notes'
 import TextNotes from './text-notes'
-import VoiceNote from './voice-note'
 import MetricsTab from './metrics-tab'
 import HittingMetricsTab from './hitting-metrics-tab'
 import AiChat from './ai-chat'
 import PhaseChecklist from './phase-checklist'
-import ClipKindToggle from './clip-kind-toggle'
-import type { ClipKind } from '@/lib/positions'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 type TSNote   = { id: string; time_seconds: number; body: string; drawing_data?: unknown[] | null }
 export type Metric = { id: string; pitch_type: string | null; velocity: number | null; spin_rate: number | null; spin_axis: number | null; horizontal_break: number | null; vertical_break: number | null; extension?: number | null; vaa?: number | null }
 type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }
-type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
-type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
+type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null; ev_90th?: number | null; distance_avg?: number | null; distance_max?: number | null; pull_rate?: number | null; oppo_rate?: number | null; gb_rate?: number | null; ld_rate?: number | null; fb_rate?: number | null; contact_rate?: number | null; whiff_rate?: number | null }
+type Tab      = 'Timestamps' | 'Notes' | 'Mechanics' | 'Metrics' | 'AI Coach'
 
-function getTabs(): Tab[] {
-  return ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
+function isPitcherPosition(pos: string | null): boolean {
+  if (!pos) return true
+  const p = pos.toLowerCase()
+  return p === 'pitcher' || p === 'p' || p === 'rhp' || p === 'lhp' || p === 'sp' || p === 'rp' || p === 'cp'
+}
+
+function getTabs(isPitcher: boolean): Tab[] {
+  return ['Timestamps', 'Notes', 'Mechanics', 'Metrics', 'AI Coach']
 }
 
 const TAB_LABEL: Record<Tab, (isPitcher: boolean) => string> = {
   Timestamps: () => 'Timestamps',
   Notes:      () => 'Notes',
-  Voice:      () => 'Voice',
   Mechanics:  (p) => p ? 'Mechanics' : 'Swing',
   Metrics:    (p) => p ? 'Metrics' : 'Hit Data',
   'AI Coach': () => 'AI Coach',
@@ -36,7 +38,6 @@ const TAB_LABEL: Record<Tab, (isPitcher: boolean) => string> = {
 const TAB_SHORT: Record<Tab, (isPitcher: boolean) => string> = {
   Timestamps: () => 'Times',
   Notes:      () => 'Notes',
-  Voice:      () => 'Voice',
   Mechanics:  (p) => p ? 'Mech' : 'Swing',
   Metrics:    (p) => p ? 'Stats' : 'Data',
   'AI Coach': () => 'AI',
@@ -53,60 +54,68 @@ export default function ClipTabs({
   playerId,
   role,
   initialNotes,
-  initialVoiceUrl,
   initialTsNotes,
   initialMetrics,
-  canDeleteMetrics = false,
-  canAddMetrics = false,
   initialChecklist,
   initialHittingMetrics,
   playerName,
   playerAgeGroup,
   playerPosition,
-  initialClipKind,
-  canEditClipKind = true,
-  aiCoachAvailable = true,
-  canAddMedia,
 }: {
   clipId: string
   playerId: string
   role: 'coach' | 'player'
   initialNotes: string | null
-  initialVoiceUrl: string | null
   initialTsNotes: TSNote[]
   initialMetrics: Metric[]
-  /** Show delete buttons for saved metrics: only for the player's direct coach. */
-  canDeleteMetrics?: boolean
-  /** Show pitch entry and CSV/PDF import: the direct coach or the player (not team coaches). */
-  canAddMetrics?: boolean
   initialChecklist: PhaseRow[] | null
   initialHittingMetrics: HittingMetrics | null
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
-  /** Resolved pitching/hitting for this clip (saved toggle, else default from positions). */
-  initialClipKind: ClipKind
-  /** Coach or player may save the toggle; guardians see it but cannot change it. */
-  canEditClipKind?: boolean
-  /** Whether this viewer may use the AI Coach (own coach or the player). */
-  aiCoachAvailable?: boolean
-  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
-  canAddMedia: boolean
 }) {
-  const [active, setActive] = useState<Tab>('Timestamps')
-  const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
-  const [clipKind, setClipKind] = useState<ClipKind>(initialClipKind)
-  const isPitcher = clipKind === 'pitching'
-  const TABS = getTabs()
+  const [active,   setActive]   = useState<Tab>('Timestamps')
+  const [metrics,  setMetrics]  = useState<Metric[]>(initialMetrics)
+  const [clipMode, setClipMode] = useState<'pitcher' | 'hitter'>(() => isPitcherPosition(playerPosition) ? 'pitcher' : 'hitter')
+  const isPitcher = clipMode === 'pitcher'
+  const TABS = getTabs(isPitcher)
 
   return (
     <div>
-      <ClipKindToggle
-        clipId={clipId}
-        value={clipKind}
-        canEdit={canEditClipKind}
-        onSaved={setClipKind}
-      />
+      {/* Pitcher / Hitter mode toggle */}
+      <div className="flex items-center justify-between mb-3">
+        <div
+          className="inline-flex items-center rounded-full p-0.5"
+          style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}
+        >
+          <button
+            onClick={() => setClipMode('pitcher')}
+            className="px-5 py-1.5 rounded-full text-[11px] tracking-widest transition-all"
+            style={{
+              ...os,
+              background: clipMode === 'pitcher' ? '#C8102E' : 'transparent',
+              color: clipMode === 'pitcher' ? 'white' : '#94a3b8',
+            }}
+          >
+            Pitcher
+          </button>
+          <button
+            onClick={() => setClipMode('hitter')}
+            className="px-5 py-1.5 rounded-full text-[11px] tracking-widest transition-all"
+            style={{
+              ...os,
+              background: clipMode === 'hitter' ? '#1C3A5C' : 'transparent',
+              color: clipMode === 'hitter' ? 'white' : '#94a3b8',
+            }}
+          >
+            Hitter
+          </button>
+        </div>
+        <span className="text-[10px] text-[#94a3b8]" style={os}>
+          {isPitcher ? 'Randy Johnson × Nolan Ryan' : 'Barry Bonds × Tony Gwynn'}
+        </span>
+      </div>
+
       {/* Tab bar */}
       <div className="relative z-10 flex" style={{ borderBottom: '1px solid #e2e8f0' }}>
         {TABS.map((tab) => {
@@ -115,8 +124,8 @@ export default function ClipTabs({
             <button
               key={tab}
               onClick={() => setActive(tab)}
-              className={`relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center max-sm:min-h-11 ${isActive ? 'rp-tab-active' : ''}`}
-              style={{ ...os, color: isActive ? 'var(--rp-navy, #023167)' : '#94a3b8' }}
+              className="relative flex-1 px-1 sm:px-4 py-2.5 text-[10px] sm:text-[12px] tracking-wider transition-colors text-center"
+              style={{ ...os, color: isActive ? '#0f172a' : '#94a3b8' }}
             >
               <span className="hidden sm:inline">{TAB_LABEL[tab](isPitcher)}</span>
               <span className="sm:hidden">{TAB_SHORT[tab](isPitcher)}</span>
@@ -124,8 +133,8 @@ export default function ClipTabs({
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator"
-                  className="rp-tab-indicator absolute bottom-0 inset-x-0 h-0.5"
-                  style={{ background: 'var(--rp-navy, #023167)' }}
+                  className="absolute bottom-0 inset-x-0 h-px"
+                  style={{ background: '#E8102A' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                 />
               )}
@@ -151,9 +160,6 @@ export default function ClipTabs({
             {active === 'Notes' && (
               <TextNotes clipId={clipId} role={role} initialNotes={initialNotes} />
             )}
-            {active === 'Voice' && (
-              <VoiceNote clipId={clipId} playerId={playerId} role={role} initialVoiceUrl={initialVoiceUrl} canAddMedia={canAddMedia} />
-            )}
             {active === 'Mechanics' && (
               <PhaseChecklist clipId={clipId} role={role} initial={initialChecklist} isPitcher={isPitcher} />
             )}
@@ -167,31 +173,27 @@ export default function ClipTabs({
                   playerPosition={playerPosition}
                   initialMetrics={metrics}
                   onMetricsChange={setMetrics}
-                  canDelete={canDeleteMetrics}
-                  canAdd={canAddMetrics}
                 />
               ) : (
                 <HittingMetricsTab
                   clipId={clipId}
                   role={role}
                   initial={initialHittingMetrics}
-                  canDelete={canDeleteMetrics}
-                  canEdit={canAddMetrics}
                 />
               )
             )}
             {active === 'AI Coach' && (
               <AiChat
+                key={clipMode}
                 clipId={clipId}
-                available={aiCoachAvailable}
                 role={role}
                 playerName={playerName}
                 playerAgeGroup={playerAgeGroup}
                 playerPosition={playerPosition}
-                clipKind={clipKind}
                 metrics={metrics}
                 checklist={initialChecklist}
                 coachNotes={initialNotes}
+                forcedAgent={isPitcher ? 'randy' : 'barry'}
               />
             )}
           </motion.div>

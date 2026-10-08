@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createClip, getSignedUploadUrl } from '@/app/actions/clips'
 import BulkUploadModal from './bulk-upload-modal'
-import { canUploadVideo, pendingReason, type PlayerConsentFields, type UploadBlockedViewer } from '@/lib/consent'
-import UploadBlockedNotice from '@/components/upload-blocked-notice'
 
-const COMPRESS_THRESHOLD_MB = 30
+const COMPRESS_THRESHOLD_MB = 10
+const MAX_RAW_MB = 500
 const FFMPEG_CORE_VERSION = '0.12.6'
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -19,11 +18,17 @@ async function compressVideo(file: File, onProgress: (pct: number) => void): Pro
   const ffmpeg = new FFmpeg()
   ffmpeg.on('progress', ({ progress }) => onProgress(Math.round(progress * 100)))
 
-  const base = `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
-  })
+  const base = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`
+  const [coreURL, wasmURL] = await Promise.all([
+    toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
+    toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
+  ])
+  await Promise.race([
+    ffmpeg.load({ coreURL, wasmURL }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('FFmpeg load timed out')), 30_000)
+    ),
+  ])
 
   const ext = file.name.split('.').pop() ?? 'mp4'
   await ffmpeg.writeFile(`input.${ext}`, await fetchFile(file))
@@ -55,18 +60,10 @@ export default function UploadButton({
   playerId,
   playerName,
   maxFiles = 20,
-  consent,
-  viewer = 'coach',
-  showBlockedNotice = true,
 }: {
   playerId: string
   playerName: string
   maxFiles?: number
-  /** The player's stored consent status (see src/lib/consent.ts). Required. */
-  consent: PlayerConsentFields
-  viewer?: UploadBlockedViewer
-  /** Set false when the parent renders its own UploadBlockedNotice. */
-  showBlockedNotice?: boolean
 }) {
   const [phase, setPhase]             = useState<Phase>('idle')
   const [compressPct, setCompressPct] = useState(0)
@@ -90,18 +87,21 @@ export default function UploadButton({
     let fileToUpload = file
 
     const largeEnough = file.size > COMPRESS_THRESHOLD_MB * 1024 * 1024
-    const canCompress = typeof SharedArrayBuffer !== 'undefined'
 
-    if (largeEnough && canCompress) {
+    if (largeEnough) {
       setPhase('compressing')
       setCompressPct(0)
       try {
         fileToUpload = await compressVideo(file, setCompressPct)
       } catch {
-        // Compression failed — upload original. User will see the larger file size.
         fileToUpload = file
-        setError('Compression failed. Uploading original file.')
       }
+    }
+
+    if (fileToUpload.size > MAX_RAW_MB * 1024 * 1024) {
+      setError(`File is too large (${Math.round(fileToUpload.size / 1024 / 1024)} MB). Try a shorter clip or reduce video quality in your camera settings.`)
+      setPhase('idle')
+      return
     }
 
     setPhase('uploading')
@@ -145,18 +145,12 @@ export default function UploadButton({
     router.refresh()
   }
 
-  // ── consent gate ──────────────────────────────────────────────────────────
-  if (!canUploadVideo(consent)) {
-    if (!showBlockedNotice) return null
-    return <UploadBlockedNotice viewer={viewer} reason={pendingReason(consent) ?? undefined} className="max-w-xs" />
-  }
-
   // ── naming overlay ───────────────────────────────────────────────────────
   if (phase === 'naming') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-6 w-[22rem] space-y-4">
-          <p className="text-[10px] tracking-[0.3em] text-[#C8031E]" style={oswald}>Name This Clip</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Name This Clip</p>
           <input
             autoFocus
             value={title}
@@ -166,12 +160,12 @@ export default function UploadButton({
               if (e.key === 'Escape') { setPhase('idle'); pendingFile.current = null }
             }}
             placeholder="e.g. bullpen w/ Rapsodo 9/24"
-            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080] max-sm:min-h-11"
+            className="w-full border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
           />
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => { setPhase('idle'); pendingFile.current = null }}
-              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors max-sm:min-h-11"
+              className="text-xs text-[#456080] hover:text-[#0F1F33] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors"
               style={oswald}
             >
               Cancel
@@ -179,7 +173,7 @@ export default function UploadButton({
             <button
               onClick={() => { if (title.trim() && pendingFile.current) handleFile(pendingFile.current, title.trim()) }}
               disabled={!title.trim()}
-              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 max-sm:min-h-11"
+              className="text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-40"
               style={oswald}
             >
               Upload
@@ -195,12 +189,12 @@ export default function UploadButton({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
         <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-xl p-7 w-80 space-y-5">
-          <p className="text-[10px] tracking-[0.3em] text-[#C8031E]" style={oswald}>Optimizing Video</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#C8102E]" style={oswald}>Optimizing Video</p>
           <p className="text-sm text-[#0F1F33]">Compressing to 720p for faster playback…</p>
           <div>
             <div className="h-1.5 bg-[#DDE4ED] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#C8031E] rounded-full transition-all duration-300"
+                className="h-full bg-[#C8102E] rounded-full transition-all duration-300"
                 style={{ width: `${compressPct}%` }}
               />
             </div>
@@ -248,13 +242,14 @@ export default function UploadButton({
           e.target.value = ''
         }}
       />
-      {error && <p className="text-xs text-[#C8031E]">{error}</p>}
+      {error && <p className="text-xs text-[#C8102E]">{error}</p>}
       <button
         onClick={() => phase === 'idle' && inputRef.current?.click()}
-        disabled={phase === 'uploading'}
-        className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap disabled:opacity-60 max-sm:min-h-11"
+        disabled={phase !== 'idle'}
+        className="text-[10px] sm:text-xs bg-[#1C3A5C] hover:bg-[#223F63] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap disabled:opacity-60"
+        style={oswald}
       >
-        {phase === 'uploading' ? 'Uploading…' : 'Upload Clip'}
+        {phase === 'uploading' ? 'Uploading…' : 'Upload'}
       </button>
     </div>
   )

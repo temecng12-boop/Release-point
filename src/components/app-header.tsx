@@ -25,9 +25,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, b
     <header
       className="sticky top-0 z-50 flex items-center justify-between gap-2 px-5 md:px-8 min-h-14"
       style={{
-        backgroundColor: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backgroundColor: '#ffffff',
         borderBottom: '1px solid #e2e8f0',
         viewTransitionName: 'site-header',
         // The header sits at the very top, so stretch it over the notch /

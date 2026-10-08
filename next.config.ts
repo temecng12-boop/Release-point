@@ -1,4 +1,6 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { withSentryConfig } = require('@sentry/nextjs/config')
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -32,4 +34,13 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: 'release-point-ai',
+  project: 'javascript-nextjs',
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute: '/monitoring',
+  hideSourceMaps: true,
+  disableLogger: true,
+  automaticVercelMonitors: true,
+})

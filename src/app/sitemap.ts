@@ -1,12 +1,9 @@
-import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/lib/site-meta'
+import { MetadataRoute } from 'next'
 
-// Marketing + legal pages only. /home duplicates / and is canonicalized to
-// it, so it stays out. App, auth, and API routes are disallowed in robots.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date()
-  return ['/', '/about', '/waitlist', '/privacy', '/terms'].map((path) => ({
-    url: `${SITE_URL}${path === '/' ? '' : path}`,
-    lastModified: now,
-  }))
+  return [
+    { url: 'https://releasepointai.com',          lastModified: new Date(), changeFrequency: 'weekly',  priority: 1   },
+    { url: 'https://releasepointai.com/about',     lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
+    { url: 'https://releasepointai.com/waitlist',  lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
+  ]
 }

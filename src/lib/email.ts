@@ -144,25 +144,80 @@ export async function sendClipUploadedEmail({
 export async function sendWaitlistNotification({
   email,
   name,
+  role,
+  programName,
+  athleteCount,
+  tech,
+  referral,
 }: {
   email: string
   name?: string | null
+  role?: string | null
+  programName?: string | null
+  athleteCount?: string | null
+  tech?: string | null
+  referral?: string | null
 }) {
   if (!resend) return
+  const row = (label: string, val?: string | null) =>
+    val ? `<p style="color:#0F1F33;font-size:14px;margin:6px 0;"><strong>${label}:</strong> ${val}</p>` : ''
   await resend.emails.send({
     from: FROM,
     to: 'temecng12@gmail.com',
-    subject: `New waitlist signup: ${email}`,
+    subject: `New waitlist signup: ${name || email}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
           <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">New Waitlist Signup</h1>
         </div>
-        ${name ? `<p style="color:#0F1F33;font-size:15px;"><strong>Name:</strong> ${name}</p>` : ''}
-        <p style="color:#0F1F33;font-size:15px;"><strong>Email:</strong> ${email}</p>
+        ${row('Name', name)}
+        ${row('Email', email)}
+        ${row('Role', role)}
+        ${row('Program', programName)}
+        ${row('Athletes', athleteCount)}
+        ${row('Tech', tech)}
+        ${row('Heard via', referral)}
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
           Release Point AI Waitlist
+        </p>
+      </div>
+    `,
+  })
+}
+
+export async function sendCoachApprovalEmail({
+  toEmail,
+  name,
+  inviteUrl,
+}: {
+  toEmail: string
+  name?: string
+  inviteUrl: string
+}) {
+  if (!resend) return
+  const greeting = name ? `Hey ${name},` : 'Hey,'
+  await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: "You're in — Release Point",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+        <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">You're Approved</h1>
+        </div>
+        <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
+        <p style="color:#456080;font-size:14px;line-height:1.6;">
+          Your waitlist spot just turned into a coaching account. Click below to set up your profile, add your players, and start uploading film.
+        </p>
+        <a href="${inviteUrl}"
+           style="display:inline-block;background:#C8102E;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:13px;text-transform:uppercase;letter-spacing:0.1em;margin:16px 0;">
+          Set Up Your Account →
+        </a>
+        <p style="color:#8096AE;font-size:12px;margin-top:8px;">This link expires in 24 hours.</p>
+        <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
+          Release Point · Built for coaches and players.
         </p>
       </div>
     `,

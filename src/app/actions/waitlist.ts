@@ -1,57 +1,60 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendWaitlistNotification } from '@/lib/email'
-import {
-  WAITLIST_INVALID_EMAIL,
-  WAITLIST_RATE_LIMITED,
-  clientIpFromHeaders,
-  isValidWaitlistEmail,
-  normalizeWaitlistEmail,
-  normalizeWaitlistName,
-  waitlistJoinOutcome,
-  waitlistRateLimited,
-} from '@/lib/waitlist'
 
-export async function joinWaitlist(data: { email: string; name: string }) {
-  const email = normalizeWaitlistEmail(data.email ?? '')
-  const name = normalizeWaitlistName(data.name ?? '')
+export async function joinWaitlist(data: {
+  email: string
+  name: string
+  role?: string
+  programName?: string
+  athleteCount?: string
+  tech?: string
+  referral?: string
+}) {
+  const email = data.email.trim().toLowerCase()
+  const name  = data.name.trim()
 
-  if (!email || !isValidWaitlistEmail(email)) {
-    return { error: WAITLIST_INVALID_EMAIL }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address.' }
   }
 
-  // Best-effort per-instance bucket (IP + email). Blocks unique-email floods and
-  // Resend spam to the founder inbox. Not shared across Vercel instances — see
-  // waitlist-traffic-audit.md. No Upstash in this stack.
-  const h = await headers()
-  const ip = clientIpFromHeaders(h)
-  if (waitlistRateLimited(`ip:${ip}`) || waitlistRateLimited(`email:${email}`)) {
-    return { error: WAITLIST_RATE_LIMITED }
+  const payload: Record<string, string | null> = {
+    email,
+    name:          name || null,
+    role:          data.role          || null,
+    program_name:  data.programName   || null,
+    athlete_count: data.athleteCount  || null,
+    tech_stack:    data.tech          || null,
+    referral:      data.referral      || null,
   }
 
-  // Schema (015_waitlist.sql): id uuid PK, email text UNIQUE NOT NULL, name text,
-  // created_at timestamptz. Service role only (RLS on, no anon/authenticated policies).
-  const { error: dbError } = await supabaseAdmin
-    .from('waitlist')
-    .insert({ email, name })
+  // Best-effort DB insert — qualifying columns may not exist yet if migration hasn't run
+  const { error: dbError } = await supabaseAdmin.from('waitlist').insert(payload)
 
-  let emailOk = false
+  if (dbError?.code === '23505') {
+    return { error: "You're already on the list — we'll be in touch!" }
+  }
+
+  // If columns are missing, fall back to base insert so no one is lost
+  if (dbError) {
+    await supabaseAdmin.from('waitlist').insert({ email, name: name || null })
+  }
+
+  // Always send email notification so no signups are lost regardless of DB outcome
   try {
-    await sendWaitlistNotification({ email, name })
-    emailOk = true
-  } catch (err) {
-    console.error('[joinWaitlist] founder notification failed', err)
+    await sendWaitlistNotification({
+      email,
+      name:         name || null,
+      role:         data.role         || null,
+      programName:  data.programName  || null,
+      athleteCount: data.athleteCount || null,
+      tech:         data.tech         || null,
+      referral:     data.referral     || null,
+    })
+  } catch {
+    // email is non-critical
   }
 
-  const outcome = waitlistJoinOutcome({ dbError, emailOk })
-  if ('error' in outcome) {
-    console.error('[joinWaitlist] insert failed', {
-      code: dbError?.code ?? null,
-      message: dbError?.message ?? null,
-      emailOk,
-    })
-  }
-  return outcome
+  return { success: true }
 }

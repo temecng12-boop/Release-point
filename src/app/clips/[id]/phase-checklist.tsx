@@ -20,13 +20,54 @@ const PITCHING_PHASES = [
 ]
 
 const HITTING_PHASES = [
-  { name: 'Stance / Setup',          desc: 'Foot position, weight distribution, hand placement, posture' },
-  { name: 'Load',                     desc: 'Weight shift back, hip hinge, hand trigger, rhythm' },
-  { name: 'Stride / Timing',          desc: 'Stride length, direction, front foot landing, timing' },
-  { name: 'Hip Rotation',             desc: 'Back hip drive, rotation sequence, ground force use' },
-  { name: 'Hip-Shoulder Separation',  desc: 'Hips lead shoulders. The gap creates bat speed.' },
-  { name: 'Contact Point',            desc: 'Barrel path to ball, attack angle, hand position at contact' },
-  { name: 'Extension / Follow Thru',  desc: 'Through-contact extension, full rotation, balance' },
+  {
+    name: 'Stance & Athletic Posture',
+    desc: 'Feet shoulder-width or slightly wider. Knees flexed, slight hip hinge forward — not upright, not crouched. Weight 50/50 or slightly back. Spine angle consistent. Both eyes level toward pitcher.',
+  },
+  {
+    name: 'Grip & Hand Setup',
+    desc: 'Knocking knuckles aligned (or close). Grip pressure light-to-medium — tension kills bat speed. Hands 3–6" from body, typically between armpit and shoulder height. Bat angle sets the attack plane before the pitch arrives.',
+  },
+  {
+    name: 'Load & Timing Trigger',
+    desc: 'Weight shifts into back hip — coil, not sway (hip stays over back foot). Hand trigger moves hands back slightly. Back hip hinges and loads, creating hip-to-shoulder separation window. Rhythm/tempo: smooth, not jerky. The load is the battery charge.',
+  },
+  {
+    name: 'Stride & Front Foot Landing',
+    desc: 'Stride typically 4–8" for elite hitters. Direction straight to pitcher or slightly closed. Front foot lands SOFT — toe touches first, controlled. No stomping, no lunging. The stride is about timing, not power. Foot lands before committing to swing.',
+  },
+  {
+    name: 'Heel Drop (Swing Commitment)',
+    desc: 'Front heel planting is the point of no return — it fires the kinetic chain. Timing here defines everything. Early heel drop = early commitment, easy to fool. Late heel drop = covers more pitches. Front foot angle at landing: slightly closed (in) is generally strongest for rotation.',
+  },
+  {
+    name: 'Hip Drive & Clearance',
+    desc: 'Back hip drives forward and rotates toward pitcher — not just sideways. Back heel rises as back hip fires, indicating ground force transfer. Hips clear BEFORE shoulders open. Pelvis fully rotates around a fixed spine axis. A hitter who rotates with their shoulders only loses the entire lower-half advantage.',
+  },
+  {
+    name: 'Hip-Shoulder Separation',
+    desc: 'Hips fire first, shoulders stay closed as long as possible. This stretch-shortening gap is where elite bat speed is generated — the rubber band effect. Hands stay back while hips open. The narrower this window gets, the less torque available. Bonds/Trout/Soto all show exceptional separation.',
+  },
+  {
+    name: 'Bat Path & Attack Angle',
+    desc: 'Barrel stays above the hands through the swing plane. Attack angle should match the downward trajectory of the pitch: slightly upward, typically 5–15°. This puts the barrel on plane longest. An uppercut (too steep) misses inside the zone. A chopping path (down) creates weak ground balls. Knob leads, barrel trails — never casting.',
+  },
+  {
+    name: 'Contact Point & Barrel Alignment',
+    desc: 'Contact depth: pull side slightly out front, middle/oppo deeper in zone. Front shoulder stays closed through contact — early shoulder opens the path. Head down, eyes tracking ball into contact. Palm-up / palm-down hand orientation at impact. Barrel perpendicular to the flight path of the pitch.',
+  },
+  {
+    name: 'Extension Through Contact',
+    desc: 'Swing does not stop at the ball — extension happens through and past contact. Arms extend toward the pitcher after contact. This is what separates hard contact from stabs. Extension is the proof that the kinetic chain stayed connected all the way through the zone.',
+  },
+  {
+    name: 'Follow-Through & Finish',
+    desc: 'Full rotation: belly button faces pitcher at finish. Hands finish high (over lead shoulder for most hitters). Weight transfers fully onto front side — back toe is all that remains. Spine angle maintained — no collapsing or standing up through the swing. Balance at finish indicates controlled aggression.',
+  },
+  {
+    name: 'Head & Eye Tracking',
+    desc: 'Head stays as still as possible throughout — excessive head movement causes mis-hits. Eyes pick up pitch at release, track through the zone to contact. Head should not pull out before contact. Hitters who cheat their eyes early lose the ability to read spin and adjust. The eyes are the first thing to evaluate on swing issues.',
+  },
 ]
 
 const RATINGS: { value: Rating; label: string; color: string }[] = [

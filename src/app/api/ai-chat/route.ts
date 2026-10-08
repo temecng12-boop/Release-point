@@ -1,17 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { supabaseAdmin } from '@/lib/supabase/admin'
-import { checkAiChatGate } from '@/lib/ai-chat-gate'
 import { formatPhilosophiesForPrompt } from '@/lib/philosophies'
-import { loadAiChatContext, sanitizeChatMessages } from '@/lib/ai-chat-context'
-import { loadClipContext } from '@/lib/ai-coach/clip-context'
-import type { ClipKind } from '@/lib/positions'
-import {
-  VIDEO_ACCESS_NOTE, cleanCoachNotes, formatChecklist, formatClipDetails, formatHittingMetrics, formatMetrics,
-  formatTimestampNotes,
-  type CoachClipDetails, type CoachHittingMetrics, type CoachMetric, type CoachPhaseRow, type CoachTimestampNote,
-} from '@/lib/ai-coach/prompt'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const client = new Anthropic()
 
@@ -23,6 +14,45 @@ const AGE_BENCHMARKS = {
   'Professional':  { velocity: { avg: 94, good: 97, elite: 99 }, spin: { avg: 2400, good: 2500, elite: 2700 }, spinEff: { avg: 92, good: 96 } },
 }
 
+type Metric = {
+  pitch_type: string | null
+  velocity: number | null
+  spin_rate: number | null
+  spin_axis: number | null
+  horizontal_break: number | null
+  vertical_break: number | null
+}
+
+type PhaseRow = {
+  name: string
+  rating: 'good' | 'needs_work' | 'critical' | null
+  note: string
+}
+
+function formatMetrics(metrics: Metric[]): string {
+  if (!metrics.length) return 'No pitch metrics uploaded for this session.'
+  return metrics.map(m => {
+    const parts: string[] = []
+    if (m.pitch_type) parts.push(`Pitch: ${m.pitch_type}`)
+    if (m.velocity != null) parts.push(`Velo: ${m.velocity} mph`)
+    if (m.spin_rate != null) parts.push(`Spin: ${m.spin_rate} rpm`)
+    if (m.spin_axis != null) parts.push(`Axis: ${m.spin_axis}°`)
+    if (m.horizontal_break != null) parts.push(`HB: ${m.horizontal_break}"`)
+    if (m.vertical_break != null) parts.push(`VB: ${m.vertical_break}"`)
+    return parts.join(' | ')
+  }).join('\n')
+}
+
+function formatChecklist(checklist: PhaseRow[] | null): string {
+  if (!checklist || checklist.length === 0) return 'No mechanics checklist completed for this clip.'
+  const ratingLabel = { good: '✓ Good', needs_work: '△ Needs Work', critical: '✗ Critical' }
+  return checklist.map(row => {
+    const rating = row.rating ? ratingLabel[row.rating] : '— Not rated'
+    const note = row.note?.trim() ? ` — "${row.note}"` : ''
+    return `${row.name}: ${rating}${note}`
+  }).join('\n')
+}
+
 const HITTING_BENCHMARKS = {
   'Youth':         { ev: { avg: 60, good: 72, elite: 80  }, la: { sweet: '8-32°', ideal: '12-25°' } },
   'Middle School': { ev: { avg: 72, good: 80, elite: 87  }, la: { sweet: '8-32°', ideal: '12-25°' } },
@@ -31,21 +61,7 @@ const HITTING_BENCHMARKS = {
   'Professional':  { ev: { avg: 90, good: 96, elite: 103 }, la: { sweet: '8-32°', ideal: '14-28°' } },
 }
 
-// Shared by Randy and Barry: what the model can see, and the clip it's about.
-function buildClipBlock(clipText: string, timestampNotesText: string): string {
-  return `${VIDEO_ACCESS_NOTE}
-
-CLIP CONTEXT (TEXT ONLY — YOU CAN'T SEE THE VIDEO):
-${clipText}
-${timestampNotesText ? `\nTIMESTAMPED NOTES FROM THE COACH:\n${timestampNotesText}\n` : ''}`
-}
-
-function playerLine(playerName: string | null, ageGroup: string | null, position: string | null, clipKind: ClipKind | null): string {
-  const clip = clipKind === 'hitting' ? 'Hitting' : clipKind === 'pitching' ? 'Pitching' : null
-  return `PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}${clip ? ` | This clip: ${clip}` : ''}`
-}
-
-function buildBarryPrompt(playerName: string | null, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null, clipBlock: string, clipKind: ClipKind | null): string {
+function buildBarryPrompt(playerName: string, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null): string {
   const hb = ageGroup ? HITTING_BENCHMARKS[ageGroup as keyof typeof HITTING_BENCHMARKS] : null
   return `You are Barry — built after Barry Bonds. The greatest hitter who ever lived by the numbers, and the most disciplined one. Bonds walked 232 times in a single season because he refused to give pitchers anything to work with. His approach was simple: know your zone, know your pitch, and make the pitcher come to you. When his pitch came, he didn't miss it.
 
@@ -53,9 +69,7 @@ Barry Bonds didn't have the biggest swing. He had the best information. He knew 
 
 YOUR VOICE: calm, precise, no wasted words. You don't get excited about mechanics for their own sake. You care about what the data tells you about the swing decision and the swing path. When the numbers are good, you say what made them good. When they're off, you trace it back to the specific thing that went wrong — approach, timing, load, or path — and you say it plainly.
 
-${clipBlock}
-
-${playerLine(playerName, ageGroup, position, clipKind)}
+PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
 
 ${hb ? `BENCHMARKS (${ageGroup}):
 Exit velocity — avg ${hb.ev.avg} mph | solid ${hb.ev.good}+ mph | elite ${hb.ev.elite}+ mph
@@ -93,78 +107,35 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
 
-  // Invite-only + age screen: coaches pass (their player access is checked
-  // below); anyone else needs a completed age screen and a linked player
-  // account, so the paid AI isn't usable before the one screen.
-  const gate = await checkAiChatGate(supabaseAdmin, user.id)
-  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
-
-  const body = await req.json().catch(() => null) as { messages?: unknown; agent?: unknown; context?: { clipId?: unknown; playerId?: unknown } } | null
-  if (!body) return new Response('Bad request', { status: 400 })
-  const messages = sanitizeChatMessages(body.messages).filter(m => m.content.trim() !== '')
-  if (messages.length === 0) return new Response('No message to answer.', { status: 400 })
-  const requestedAgent = body.agent === 'barry' || body.agent === 'randy' ? body.agent : null
-
-  // The client says only which clip or player this is about. Everything the
-  // prompt says about the player is loaded here after an access check (their
-  // coaches or the player; not guardians); anything else in the body is ignored.
-  let playerName: string | null
-  let ageGroup: string | null
-  let position: string | null
-  let clipKind: ClipKind | null = null
-  let metrics: CoachMetric[]
-  let hittingMetrics: CoachHittingMetrics | null = null
-  let checklist: CoachPhaseRow[] | null
-  let coachNotes: string | null
-  let clipDetails: CoachClipDetails | null = null
-  let timestampNotes: CoachTimestampNote[] = []
-
-  const context = {
-    clipId: typeof body.context?.clipId === 'string' && body.context.clipId ? body.context.clipId : null,
-    playerId: body.context?.playerId,
+  // 20 chat messages per user per minute
+  const limit = await checkRateLimit(user.id, 'ai-chat', 20, 60)
+  if (!limit.allowed) {
+    return new Response('Rate limit exceeded. Wait a moment and try again.', {
+      status: 429,
+      headers: { 'Retry-After': String(limit.retryAfterSecs ?? 60) },
+    })
   }
-  if (context.clipId) {
-    const loaded = await loadClipContext(user.id, context.clipId)
-    if (!loaded.ok) return new Response(loaded.message, { status: loaded.status })
-    const c = loaded.context
-    playerName = c.playerName
-    ageGroup = c.ageGroup
-    position = c.position
-    clipKind = c.clipKind
-    metrics = c.metrics
-    hittingMetrics = c.hittingMetrics
-    checklist = c.checklist
-    coachNotes = cleanCoachNotes(c.coachNotes)
-    clipDetails = c.clip
-    timestampNotes = c.timestampNotes
-  } else {
-    // Player-profile chat: summary across the player's clips.
-    const loaded = await loadAiChatContext(supabaseAdmin, user.id, { playerId: context.playerId })
-    if (!loaded.ok) return new Response(loaded.status === 400 ? 'Bad request' : 'Not found', { status: loaded.status })
-    const c = loaded.context
-    playerName = c.playerName || null
-    ageGroup = c.ageGroup
-    position = c.position
-    clipKind = c.defaultClipKind
-    metrics = c.metrics as CoachMetric[]
-    checklist = c.checklist as CoachPhaseRow[] | null
-    coachNotes = cleanCoachNotes(c.coachNotes)
-  }
+
+  const { messages, agent = 'randy', context } = await req.json()
+
+  const {
+    playerName,
+    ageGroup,
+    position,
+    metrics = [],
+    checklist = null,
+    coachNotes = null,
+  } = context
 
   const benchmarks    = ageGroup ? AGE_BENCHMARKS[ageGroup as keyof typeof AGE_BENCHMARKS] : null
-  const checklistText = formatChecklist(checklist)
-  const clipBlock     = buildClipBlock(formatClipDetails(clipDetails), clipDetails ? formatTimestampNotes(timestampNotes) : '')
-  // Honor Switch Agent when the client sends one; otherwise frame from the clip toggle.
-  const agent = requestedAgent ?? (clipKind === 'hitting' ? 'barry' : 'randy')
+  const metricsText   = formatMetrics(metrics as Metric[])
+  const checklistText = formatChecklist(checklist as PhaseRow[] | null)
 
   let systemPrompt: string
 
   if (agent === 'barry') {
-    // Barry reads the session's hitting metrics; pitch metrics are Randy's.
-    const metricsText = formatHittingMetrics(hittingMetrics)
-    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes, clipBlock, clipKind)
+    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes)
   } else {
-    const metricsText = formatMetrics(metrics)
     const philosophiesText = formatPhilosophiesForPrompt()
     systemPrompt = `You are Randy — built after Randy Johnson, the Big Unit. 6'10". Four Cy Youngs. 4,875 strikeouts. The most dominant left-handed pitcher who ever lived, and someone who reinvented himself mechanically in his mid-30s to become even better. You don't sugarcoat. You don't guess. You look at the numbers, you look at what the mechanics evaluation says, and you tell a pitcher exactly what's happening and why.
 
@@ -172,9 +143,7 @@ Randy Johnson's philosophy: attack the zone, make hitters uncomfortable, and und
 
 YOUR VOICE: blunt, confident, specific. Not mean — just doesn't waste words. If something is wrong, you say it plainly and explain what to fix. If something is right, you say that too. You don't lecture. You say one thing at a time and make it land.
 
-${clipBlock}
-
-${playerLine(playerName, ageGroup, position, clipKind)}
+PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
 
 ${benchmarks ? `BENCHMARKS (${ageGroup}):
 Fastball velocity — avg ${benchmarks.velocity.avg} mph | solid ${benchmarks.velocity.good}+ mph | elite ${benchmarks.velocity.elite}+ mph
@@ -223,7 +192,10 @@ Quote specific numbers from the session. If a metric isn't there, say so — nev
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      messages,
+      messages: messages.map((m: { role: string; content: string }) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
     })
 
     const readable = new ReadableStream({

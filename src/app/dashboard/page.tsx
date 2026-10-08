@@ -1,18 +1,10 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { selectPlayersWithConsent } from '@/lib/consent-server'
 import UploadButton from './upload-button'
-import { canUploadVideo, isFrozenUnder13, type PlayerConsentFields } from '@/lib/consent'
-import AgeStopNotice from '@/components/age-stop-notice'
-import AccountLoadError from '@/components/account-load-error'
-import { dashboardRoute } from '@/lib/age-gate-routing'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
-import CoachInvitePanel from './coach-invite-panel'
-import { isMissingColumnError } from '@/lib/db-errors'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 
@@ -34,38 +26,15 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const profileRead = await supabaseAdmin
+  const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('full_name, role, team_name')
     .eq('id', user.id)
-    .maybeSingle()
-  const profile = profileRead.data
+    .single()
 
-  // A failed or missing profile read: say so (Try again / Sign out). Never
-  // guess a role and redirect: that could bounce between pages.
-  if (dashboardRoute(profileRead, null) === 'error') {
-    console.error('[dashboard] profile read failed', { userId: user.id, missing: !profileRead.error })
-    return <AccountLoadError retryHref="/dashboard" />
-  }
   if (profile?.role === 'guardian') redirect('/guardian')
 
-  // Platform admins get the early-access coach invite panel. Read separately
-  // so a database behind migration 041 never breaks the dashboard: a missing
-  // column just hides the panel (the invite action gates itself too).
-  let isPlatformAdmin = false
-  const adminRead = await supabaseAdmin
-    .from('profiles')
-    .select('is_platform_admin')
-    .eq('id', user.id)
-    .maybeSingle()
-  if (!adminRead.error) {
-    isPlatformAdmin = (adminRead.data as { is_platform_admin?: boolean | null } | null)?.is_platform_admin === true
-  } else if (!isMissingColumnError(adminRead.error, 'is_platform_admin')) {
-    console.error('[dashboard] platform admin read failed', { userId: user.id, code: adminRead.error.code })
-  }
-
-  // Role comes from profiles only; user_metadata is set by the client at signup.
-  const isCoach = profile?.role === 'coach'
+  const isCoach = (profile?.role ?? user.user_metadata?.role) === 'coach'
 
   // ── Coach data ──────────────────────────────────────────────────────────────
   // Fetch all teams where this user is a coach (organizer OR assistant)
@@ -153,26 +122,20 @@ export default async function DashboardPage() {
   const playerNameMap = Object.fromEntries((recentPlayers ?? []).map(p => [p.id, p.full_name]))
 
   // ── Player data ─────────────────────────────────────────────────────────────
-  const { data: playerRow, error: playerReadError } = !isCoach
-    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null; coach_id: string | null } & PlayerConsentFields>(
-        'id, full_name, position, coach_id',
-        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle(),
-      )
-    : { data: null, error: null }
+  const { data: playerRow } = !isCoach
+    ? await supabaseAdmin
+        .from('players')
+        .select('id, full_name, position')
+        .eq('user_id', user.id)
+        .single()
+    : { data: null }
 
-  // A player whose age isn't confirmed yet (coach-invited, Google/Apple, no
-  // players row yet) answers the one screen first, once.
-  // Only on a confirmed state (both rows read fine); see src/lib/age-gate-routing.ts.
-  if (dashboardRoute(profileRead, isCoach ? null : { data: playerRow, error: playerReadError }) === 'age') redirect('/onboarding/age')
-  // Under 13 is a hard stop for now: the account shows only the stop message.
-  const frozen = !isCoach && isFrozenUnder13(playerRow)
-  // Position chips are optional: an empty selection is valid, so the dashboard
-  // does not send the player back to the picker.
+  if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
         .from('clips')
-        .select('id, title, created_at, session_date, voice_path')
+        .select('id, title, created_at, session_date')
         .eq('player_id', playerRow.id)
         .order('created_at', { ascending: false })
     : { data: null }
@@ -206,24 +169,27 @@ export default async function DashboardPage() {
   const dashNav = (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500 hidden sm:block truncate max-w-[140px]">
+        <span className="text-xs text-slate-500 hidden md:block truncate max-w-[140px]">
           {profile?.full_name ?? user.email}
         </span>
-        {profile?.role && (
-          <span
-            className="text-xs px-2 py-0.5 rounded"
-            style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
-          >
-            {profile.role}
-          </span>
-        )}
+        <span
+          className="text-xs px-2 py-0.5 rounded"
+          style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
+        >
+          {profile?.role ?? user.user_metadata?.role ?? 'coach'}
+        </span>
       </div>
-      <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block max-sm:min-h-11" style={os}>
+      {user.email === 'temecng12@gmail.com' && (
+        <Link href="/admin/waitlist" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors hidden sm:block font-semibold" style={os}>
+          Admin
+        </Link>
+      )}
+      <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block" style={os}>
         About RP
       </Link>
       <Link
         href={isCoach ? '/profile' : '/player-settings'}
-        className="text-xs text-slate-400 hover:text-slate-700 transition-colors max-sm:min-h-11 max-sm:min-w-11"
+        className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block"
         style={os}
       >
         {isCoach ? 'Profile' : 'My Profile'}
@@ -236,7 +202,6 @@ export default async function DashboardPage() {
       <AppHeader right={dashNav} showSignOut />
 
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
-        {isPlatformAdmin && <CoachInvitePanel />}
         {isCoach ? (
           <>
             {/* ── Compact coach hero ── */}
@@ -244,17 +209,17 @@ export default async function DashboardPage() {
               className="rounded-2xl overflow-hidden"
               style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
             >
-              <div className="h-px bg-[#C8031E]" />
+              <div className="h-px bg-[#E8102A]" />
               <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white shrink-0 font-bold"
-                    style={{ ...os, background: 'linear-gradient(135deg, #C8031E, #A30219)' }}
+                    style={{ ...os, background: 'linear-gradient(135deg, #E8102A, #A50D1E)' }}
                   >
                     {(profile?.full_name ?? user.email ?? 'C').split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[color:var(--rp-navy,#023167)] tracking-[0.3em]" style={os}>Head Coach</p>
+                    <p className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Head Coach</p>
                     <h1 className="text-lg text-slate-950 truncate leading-tight tracking-tight" style={os}>
                       {profile?.full_name ?? user.email?.split('@')[0] ?? 'Coach'}
                     </h1>
@@ -276,7 +241,7 @@ export default async function DashboardPage() {
                     <CreateTeamButton />
                     <Link
                       href="/clips/compare"
-                      className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg transition-colors text-slate-500 hover:text-slate-800 hover:bg-slate-100 max-sm:min-h-11"
+                      className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg transition-colors text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                       style={{ ...os, border: '1px solid #e2e8f0' }}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -303,7 +268,7 @@ export default async function DashboardPage() {
             {/* ── Teams grid ── */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] tracking-[0.25em] text-[color:var(--rp-navy,#023167)]" style={os}>Your Teams</p>
+                <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Your Teams</p>
                 <span className="text-[11px] text-slate-400" style={os}>{teams.length} {teams.length === 1 ? 'team' : 'teams'}</span>
               </div>
 
@@ -321,7 +286,7 @@ export default async function DashboardPage() {
                       className="group rounded-xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md"
                       style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
                     >
-                      <div className="h-0.5 bg-[#C8031E]" />
+                      <div className="h-0.5 bg-[#E8102A]" />
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div className="min-w-0">
@@ -378,7 +343,7 @@ export default async function DashboardPage() {
             {recentClips.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[11px] tracking-[0.25em] text-[color:var(--rp-navy,#023167)]" style={os}>Recent Activity</p>
+                  <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Recent Activity</p>
                   <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total clips</span>
                 </div>
                 <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
@@ -394,7 +359,7 @@ export default async function DashboardPage() {
                         style={{ borderBottom: i < recentClips.length - 1 ? '1px solid #f1f5f9' : undefined }}
                       >
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                          <svg className="w-3.5 h-3.5 text-[#C8031E]" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                           </svg>
                         </div>
@@ -405,7 +370,7 @@ export default async function DashboardPage() {
                           </p>
                         </div>
                         {i === 0 && (
-                          <span className="text-[10px] bg-[#C8031E] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
+                          <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
                         )}
                         <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -420,50 +385,36 @@ export default async function DashboardPage() {
         ) : (
           /* ── Player view ── */
           <div className="space-y-6">
-            {frozen && <AgeStopNotice />}
-            {!frozen && (<>
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              <div className="h-px bg-[#C8031E]" />
+              <div className="h-px bg-[#E8102A]" />
               <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(200,3,30,0.04) 0%, transparent 70%)' }} />
+                style={{ background: 'radial-gradient(circle, rgba(232,16,42,0.04) 0%, transparent 70%)' }} />
 
               <div className="relative px-4 sm:px-7 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <div
                   className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl text-white shrink-0"
-                  style={{ ...os, background: '#C8031E', boxShadow: '0 4px 12px rgba(200,3,30,0.2)' }}
+                  style={{ ...os, background: '#E8102A', boxShadow: '0 4px 12px rgba(232,16,42,0.2)' }}
                 >
                   {(playerRow?.full_name ?? 'P').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-[color:var(--rp-navy,#023167)] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
+                  <p className="text-[11px] text-[#E8102A] tracking-[0.3em] mb-1" style={os}>Welcome Back</p>
                   <h1 className="text-2xl text-slate-950 leading-tight truncate tracking-tight" style={os}>
-                    {playerRow?.full_name ?? 'Player'}
+                    {playerRow?.full_name ?? 'Pitcher'}
                   </h1>
                   <p className="text-sm text-slate-500 mt-1">
                     {(myClips?.length ?? 0) === 0
                       ? 'Ready to start your development journey?'
                       : `${myClips!.length} clip${myClips!.length === 1 ? '' : 's'} uploaded · Keep grinding.`}
                   </p>
-                  <Link
-                    href="/player-settings"
-                    className="inline-flex items-center justify-center min-h-11 mt-3 px-4 rounded-lg border border-[#e2e8f0] text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                    style={os}
-                  >
-                    My Profile
-                  </Link>
                 </div>
                 {playerRow && (
-                  <UploadButton
-                    playerId={playerRow.id}
-                    playerName={playerRow.full_name ?? 'Player'}
-                    consent={playerRow}
-                    viewer="player"
-                  />
+                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
                 )}
               </div>
 
@@ -485,8 +436,8 @@ export default async function DashboardPage() {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-3 gap-3">
                   {[
-                    { title: 'Upload a Clip', desc: 'Film your bullpen, cage work, or game appearance and upload it. Your coach gets notified instantly.' },
-                    { title: 'Track Metrics', desc: 'Your coach adds pitch or swing data linked to your clips: velocity, spin rate, exit velocity, bat speed.' },
+                    { title: 'Upload a Clip', desc: 'Film your bullpen or game appearance and upload it. Your coach gets notified instantly.' },
+                    { title: 'Track Metrics', desc: 'Your coach uploads Rapsodo data linked to your clips: velocity, spin rate, movement.' },
                     { title: 'Get Feedback',  desc: 'Coaches draw directly on your video and leave voice notes. See exactly what to work on.' },
                   ].map(card => (
                     <div key={card.title} className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
@@ -496,11 +447,11 @@ export default async function DashboardPage() {
                   ))}
                 </div>
 
-                {playerRow && canUploadVideo(playerRow) && (
+                {playerRow && (
                   <div className="rounded-xl px-6 py-10 text-center" style={{ background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
                     <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
                     <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
-                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} viewer="player" />
+                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
                   </div>
                 )}
               </div>
@@ -509,9 +460,9 @@ export default async function DashboardPage() {
                 {(myMetrics?.length ?? 0) > 0 && (
                   <>
                     <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                      <div className="h-0.5 bg-[#C8031E]" />
+                      <div className="h-0.5 bg-[#E8102A]" />
                       <div className="p-5">
-                        <p className="text-[12px] text-[color:var(--rp-navy,#023167)] tracking-[0.2em] mb-4" style={os}>Career Stats</p>
+                        <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-4" style={os}>Career Stats</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           {[
                             { label: 'Pitches Logged', value: myMetrics!.length },
@@ -530,9 +481,9 @@ export default async function DashboardPage() {
 
                     {bestPitch && (
                       <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                        <div className="h-px bg-[#C8031E]" />
+                        <div className="h-px bg-[#E8102A]" />
                         <div className="p-5">
-                          <p className="text-[12px] text-[color:var(--rp-navy,#023167)] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
+                          <p className="text-[12px] text-[#E8102A] tracking-[0.2em] mb-3" style={os}>Best Pitch</p>
                           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                             <div>
                               <p className="text-3xl sm:text-4xl text-slate-950 leading-none tracking-tight" style={os}>
@@ -555,48 +506,47 @@ export default async function DashboardPage() {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-[color:var(--rp-navy,#023167)] tracking-[0.3em]" style={os}>Your Clips ({myClips.length})</p>
-                  <Link href="/player-settings" className="text-xs text-slate-400 hover:text-slate-700 transition-colors max-sm:inline-flex max-sm:items-center max-sm:min-h-11" style={os}>
+                  <p className="text-xs text-[#E8102A] tracking-[0.3em]" style={os}>Your Clips ({myClips.length})</p>
+                  <Link href="/player-settings" className="text-xs text-slate-400 hover:text-slate-700 transition-colors" style={os}>
                     Edit Profile →
                   </Link>
                 </div>
 
                 <div className="space-y-2">
                   {myClips.map((clip, i) => (
-                    <Link
+                    <div
                       key={clip.id}
-                      href={`/clips/${clip.id}`}
                       className="group flex items-center gap-3 sm:gap-4 rounded-xl px-4 sm:px-5 py-3 sm:py-4 transition-all"
                       style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
                     >
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                        <svg className="w-5 h-5 text-[#C8031E]" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <Link href={`/clips/${clip.id}`} className="flex-1 min-w-0">
                         <p className="text-sm text-slate-700 group-hover:text-slate-950 truncate transition-colors">{clip.title}</p>
                         <p className="text-xs text-slate-400 mt-0.5">
                           {fmtClipDate((clip as { session_date?: string | null }).session_date ?? null, clip.created_at)}
                         </p>
-                      </div>
+                      </Link>
                       {i === 0 && (
-                        <span className="text-xs bg-[#C8031E] text-white px-2 py-0.5 rounded shrink-0" style={os}>Latest</span>
+                        <span className="text-xs bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>Latest</span>
                       )}
-                      <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
+                      <Link
+                        href={`/clips/compare?a=${clip.id}`}
+                        className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-[#E8102A] hover:bg-slate-50 transition-colors"
+                        title="Compare"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+                        </svg>
+                      </Link>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
-            </>)}
-          </div>
-        )}
-        {!isCoach && !frozen && playerRow && user && (
-          <div className="mt-6">
-            <LessonFeedbackSection playerId={playerRow.id} viewerId={user.id} />
           </div>
         )}
       </main>

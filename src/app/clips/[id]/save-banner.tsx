@@ -7,7 +7,7 @@ export default function SaveBanner({ role }: { role: 'coach' | 'player' }) {
   const router = useRouter()
   const [flash, setFlash] = useState(false)
 
-  // Listen for notes-saved events dispatched by ClipNotes
+  // Listen for notes-saved events dispatched by TextNotes
   useEffect(() => {
     function onSaved() {
       setFlash(true)

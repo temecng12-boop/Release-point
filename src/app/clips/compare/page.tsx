@@ -191,7 +191,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         showSignOut
       />
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6">
-        <ComparePlayer clips={clips} />
+        <ComparePlayer clips={clips} role={role} />
       </main>
       <SiteFooter variant="app" />
     </div>

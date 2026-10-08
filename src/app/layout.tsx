@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import SwUpdateBanner from '@/components/sw-update-banner'
 import { Oswald } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Script from "next/script";
-import { OG_IMAGE_ALT, OG_IMAGE_HEIGHT, OG_IMAGE_URL, OG_IMAGE_WIDTH, SITE_URL } from "@/lib/site-meta";
+import ErrorBoundary from "@/components/error-boundary";
 import "./globals.css";
 
 const oswald = Oswald({
@@ -13,9 +12,6 @@ const oswald = Oswald({
   weight: ["400", "500", "600", "700"],
 });
 
-// No zoom restriction here: marketing and legal pages must allow pinch-zoom.
-// The clip viewer and compare routes set their own viewport (zoom locked)
-// per route segment.
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -23,35 +19,27 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: { default: "Release Point AI", template: "%s | Release Point AI" },
-  description: "Baseball pitching and hitting mechanics analysis for coaches and players. Upload video, track pitch and swing data, and get AI-powered feedback.",
-  metadataBase: new URL(SITE_URL),
-  alternates: { canonical: SITE_URL },
+  title: { default: "Release Point", template: "%s | Release Point" },
+  description: "Pitching and hitting mechanics analysis for coaches and players. Upload video, track Rapsodo data, and get AI-powered feedback.",
+  metadataBase: new URL("https://releasepointai.com"),
   openGraph: {
-    title: "Release Point AI",
-    description: "Baseball video analysis and pitching and hitting metrics for coaches and players.",
-    url: SITE_URL,
-    siteName: "Release Point AI",
+    title: "Release Point",
+    description: "Video analysis and Rapsodo metrics for baseball coaches and players.",
+    url: "https://releasepointai.com",
+    siteName: "Release Point",
     type: "website",
-    images: [
-      {
-        url: OG_IMAGE_URL,
-        width: OG_IMAGE_WIDTH,
-        height: OG_IMAGE_HEIGHT,
-        alt: OG_IMAGE_ALT,
-      },
-    ],
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Release Point" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Release Point AI",
-    description: "Baseball video analysis and pitching and hitting metrics for coaches and players.",
-    images: [OG_IMAGE_URL],
+    title: "Release Point",
+    description: "Video analysis and Rapsodo metrics for baseball coaches and players.",
+    images: ["/logo.jpg"],
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Release Point AI",
+    title: "Release Point",
   },
 };
 
@@ -63,14 +51,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${oswald.variable} ${GeistSans.variable} h-full`}>
       <body className="min-h-full antialiased">
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <SpeedInsights />
-        <SwUpdateBanner />
         <Script
           id="sw-register"
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js?v=2',{updateViaCache:'none'})}`,
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
           }}
         />
       </body>

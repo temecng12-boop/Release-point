@@ -1,5 +1,4 @@
-import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/lib/site-meta'
+import { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -7,9 +6,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/auth', '/dashboard', '/clips', '/onboarding', '/player-settings', '/profile', '/guardian', '/api'],
+        disallow: ['/dashboard', '/clips/', '/profile/', '/player-settings', '/guardian', '/onboarding', '/api/'],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    sitemap: 'https://releasepointai.com/sitemap.xml',
   }
 }

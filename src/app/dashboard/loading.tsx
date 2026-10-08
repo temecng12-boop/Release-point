@@ -3,7 +3,7 @@ export default function DashboardLoading() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="sticky top-0 z-50 h-14 flex items-center px-5 md:px-8 gap-3"
-        style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', borderBottom: '1px solid #e2e8f0' }}>
+        style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
         <div className="w-24 h-4 rounded shimmer" />
         <div className="w-px h-4 bg-slate-200" />
         <div className="w-20 h-3 rounded shimmer" />

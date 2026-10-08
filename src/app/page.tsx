@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
 import SiteFooter from '@/components/SiteFooter'
 import SpotlightCard from '@/components/spotlight-card'
@@ -8,14 +7,8 @@ import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
 import PitchMetrics from '@/components/pitch-metrics'
 import { createClient } from '@/lib/supabase/server'
-import { pageMetadata } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-
-// Canonical + social URL for the root page (/home sets its own pair).
-export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
-  return pageMetadata('/', parent)
-}
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -37,16 +30,16 @@ export default async function HomePage() {
         <Logo size="md" wordmarkClass="inline" />
         <nav className="flex items-center gap-1">
           {user ? (
-            <Link href="/dashboard" className="text-xs bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
+            <Link href="/dashboard" className="text-xs bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
               Dashboard
             </Link>
           ) : (
             <>
-              <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center" style={os}>
-                Sign in
+              <Link href="/auth/login" className="text-xs text-slate-500 hover:text-slate-900 transition-colors px-4 py-2" style={os}>
+                Sign In
               </Link>
-              <Link href="/waitlist" className="text-xs bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white px-5 py-2 rounded-lg transition-all max-sm:min-h-11 max-sm:inline-flex max-sm:items-center" style={os}>
-                Join the waitlist
+              <Link href="/auth/signup" className="text-xs bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white px-5 py-2 rounded-lg transition-all" style={os}>
+                Get Started
               </Link>
             </>
           )}
@@ -58,7 +51,7 @@ export default async function HomePage() {
         {/* Background — clean dot pattern, no grid */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-60 -left-60 w-[900px] h-[900px] rounded-full"
-            style={{ background: 'radial-gradient(circle, rgba(200,3,30,0.05) 0%, transparent 60%)' }} />
+            style={{ background: 'radial-gradient(circle, rgba(232,16,42,0.05) 0%, transparent 60%)' }} />
           <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.04) 0%, transparent 60%)' }} />
           {/* Dot pattern */}
@@ -76,50 +69,60 @@ export default async function HomePage() {
             <div className="animate-fade-up">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-8"
-                style={{ background: 'rgba(200,3,30,0.07)', border: '1px solid rgba(200,3,30,0.18)' }}>
-                <div className="w-1.5 h-1.5 rounded-full bg-[#C8031E] animate-pulse shrink-0" />
-                <span className="text-[10px] text-[#C8031E] tracking-[0.3em]" style={os}>Created by Pitchers · Built for Coaches</span>
+                style={{ background: 'rgba(232,16,42,0.07)', border: '1px solid rgba(232,16,42,0.18)' }}>
+                <div className="w-1.5 h-1.5 rounded-full bg-[#E8102A] animate-pulse shrink-0" />
+                <span className="text-[10px] text-[#E8102A] tracking-[0.3em]" style={os}>Created by Pitchers · Trusted by Coaches</span>
               </div>
 
               <h1 className="text-[clamp(48px,8vw,88px)] leading-[0.86] mb-8 text-slate-950 tracking-tight" style={os}>
-                See Every<br />Pitch<br /><span className="text-[#C8031E]">Differently.</span>
+                See Every<br />Pitch<br /><span className="text-[#E8102A]">Differently.</span>
               </h1>
 
               {/* Live data counters */}
               <div className="mb-10 py-6 border-y border-slate-100">
-                <p className="text-[9px] text-slate-400 tracking-[0.3em] mb-4" style={os}>Example data</p>
+                <p className="text-[9px] text-slate-400 tracking-[0.3em] mb-4" style={os}>Live from the platform</p>
                 <LiveStats />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 mb-8">
-                <MagneticButton>
-                  <Link
-                    href="/waitlist"
-                    className="block px-8 py-4 bg-[#C8031E] hover:bg-[#A30219] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(200,3,30,0.25)] hover:shadow-[0_8px_32px_rgba(200,3,30,0.35)] max-sm:min-h-11"
-                    style={os}
-                  >
-                    Join the waitlist
-                  </Link>
-                </MagneticButton>
-                <MagneticButton>
-                  <Link
-                    href="/auth/login"
-                    className="block px-8 py-4 text-sm rounded-xl transition-all text-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 max-sm:min-h-11"
-                    style={os}
-                  >
-                    Already testing? Sign in
-                  </Link>
-                </MagneticButton>
+                {user ? (
+                  <MagneticButton>
+                    <Link
+                      href="/dashboard"
+                      className="block px-8 py-4 bg-[#E8102A] hover:bg-[#C80E24] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(232,16,42,0.25)] hover:shadow-[0_8px_32px_rgba(232,16,42,0.35)]"
+                      style={os}
+                    >
+                      Go to Dashboard
+                    </Link>
+                  </MagneticButton>
+                ) : (
+                  <>
+                    <MagneticButton>
+                      <Link
+                        href="/auth/signup"
+                        className="block px-8 py-4 bg-[#E8102A] hover:bg-[#C80E24] text-white text-sm rounded-xl transition-all text-center shadow-[0_4px_24px_rgba(232,16,42,0.25)] hover:shadow-[0_8px_32px_rgba(232,16,42,0.35)]"
+                        style={os}
+                      >
+                        Start Free: Coaches
+                      </Link>
+                    </MagneticButton>
+                    <MagneticButton>
+                      <Link
+                        href="/auth/login"
+                        className="block px-8 py-4 text-sm rounded-xl transition-all text-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
+                        style={os}
+                      >
+                        Player Login
+                      </Link>
+                    </MagneticButton>
+                  </>
+                )}
               </div>
 
-              <p className="text-sm text-slate-500 leading-relaxed max-w-md mb-6">
-                Release Point AI is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
-                get AI Coach insights, and share it all with their players, from high school to pro.
-              </p>
               <div className="flex items-center gap-5 flex-wrap">
-                {['Pitching and hitting', 'High school through pro'].map((t) => (
+                {['Free for coaches', 'No credit card', 'All levels'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5 text-[#C8031E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-xs text-slate-500">{t}</span>
@@ -132,7 +135,7 @@ export default async function HomePage() {
             <div className="hidden lg:block relative animate-fade-up-2">
               {/* Glow behind mockup */}
               <div className="absolute -inset-8 rounded-3xl pointer-events-none"
-                style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(200,3,30,0.06), transparent 70%)' }} />
+                style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(232,16,42,0.06), transparent 70%)' }} />
 
               <div className="relative rounded-2xl overflow-hidden"
                 style={{
@@ -163,7 +166,7 @@ export default async function HomePage() {
                     <span className="text-white/20 text-xs">/</span>
                     <span className="text-[10px] text-white/60" style={os}>Sep 14, 2026</span>
                   </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded" style={{ ...os, background: 'rgba(200,3,30,0.2)', color: '#C8031E' }}>Coach</span>
+                  <span className="text-[9px] px-2 py-0.5 rounded" style={{ ...os, background: 'rgba(232,16,42,0.2)', color: '#E8102A' }}>Coach</span>
                 </div>
 
                 {/* Content */}
@@ -182,42 +185,42 @@ export default async function HomePage() {
                     />
                     <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice">
                       {/* Lead knee — peak of leg kick / balance point */}
-                      <circle cx="169" cy="116" r="16" fill="none" stroke="#C8031E" strokeWidth="2.2" opacity="0.92" />
-                      <circle cx="169" cy="116" r="4" fill="#C8031E" opacity="0.92" />
+                      <circle cx="169" cy="116" r="16" fill="none" stroke="#E8102A" strokeWidth="2.2" opacity="0.92" />
+                      <circle cx="169" cy="116" r="4" fill="#E8102A" opacity="0.92" />
                       {/* Short vertical tick at knee showing height of leg drive */}
-                      <line x1="169" y1="100" x2="169" y2="132" stroke="#C8031E" strokeWidth="1.4" strokeDasharray="4,3" strokeLinecap="round" opacity="0.60" />
+                      <line x1="169" y1="100" x2="169" y2="132" stroke="#E8102A" strokeWidth="1.4" strokeDasharray="4,3" strokeLinecap="round" opacity="0.60" />
                       {/* Glove — front-side arm tucked at chest */}
                       <circle cx="169" cy="66" r="13" fill="none" stroke="#3B82F6" strokeWidth="1.8" opacity="0.88" />
                     </svg>
                     <div className="absolute top-2 left-2">
-                      <span className="text-[9px] bg-[#C8031E] text-white px-1.5 py-0.5 rounded font-mono">0:01.2</span>
+                      <span className="text-[9px] bg-[#E8102A] text-white px-1.5 py-0.5 rounded font-mono">0:01.2</span>
                     </div>
                     <div className="absolute top-2 right-2">
                       <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}>Balance pt</span>
                     </div>
                   </div>
                     <div className="px-3 py-2.5 flex items-center gap-2.5 border-t" style={{ background: '#0A0F1A', borderColor: 'rgba(255,255,255,0.07)' }}>
-                      <div className="w-6 h-6 rounded-full bg-[#C8031E] flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-[#E8102A] flex items-center justify-center shrink-0">
                         <span className="text-white text-[8px] ml-px">▶</span>
                       </div>
                       <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                        <div className="h-full w-[18%] bg-[#C8031E] rounded-full" />
+                        <div className="h-full w-[18%] bg-[#E8102A] rounded-full" />
                       </div>
                       <span className="text-[9px] text-white/30 font-mono shrink-0">0:01 / 0:09</span>
                     </div>
                   </div>
 
-                  {/* Metrics — example numbers */}
+                  {/* Metrics — Nolan's real Trackman numbers */}
                   <div className="flex flex-col">
                     <div className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-                      <p className="text-[9px] tracking-[0.2em] text-[#C8031E]" style={os}>Pitch Metrics</p>
-                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Jan 22 · Example data</p>
+                      <p className="text-[9px] tracking-[0.2em] text-[#E8102A]" style={os}>Pitch Metrics</p>
+                      <p className="text-[9px] text-white/30 mt-0.5">4-Seam · Jan 22</p>
                     </div>
                     {[
-                      { label: 'Velocity',  value: '89 mph',  pct: 80, color: '#C8031E' },
-                      { label: 'Spin Rate', value: '2,248',   pct: 68, color: '#3B82F6' },
-                      { label: 'IVB',       value: '+18.7"',  pct: 88, color: '#10B981' },
-                      { label: 'H. Break',  value: '+8.1"',   pct: 62, color: '#8B5CF6' },
+                      { label: 'Velocity',  value: '89 mph',  pct: 80, color: '#E8102A' },
+                      { label: 'Spin Rate', value: '2,248',   pct: 68, color: '#1C3A5C' },
+                      { label: 'IVB',       value: '+18.7"',  pct: 88, color: '#284F75' },
+                      { label: 'H. Break',  value: '+8.1"',   pct: 62, color: '#456080' },
                     ].map((m) => (
                       <div key={m.label} className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
                         <div className="flex justify-between mb-1.5">
@@ -231,11 +234,11 @@ export default async function HomePage() {
                     ))}
                     <div className="px-3 py-2 border-b flex justify-between items-center" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}>
                       <span className="text-[9px] text-white/30" style={os}>College</span>
-                      <span className="text-[9px] font-medium" style={{ ...os, color: '#10B981' }}>Elite ↑</span>
+                      <span className="text-[9px] font-medium" style={{ ...os, color: '#E8102A' }}>Elite ↑</span>
                     </div>
                     <div className="flex-1 p-3 space-y-2 overflow-hidden">
                       <p className="text-[9px] tracking-[0.15em] text-white/25 mb-2" style={os}>AI Coach</p>
-                      <div className="bg-[#C8031E] rounded-xl rounded-br-none px-2 py-1.5 ml-2 text-[9px] text-white leading-snug">
+                      <div className="bg-[#E8102A] rounded-xl rounded-br-none px-2 py-1.5 ml-2 text-[9px] text-white leading-snug">
                         Is his IVB elite?
                       </div>
                       <div className="rounded-xl rounded-bl-none px-2 py-1.5 mr-2 text-[9px] leading-snug"
@@ -255,9 +258,9 @@ export default async function HomePage() {
       <div className="border-y border-slate-100">
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-slate-100">
           {[
-            { n: 'All Levels', sub: 'High school through pro', color: '#C8031E' },
-            { n: 'Mechanics',  sub: 'Pitching & hitting',    color: '#3B82F6' },
-            { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#10B981' },
+            { n: 'All Levels', sub: 'Youth → Pro',          color: '#E8102A' },
+            { n: 'Any Device', sub: 'CSV & PDF import',       color: '#1C3A5C' },
+            { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#E8102A' },
           ].map((s) => (
             <div key={s.n} className="py-8 text-center px-4 group cursor-default">
               <p className="text-[clamp(20px,3vw,32px)] text-slate-950 leading-none mb-1.5 tracking-tight transition-colors group-hover:text-[color:var(--c)]" style={{ ...os, '--c': s.color } as React.CSSProperties}>{s.n}</p>
@@ -284,17 +287,17 @@ export default async function HomePage() {
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
             <div className="p-8">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(200,3,30,0.08)' }}>
-                <svg className="w-5 h-5 text-[#C8031E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(232,16,42,0.08)' }}>
+                <svg className="w-5 h-5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#C8031E] mb-4" style={os}>01 · Video Analysis</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#E8102A] mb-4" style={os}>01 · Video Analysis</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-4 tracking-tight" style={os}>
                 Annotate<br />Every<br />Frame.
               </h3>
               <p className="text-sm text-slate-500 leading-[1.85]">
-                Draw directly on video. Mark arm angles, swing paths, hip rotation, and release points. Every annotation timestamped and shared instantly.
+                Draw directly on video. Mark arm angles, hip rotation, and release points. Every annotation timestamped and shared instantly.
               </p>
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
                 <div className="relative overflow-hidden" style={{ paddingBottom: '66.67%' }}>
@@ -307,24 +310,24 @@ export default async function HomePage() {
                   />
                   <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 267" preserveAspectRatio="xMidYMid slice">
                     {/* Glove tuck after release */}
-                    <circle cx="230" cy="107" r="15" fill="none" stroke="#C8031E" strokeWidth="2.2" opacity="0.95" />
-                    <circle cx="230" cy="107" r="4" fill="#C8031E" opacity="0.95" />
+                    <circle cx="230" cy="107" r="15" fill="none" stroke="#E8102A" strokeWidth="2.2" opacity="0.95" />
+                    <circle cx="230" cy="107" r="4" fill="#E8102A" opacity="0.95" />
                     {/* Trail leg shoe — raised behind in follow-through */}
                     <circle cx="110" cy="72" r="14" fill="none" stroke="#3B82F6" strokeWidth="1.8" opacity="0.88" />
                   </svg>
                   <div className="absolute top-2 left-2">
-                    <span className="text-[9px] bg-[#C8031E] text-white px-1.5 py-0.5 rounded font-mono">0:06.4</span>
+                    <span className="text-[9px] bg-[#E8102A] text-white px-1.5 py-0.5 rounded font-mono">0:06.4</span>
                   </div>
                   <div className="absolute top-2 right-2">
                     <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}>Follow-through</span>
                   </div>
                 </div>
                 <div className="px-4 py-2.5 flex items-center gap-3 border-t" style={{ background: '#0A0F1A', borderColor: 'rgba(255,255,255,0.07)' }}>
-                  <div className="w-5 h-5 rounded-full bg-[#C8031E] flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-[#E8102A] flex items-center justify-center shrink-0">
                     <span className="text-white text-[7px]">▶</span>
                   </div>
                   <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                    <div className="h-full w-[72%] bg-[#C8031E] rounded-full" />
+                    <div className="h-full w-[72%] bg-[#E8102A] rounded-full" />
                   </div>
                   <span className="text-[10px] text-white/30 font-mono shrink-0">0:06 / 0:09</span>
                 </div>
@@ -332,24 +335,23 @@ export default async function HomePage() {
             </div>
           </SpotlightCard>
 
-          {/* Pitch data */}
+          {/* Rapsodo */}
           <SpotlightCard
             className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
             <div className="p-8">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(59,130,246,0.08)' }}>
-                <svg className="w-5 h-5 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(28,58,92,0.08)' }}>
+                <svg className="w-5 h-5 text-[#1C3A5C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 · Pitching & Hitting Data</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#1C3A5C] mb-4" style={os}>02 · Pitch Analytics</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
-              <p className="text-[10px] text-slate-400 mb-5">Pitching &amp; hitting metrics</p>
+              <p className="text-[10px] text-slate-400 mb-5">TrackMan · Rapsodo · Hawk-Eye · CSV · PDF</p>
               <PitchMetrics />
-              <p className="text-[10px] text-slate-400 mt-4" style={os}>Example data</p>
             </div>
           </SpotlightCard>
 
@@ -359,19 +361,18 @@ export default async function HomePage() {
             style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
             <div className="p-8">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(16,185,129,0.08)' }}>
-                <svg className="w-5 h-5 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6" style={{ background: 'rgba(232,16,42,0.08)' }}>
+                <svg className="w-5 h-5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#10B981] mb-4" style={os}>03 · AI Coach</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#E8102A] mb-4" style={os}>03 · AI Coach</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-5 tracking-tight" style={os}>
                 An Expert<br />In Every<br />Session.
               </h3>
-              <p className="text-[10px] text-slate-400 mb-3" style={os}>Example data</p>
               <div className="space-y-2.5">
                 <div className="flex justify-end">
-                  <div className="max-w-[88%] bg-[#C8031E] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
+                  <div className="max-w-[88%] bg-[#E8102A] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
                     His curveball movement has been all over the place lately.
                   </div>
                 </div>
@@ -383,7 +384,7 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <div className="max-w-[88%] bg-[#C8031E] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
+                  <div className="max-w-[88%] bg-[#E8102A] rounded-xl rounded-br-sm px-3 py-2 text-xs text-white leading-relaxed">
                     How do I get him to feel the difference?
                   </div>
                 </div>
@@ -405,14 +406,14 @@ export default async function HomePage() {
           <p className="text-[10px] tracking-[0.35em] text-slate-400 mb-16 text-center" style={os}>How It Works</p>
           <div className="grid md:grid-cols-3 gap-10">
             {[
-              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They confirm their age, accept the Terms, and join the roster.' },
-              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, and record pitching and hitting metrics. Everything linked to the player.' },
-              { n: '03', t: 'Players Get It All',   d: 'Every annotation and metric is shared with the player. Players can ask AI Coach about their clips.' },
+              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They set up their account and join the roster.' },
+              { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, import pitch data files. Everything linked to the player.' },
+              { n: '03', t: 'Players Get It All',   d: 'Every annotation, metric, and AI insight is shared with the player instantly.' },
             ].map((s, i) => (
               <div key={s.n} className="group">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110"
-                  style={{ background: 'rgba(200,3,30,0.08)', border: '1px solid rgba(200,3,30,0.12)' }}>
-                  <p className="text-lg text-[#C8031E] leading-none tracking-tight font-bold" style={os}>{String(i + 1).padStart(2, '0')}</p>
+                  style={{ background: 'rgba(232,16,42,0.08)', border: '1px solid rgba(232,16,42,0.12)' }}>
+                  <p className="text-lg text-[#E8102A] leading-none tracking-tight font-bold" style={os}>{String(i + 1).padStart(2, '0')}</p>
                 </div>
                 <p className="text-lg text-slate-950 mb-2.5 tracking-tight font-semibold" style={os}>{s.t}</p>
                 <p className="text-sm text-slate-500 leading-relaxed">{s.d}</p>
@@ -424,11 +425,11 @@ export default async function HomePage() {
 
       {/* ── Age groups ── */}
       <section className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <p className="text-[10px] tracking-[0.3em] text-slate-400 mb-6" style={os}>All pitchers and hitters welcome · All levels</p>
+        <p className="text-[10px] tracking-[0.3em] text-slate-400 mb-6" style={os}>All pitchers welcome · All levels</p>
         <div className="flex items-center justify-center flex-wrap gap-2">
-          {['High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches', 'Hitting Coaches'].map((age) => (
+          {['Youth', 'Middle School', 'High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches'].map((age) => (
             <span key={age}
-              className="px-5 py-2 rounded-lg text-xs text-slate-500 hover:text-[#C8031E] hover:border-[#C8031E]/30 hover:bg-red-50 transition-all cursor-default"
+              className="px-5 py-2 rounded-lg text-xs text-slate-500 hover:text-[#E8102A] hover:border-[#E8102A]/30 hover:bg-red-50 transition-all cursor-default"
               style={{ ...os, border: '1px solid #e2e8f0' }}
             >
               {age}
@@ -440,12 +441,12 @@ export default async function HomePage() {
       {/* ── Waitlist + LinkedIn ── */}
       <section style={{ borderTop: '1px solid #e2e8f0', background: '#fff' }}>
         <div className="max-w-5xl mx-auto px-6 py-24 md:py-32">
-          <p className="text-[10px] tracking-[0.35em] text-[#C8031E] text-center mb-4" style={os}>Stay Connected</p>
+          <p className="text-[10px] tracking-[0.35em] text-[#E8102A] text-center mb-4" style={os}>Stay Connected</p>
           <h2 className="text-[clamp(32px,4vw,52px)] leading-[0.92] text-slate-950 tracking-tight text-center mb-4" style={os}>
             Be part of what&apos;s<br />being built.
           </h2>
           <p className="text-base text-slate-500 text-center max-w-xl mx-auto mb-14 leading-relaxed">
-            Release Point AI is an early-stage platform growing with coaches and players. Get early access or follow along as we build.
+            Release Point is an early-stage platform growing with coaches and players. Get early access or follow along as we build.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -455,17 +456,17 @@ export default async function HomePage() {
               className="group relative rounded-2xl p-8 flex flex-col gap-4 transition-all hover:shadow-lg"
               style={{ background: '#0F1F33', border: '1px solid #1C3A5C' }}
             >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(200,3,30,0.15)' }}>
-                <svg className="w-5 h-5 text-[#C8031E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(232,16,42,0.15)' }}>
+                <svg className="w-5 h-5 text-[#E8102A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </div>
               <div>
-                <p className="text-white text-sm mb-1" style={os}>Join the waitlist</p>
+                <p className="text-white text-sm mb-1" style={os}>Join the Waitlist</p>
                 <p className="text-[#8096AE] text-xs leading-relaxed">Be first in line for early access. We&apos;ll reach out when your spot is ready.</p>
               </div>
-              <span className="text-[10px] text-[#C8031E] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
-                Join the waitlist
+              <span className="text-[10px] text-[#E8102A] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
+                Get Early Access
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>
@@ -487,7 +488,7 @@ export default async function HomePage() {
               </div>
               <div>
                 <p className="text-slate-900 text-sm mb-1" style={os}>Follow on LinkedIn</p>
-                <p className="text-slate-500 text-xs leading-relaxed">Follow Release Point AI for product updates, baseball development insights, and launch news.</p>
+                <p className="text-slate-500 text-xs leading-relaxed">Follow Release Point for product updates, baseball development insights, and launch news.</p>
               </div>
               <span className="text-[10px] text-[#0A66C2] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
                 Release Point AI
@@ -503,31 +504,41 @@ export default async function HomePage() {
       {/* ── Final CTA ── */}
       <section className="relative overflow-hidden bg-slate-950">
         <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 110%, rgba(200,3,30,0.15) 0%, transparent 65%)' }} />
+          style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 110%, rgba(232,16,42,0.15) 0%, transparent 65%)' }} />
         <div className="relative max-w-4xl mx-auto px-6 py-36 md:py-52 text-center">
-          <p className="text-[10px] tracking-[0.35em] text-white/30 mb-6" style={os}>Early access</p>
-          <h2 className="text-[clamp(44px,8vw,88px)] leading-[0.88] text-white mb-6 tracking-tight" style={os}>
-            Join the<br />waitlist
+          <p className="text-[10px] tracking-[0.35em] text-white/30 mb-6" style={os}>Join the platform</p>
+          <h2 className="text-[clamp(44px,8vw,88px)] leading-[0.88] text-white mb-10 tracking-tight" style={os}>
+            Upgrade Your<br />Program<br /><span className="text-[#E8102A]">Today.</span>
           </h2>
-          <p className="text-sm text-white/50 max-w-lg mx-auto mb-10 leading-relaxed">
-            We&apos;re in internal testing, so new coaches start on the waitlist.
-          </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/waitlist"
-              className="inline-block px-12 py-4 bg-[#C8031E] hover:bg-[#A30219] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(200,3,30,0.3)] hover:shadow-[0_8px_40px_rgba(200,3,30,0.4)] max-sm:min-h-11"
-              style={os}
-            >
-              Join the waitlist
-            </Link>
-            <Link
-              href="/auth/login"
-              className="inline-block px-12 py-4 text-sm rounded-xl transition-all text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5 max-sm:min-h-11"
-              style={os}
-            >
-              Already testing? Sign in
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="inline-block px-12 py-4 bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(232,16,42,0.3)] hover:shadow-[0_8px_40px_rgba(232,16,42,0.4)]"
+                style={os}
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/signup"
+                  className="inline-block px-12 py-4 bg-[#E8102A] hover:bg-[#C80E24] active:scale-95 text-white text-sm rounded-xl transition-all shadow-[0_4px_24px_rgba(232,16,42,0.3)] hover:shadow-[0_8px_40px_rgba(232,16,42,0.4)]"
+                  style={os}
+                >
+                  Start Free: Coaches
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="inline-block px-12 py-4 text-sm rounded-xl transition-all text-white/60 hover:text-white border border-white/10 hover:border-white/20 hover:bg-white/5"
+                  style={os}
+                >
+                  Player Login
+                </Link>
+              </>
+            )}
           </div>
+          <p className="text-xs text-white/20 mt-6">Free for coaches · No credit card required</p>
         </div>
       </section>
 

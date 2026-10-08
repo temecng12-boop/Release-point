@@ -17,14 +17,14 @@ export default function NotFound() {
         <p className="text-[11px] text-[#C8102E] tracking-[0.3em] mb-3" style={oswald}>404</p>
         <h1 className="text-5xl text-[#0F1F33] mb-4 leading-none" style={oswald}>Page Not Found</h1>
         <p className="text-sm text-[#3D5166] mb-8 max-w-xs">
-          That page doesn't exist. Head back to the dashboard.
+          That page doesn&apos;t exist.
         </p>
         <Link
-          href="/dashboard"
+          href="/"
           className="bg-[#C8102E] hover:bg-[#9E0E24] text-white px-6 py-3 rounded-lg text-sm transition-colors"
           style={oswald}
         >
-          Back to Dashboard
+          Back to Home
         </Link>
       </div>
     </div>
