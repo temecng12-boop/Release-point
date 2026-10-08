@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { saveTimestampNote, deleteTimestampNote, getSignedUploadUrl, getClipsSignedUrl } from '@/app/actions/clips'
+import { emitVoiceRecording } from '@/lib/clip-mute'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -74,7 +75,10 @@ export default function TimestampNotes({
       setNotes(prev => [...prev, note].sort((a, b) => a.time_seconds - b.time_seconds))
     }
     window.addEventListener('rp:stamp-created', onStampCreated)
-    return () => window.removeEventListener('rp:stamp-created', onStampCreated)
+    return () => {
+      window.removeEventListener('rp:stamp-created', onStampCreated)
+      emitVoiceRecording(false)
+    }
   }, [])
 
   function seekAndShow(n: TSNote) {
@@ -116,6 +120,7 @@ export default function TimestampNotes({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
+      emitVoiceRecording(false)
       setVoiceError('Microphone access denied.')
       return
     }
@@ -133,6 +138,7 @@ export default function TimestampNotes({
     recorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop())
       if (timerRef.current) clearInterval(timerRef.current)
+      emitVoiceRecording(false)
       setVoicePhase('uploading')
 
       const ext = mimeType.includes('mp4') ? 'm4a' : 'webm'
@@ -166,6 +172,7 @@ export default function TimestampNotes({
     recorderRef.current = recorder
     setVoiceSecs(0)
     setVoicePhase('recording')
+    emitVoiceRecording(true)
     timerRef.current = setInterval(() => setVoiceSecs(s => s + 1), 1000)
   }
 

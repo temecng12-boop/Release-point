@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getSignedUploadUrl, saveVoicePath, deleteVoicePath } from '@/app/actions/clips'
 import { createClient } from '@/lib/supabase/client'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
+import { emitVoiceRecording } from '@/lib/clip-mute'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -30,6 +31,8 @@ export default function VoiceNote({
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
+  useEffect(() => () => { emitVoiceRecording(false) }, [])
+
   async function startRecording() {
     setRecordError(null)
     try {
@@ -44,13 +47,16 @@ export default function VoiceNote({
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
+        emitVoiceRecording(false)
         const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
         await uploadVoice(ext, mimeType)
       }
       recorder.start(250)
       recorderRef.current = recorder
       setRecording(true)
+      emitVoiceRecording(true)
     } catch {
+      emitVoiceRecording(false)
       setRecordError('Microphone access denied. Check browser permissions.')
     }
   }
@@ -58,6 +64,7 @@ export default function VoiceNote({
   function stopRecording() {
     recorderRef.current?.stop()
     setRecording(false)
+    emitVoiceRecording(false)
   }
 
   async function uploadVoice(ext: string, mimeType: string) {

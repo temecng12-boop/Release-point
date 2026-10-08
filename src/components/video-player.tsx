@@ -12,6 +12,8 @@ import { marksAfterClear } from '@/lib/mark-clear'
 import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
 import UploadBlockedNotice from '@/components/upload-blocked-notice'
 import { applyPlaybackAction, nextPlaybackAction, type PlaybackIntent } from '@/lib/video-playback'
+import { applyClipAudio, effectiveMuted, playClip, readClipMuted, writeClipMuted, VOICE_RECORDING_EVENT } from '@/lib/clip-mute'
+import ClipMuteButton from '@/components/clip-mute-button'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -347,6 +349,11 @@ export default function VideoPlayer({
   const [currentTime,     setCurrentTime]     = useState(0)
   const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
+  const [audioMuted,      setAudioMuted]      = useState(false)
+  const savedMutedRef    = useRef(false)
+  const speedRef         = useRef(1)
+  const voiceRecRef      = useRef(false)
+  const lessonRecMuteRef = useRef(false)
   const [tool,            setTool]            = useState('pointer')
   const [inkColor,        setInkColor]        = useState('#E9412F')
   const [markerCount,     setMarkerCount]     = useState(0)
@@ -709,6 +716,19 @@ export default function VideoPlayer({
     }
   }, [src, drawFrame, resizeCanvas])
 
+  // Saved mute choice + voice-note recording (sibling components dispatch this).
+  useEffect(() => {
+    savedMutedRef.current = readClipMuted()
+    void syncAudio()
+    function onVoice(e: Event) {
+      voiceRecRef.current = !!(e as CustomEvent<{ recording?: boolean }>).detail?.recording
+      void syncAudio()
+    }
+    window.addEventListener(VOICE_RECORDING_EVENT, onVoice)
+    return () => window.removeEventListener(VOICE_RECORDING_EVENT, onVoice)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src])
+
   // ── stamp overlay listener ───────────────────────────────────────────────
   useEffect(() => {
     function clearStamp() {
@@ -748,10 +768,22 @@ export default function VideoPlayer({
     if (action === 'play') {
       clearStampOverlay()
       setPlaying(true) // optimistic: label flips to Pause before play settles
+      const want = effectiveMuted({
+        savedMuted: savedMutedRef.current,
+        playbackRate: speedRef.current,
+        recording: recordingNow(),
+      })
+      void playClip(v, want).then((audio) => {
+        setAudioMuted(audio === 'muted')
+        if (v.paused) {
+          wantPlayingRef.current.wantPlaying = false
+          setPlaying(false)
+        }
+      })
     } else {
       setPlaying(false)
+      applyPlaybackAction(v, wantPlayingRef.current, action, () => setPlaying(false))
     }
-    applyPlaybackAction(v, wantPlayingRef.current, action, () => setPlaying(false))
   }
   function stepBack() {
     const v = videoRef.current; if (!v) return
@@ -774,7 +806,34 @@ export default function VideoPlayer({
   function onScrubChange() { scrubbingRef.current = false }
   function changeSpeed(s: number) {
     if (videoRef.current) videoRef.current.playbackRate = s
+    speedRef.current = s
     setSpeedState(s)
+    void syncAudio()
+  }
+  function recordingNow() {
+    return voiceRecRef.current || lessonRecMuteRef.current
+  }
+  async function syncAudio() {
+    const want = effectiveMuted({
+      savedMuted: savedMutedRef.current,
+      playbackRate: speedRef.current,
+      recording: recordingNow(),
+    })
+    const v = videoRef.current
+    if (!v) { setAudioMuted(want); return }
+    if (want) {
+      v.muted = true
+      setAudioMuted(true)
+      return
+    }
+    const result = await applyClipAudio(v, false)
+    setAudioMuted(result === 'muted')
+  }
+  function toggleMute() {
+    const next = !savedMutedRef.current
+    savedMutedRef.current = next
+    writeClipMuted(next)
+    void syncAudio()
   }
   function selectTool(t: string)  { toolRef.current = t;     setTool(t) }
   function selectColor(c: string) { inkColorRef.current = c; setInkColor(c) }
@@ -922,6 +981,8 @@ export default function VideoPlayer({
       lessonRecRef.current = null
       setLessonError('Recording stopped unexpectedly. Try again.')
       setLessonPhase('idle')
+      lessonRecMuteRef.current = false
+      void syncAudio()
     }
     tlRecRef.current = rec
     recorder.start(250)
@@ -929,6 +990,8 @@ export default function VideoPlayer({
     setLessonSecs(0)
     setLessonNotice(null)
     setLessonPhase('recording')
+    lessonRecMuteRef.current = true
+    void syncAudio()
     lessonTimerRef.current = setInterval(() => { lessonTicksRef.current += 1; setLessonSecs(s => s + 1) }, 1000)
   }
 
@@ -996,12 +1059,16 @@ export default function VideoPlayer({
       lessonRecRef.current = null
       setLessonError('Recording stopped unexpectedly. Try again.')
       setLessonPhase('idle')
+      lessonRecMuteRef.current = false
+      void syncAudio()
     }
     recorder.start(250)
     lessonRecRef.current = recorder
     setLessonSecs(0)
     setLessonNotice(null)
     setLessonPhase('recording')
+    lessonRecMuteRef.current = true
+    void syncAudio()
     lessonTicksRef.current = 0
     lessonTimerRef.current = setInterval(() => { lessonTicksRef.current++; setLessonSecs(s => s + 1) }, 1000)
   }
@@ -1010,6 +1077,8 @@ export default function VideoPlayer({
     if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
     lessonRecRef.current?.stop()
     setLessonPhase('saving')
+    lessonRecMuteRef.current = false
+    void syncAudio()
   }
 
   async function uploadLesson(mimeType: string, durationMs: number | null, timeline: Timeline | null, timelineError: string | null) {
@@ -1204,6 +1273,7 @@ export default function VideoPlayer({
             ref={videoRef}
             src={src}
             playsInline
+            muted={audioMuted}
             crossOrigin="anonymous"
             className="w-full block"
             style={videoAspect && videoAspect < 1 ? { maxHeight: '70vh' } : {}}
@@ -1247,6 +1317,11 @@ export default function VideoPlayer({
           >
             {playing ? 'Pause' : 'Play'}
           </button>
+          <ClipMuteButton
+            muted={audioMuted}
+            onToggle={toggleMute}
+            className={`${btnBase} ${audioMuted ? btnOn : btnIdle}`}
+          />
           <button onClick={stepBack} className={`${btnBase} ${btnIdle}`}>
             <svg className="inline w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16"><path d="M3 3h2v10H3V3zm9.854 1.146a.5.5 0 01.146.354v7a.5.5 0 01-.854.354L7.5 8.207V13a.5.5 0 01-1 0V3a.5.5 0 011 0v4.793l4.646-4.647a.5.5 0 01.708 0z"/></svg>
             Frame
