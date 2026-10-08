@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { ageGroupIsUnder13 } from '@/lib/age-band'
-import { parentConsentFlowEnabled, UNDER_13_TEAM_REFUSED } from '@/lib/under13-mode'
+import { ageGroupIsUnder13, bandFromBirth } from '@/lib/age-band'
+import { parentConsentFlowEnabled, UNDER_13_INVITE_REFUSED, UNDER_13_TEAM_REFUSED } from '@/lib/under13-mode'
 import { sendPlayerInviteEmail } from '@/lib/email'
 import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
@@ -32,10 +32,21 @@ export async function invitePlayer(
 
   if (!playerEmail) return { error: 'Player email is required' }
 
-  // No age here: the player confirms their age once, when they accept the
-  // invite (the one screen). The coach can also set it, optionally, in Edit
-  // Player. A team with an under-13 age group ("U12", "Youth 10-12") can't
-  // take new players yet (hard stop, src/lib/under13-mode.ts).
+  // The coach states the player's birth month and year (required); the band
+  // is worked out here and the month/year are never stored. Under 13 (hard
+  // stop): refused before anything is read further or written — no player
+  // row, no team link, no invite link, no email. 13 or older: the row is
+  // created with no band, and the player confirms their age once when they
+  // accept the invite (the one screen).
+  const birth = bandFromBirth(formData.get('birth_month'), formData.get('birth_year'))
+  if (!birth.ok) return { error: birth.error }
+  if (birth.band === 'under_13' && !parentConsentFlowEnabled()) return { error: UNDER_13_INVITE_REFUSED }
+
+  // The player's own confirmation (birth month/year screen) when they accept
+  // the invite is the age that counts; the coach can also set a band,
+  // optionally, in Edit Player, and the younger answer wins (037). A team
+  // with an under-13 age group ("U12", "Youth 10-12") can't take new players
+  // yet (hard stop, src/lib/under13-mode.ts).
   if (teamIds.length > 0) {
     const { data: ownedTeams, error: teamsError } = await supabaseAdmin
       .from('teams')

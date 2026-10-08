@@ -433,6 +433,14 @@ export async function saveTimestampNote(data: {
     .single()
   if (player?.coach_id !== user.id && player?.user_id !== user.id) return { error: 'Not authorized' }
 
+  // A voice-note recording (the body encodes its ts_voice path): same video
+  // rule as saveVoicePath. The file upload was already gated by
+  // getSignedUploadUrl; this covers the row. Text-only notes are unaffected.
+  if (timestampVoicePathFor(data.body, clip.player_id as string, data.clip_id)) {
+    const consent = await checkUploadConsent(supabaseAdmin, clip.player_id)
+    if (!consent.ok) return { error: consent.error }
+  }
+
   // Only send drawing_data when there are drawings, so text-only notes don't
   // depend on that column (added in migration 019).
   const hasDrawing = Array.isArray(data.drawing_data) && data.drawing_data.length > 0

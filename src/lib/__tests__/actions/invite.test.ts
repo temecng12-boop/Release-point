@@ -12,9 +12,13 @@ import { emailFake } from './fakes/email'
 import { invitePlayer } from '../../../app/actions/invite'
 
 const COACH = { id: 'coach-1', email: 'coach@example.com' }
-// No age in the invite: the player confirms it once when they accept.
+// Birth month/year is required on every invite: default to a 15-year-old
+// (firmly 13_17 whatever the month) unless the test passes its own.
+const TEEN_YEAR = String(new Date().getFullYear() - 15)
 const form = (fields: Record<string, string | string[]>) => {
   const fd = new FormData()
+  if (!('birth_month' in fields)) fd.append('birth_month', '6')
+  if (!('birth_year' in fields)) fd.append('birth_year', TEEN_YEAR)
   for (const [k, v] of Object.entries(fields)) for (const x of [v].flat()) fd.append(k, x)
   return fd
 }
@@ -110,7 +114,20 @@ test('team invite form note no longer promises an email to existing accounts', a
   assert.match(src, /already have an account are added without an email/)
 })
 
-test('no age in the invite: the row is created with no band, and any age fields sent are ignored', async () => {
+test('birth month/year is required: missing fields -> neutral error, nothing written or sent', async () => {
+  const fd = new FormData()
+  fd.append('full_name', 'No Birth')
+  fd.append('player_email', 'nobirth@example.com')
+  const r = await invitePlayer(undefined, fd)
+  assert.equal(r.error, 'Enter your birth month and year.')
+  assert.equal(r.success, undefined)
+  assert.equal(r.inviteUrl, undefined)
+  assert.equal(state.tables.players.length, 0)
+  assert.equal(emailFake.invites.length, 0)
+  assert.equal(authAdmin.links.length, 0)
+})
+
+test('the birth month/year is never stored: the row is created with no band, and any age-band fields sent are ignored', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Tia Teen', player_email: 'tia@example.com', age_band: '18_plus', age_status: 'adult' }))
   assert.match(r.success ?? '', /confirm their age when they set up their account/)
   const row = state.tables.players[0]
@@ -133,11 +150,15 @@ test('a grade-range team ("9-12") is not an under-13 group: invite goes out', as
   assert.equal(state.tables.player_teams.length, 1)
 })
 
-test('the invite forms have no age or guardian fields', async () => {
+test('the invite forms collect birth month/year (required) but no band and no guardian fields', async () => {
   const { readFileSync, existsSync } = await import('node:fs')
   for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/team/[id]/team-invite-form.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     assert.doesNotMatch(src, /age_band|AgeBandFields|guardian_email|guardian_name/, f)
+    assert.match(src, /name="birth_month"[^>]*required/, `${f}: birth month is required`)
+    assert.match(src, /name="birth_year"[^>]*required/, `${f}: birth year is required`)
+    assert.match(src, /under 13/i, `${f}: honest under-13 copy, no promise`)
+    assert.doesNotMatch(src, /coming soon|soon\.|will be able/i, `${f}: no promise to under-13s`)
   }
   assert.equal(existsSync(new URL('../../../app/dashboard/age-band-fields.tsx', import.meta.url)), false, 'the band picker component is gone')
 })

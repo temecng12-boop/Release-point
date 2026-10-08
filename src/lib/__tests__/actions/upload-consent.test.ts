@@ -169,3 +169,37 @@ test('createClip: 037 trigger text ("video consent ... pending") -> friendly mes
   assert.doesNotMatch(String(r.error), /video consent for this player/)
   assert.deepEqual(state.storage.clips, [])
 })
+
+// ── timestamp voice notes: the row needs the same consent as the file ──────
+const CLIP_ID = '22222222-2222-4222-8222-222222222222'
+const voiceBody = () => `__voice__:${P}/${CLIP_ID}/ts_voice/abc123.webm`
+const note = (body: string) => ({ clip_id: CLIP_ID, time_seconds: 12.5, body })
+
+async function seedClip(band: Band) {
+  seed({ band, coach: true, user: COACH })
+  state.tables.clips.push({ id: CLIP_ID, player_id: P })
+  state.tables.timestamp_notes = []
+  const { saveTimestampNote } = await import('../../../app/actions/clips')
+  return saveTimestampNote
+}
+
+test('saveTimestampNote: voice recording for an under-13 player -> error, no row', async () => {
+  const saveTimestampNote = await seedClip('under_13')
+  const r = await saveTimestampNote(note(voiceBody())) as { error?: string }
+  assert.ok(r.error, 'refused')
+  assert.equal((state.tables.timestamp_notes ?? []).length, 0, 'no row saved')
+})
+
+test('saveTimestampNote: text-only note for the same player still works', async () => {
+  const saveTimestampNote = await seedClip('under_13')
+  const r = await saveTimestampNote(note('Good hip rotation here')) as { error?: string }
+  assert.equal(r.error, undefined)
+  assert.equal((state.tables.timestamp_notes ?? []).length, 1)
+})
+
+test('saveTimestampNote: voice recording for a confirmed 13+ player works', async () => {
+  const saveTimestampNote = await seedClip('13_17')
+  const r = await saveTimestampNote(note(voiceBody())) as { error?: string }
+  assert.equal(r.error, undefined)
+  assert.equal((state.tables.timestamp_notes ?? []).length, 1)
+})

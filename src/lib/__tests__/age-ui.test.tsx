@@ -200,12 +200,18 @@ test('removed: coach banners, one-tap band buttons, age screen form, debug-clip 
   for (const f of ['app/dashboard/age-band-confirm.tsx', 'app/dashboard/mark-adult-button.tsx', 'app/dashboard/age-band-fields.tsx', 'app/dashboard/age-screen-form.tsx', 'app/dashboard/pending-players-banner.tsx', 'lib/pending-players.ts', 'app/api/debug-clip/route.ts', 'components/under13-stop.tsx']) {
     assert.equal(existsSync(new URL(f, SRC)), false, `${f} is deleted`)
   }
-  const dead = /age-band-confirm|AgeBandConfirm|mark-adult-button|MarkAdult|age-band-fields|AgeBandFields|age-screen-form|AgeScreenForm|pending-players|PendingPlayers|pendingBannerLines|debug-clip|canSelfConfirm|needsAgeScreen|needsFirstAgeScreen|needsCoachAction|selfConfirm|setPlayerAdultConfirmed|submitAgeAnswer|checkSignupAge|Under13Stop/
+  // needsAgeScreen is live again (#57's middleware age-screen gate).
+  const dead = /age-band-confirm|AgeBandConfirm|mark-adult-button|MarkAdult|age-band-fields|AgeBandFields|age-screen-form|AgeScreenForm|pending-players|PendingPlayers|pendingBannerLines|debug-clip|canSelfConfirm|needsFirstAgeScreen|needsCoachAction|selfConfirm|setPlayerAdultConfirmed|submitAgeAnswer|checkSignupAge|Under13Stop/
   for (const f of allSource()) assert.doesNotMatch(readFileSync(f, 'utf8'), dead, f)
 })
 
-test('invite forms: no age band; Edit Player: the band picker is optional', () => {
-  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) assert.doesNotMatch(src(f), /age_band|birth_|AgeBand/, f)
+test('invite forms: birth month/year required (no band, no guardian); Edit Player: the band picker is optional', () => {
+  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) {
+    const s = src(f)
+    assert.doesNotMatch(s, /age_band|AgeBand/, `${f}: no band picker`)
+    assert.match(s, /name="birth_month"[^>]*required/, `${f}: birth month is required`)
+    assert.match(s, /name="birth_year"[^>]*required/, `${f}: birth year is required`)
+  }
   const edit = src('app/dashboard/edit-player-modal.tsx')
   assert.match(edit, /Player Age <span[^>]*>\(optional\)<\/span>/)
   assert.doesNotMatch(edit.slice(edit.indexOf('Player Age')), /^[^\n]*type="radio"[^\n]*required/m, 'no required band')
