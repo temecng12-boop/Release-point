@@ -219,10 +219,46 @@ test('all app mail sends from the verified releasepointai.com address', async ()
   const { readFileSync } = await import('node:fs')
   for (const f of ['../../../lib/email.ts', '../../../../scripts/invite-coach.mjs']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
-    assert.match(src, /Release Point <notifications@releasepointai\.com>/, f)
+    assert.match(src, /Release Point AI <notifications@releasepointai\.com>/, f)
     assert.doesNotMatch(src, /releasepoint\.app/, `${f}: no unverified domain`)
-    assert.doesNotMatch(src, /Release Point AI/, `${f}: display name stays "Release Point"`)
   }
+})
+
+test('invite emails use Release Point AI in from-name, subject, and body', async () => {
+  const { readFileSync } = await import('node:fs')
+  const inviteFns = ['sendPlayerInviteEmail', 'sendCoachInviteEmail']
+  const email = readFileSync(new URL('../../../lib/email.ts', import.meta.url), 'utf8')
+  const script = readFileSync(new URL('../../../../scripts/invite-coach.mjs', import.meta.url), 'utf8')
+  for (const name of inviteFns) {
+    const start = email.indexOf(`export async function ${name}`)
+    assert.ok(start >= 0, name)
+    const next = email.indexOf('export async function', start + 1)
+    const fn = email.slice(start, next < 0 ? email.length : next)
+    const leftover = fn.replace(/Release Point AI/g, '')
+    assert.ok(!leftover.includes('Release Point'), `${name}: bare brand`)
+    assert.match(fn, /invited you to (join |coach on )?Release Point AI/)
+  }
+  const leftoverScript = script.replace(/Release Point AI/g, '')
+  assert.ok(!leftoverScript.includes('Release Point'), 'invite-coach.mjs: bare brand')
+  assert.match(script, /invited to coach on Release Point AI/)
+  const invites = readFileSync(new URL('../../../app/actions/coach-invites.ts', import.meta.url), 'utf8')
+  assert.match(invites, /\|\| 'Release Point AI'/)
+  assert.doesNotMatch(invites, /\|\| 'Release Point'/)
+})
+
+test('clip-uploaded, waitlist, and player-joined emails use Release Point AI', async () => {
+  const { readFileSync } = await import('node:fs')
+  const email = readFileSync(new URL('../../../lib/email.ts', import.meta.url), 'utf8')
+  for (const name of ['sendClipUploadedEmail', 'sendWaitlistNotification', 'sendPlayerJoinedEmail']) {
+    const start = email.indexOf(`export async function ${name}`)
+    assert.ok(start >= 0, name)
+    const next = email.indexOf('export async function', start + 1)
+    const fn = email.slice(start, next < 0 ? email.length : next)
+    const leftover = fn.replace(/Release Point AI/g, '')
+    assert.ok(!leftover.includes('Release Point'), `${name}: bare brand`)
+  }
+  assert.match(email, /coach on Release Point AI/)
+  assert.match(email, /Release Point AI Waitlist/)
 })
 
 test('invite forms surface a copyable invite link on success and on email failure', async () => {

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clip mute fixture</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #F8FAFC; }
+    .wrap { padding: 16px; max-width: 375px; }
+    .bar {
+      display: flex; gap: 4px; align-items: center;
+      background: #F0F4F8; border: 1px solid #DDE4ED; border-radius: 8px; padding: 3px;
+    }
+    button[data-testid="clip-mute"] {
+      min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-radius: 6px;
+      cursor: pointer; color: #456080; background: transparent;
+    }
+    button[data-testid="clip-mute"][aria-pressed="true"] { background: #C8031E; color: #fff; }
+    .label { margin: 12px 0 0; font-size: 13px; color: #3D5166; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar">
+      <button type="button" data-testid="clip-mute" aria-label="Mute" aria-pressed="false">
+        <svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8.5 2.5a.5.5 0 00-.8-.4L4.65 5H2.5A1.5 1.5 0 001 6.5v3A1.5 1.5 0 002.5 11h2.15l3.05 2.9a.5.5 0 00.8-.4v-11z" />
+          <path d="M10.8 5.2a.5.5 0 01.7.05 3.5 3.5 0 010 5.5.5.5 0 11-.75-.66 2.5 2.5 0 000-4.18.5.5 0 01.05-.71z" />
+          <path d="M12.1 3.6a.5.5 0 01.7.1 6 6 0 010 8.6.5.5 0 11-.8-.6 5 5 0 000-7.4.5.5 0 01.1-.7z" />
+        </svg>
+      </button>
+    </div>
+    <p class="label" id="state">unmuted</p>
+  </div>
+  <script>
+    const mutedSvg = '<svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 2.5a.5.5 0 00-.8-.4L4.65 5H2.5A1.5 1.5 0 001 6.5v3A1.5 1.5 0 002.5 11h2.15l3.05 2.9a.5.5 0 00.8-.4v-11z" /><path d="M11.15 6.15a.5.5 0 01.7 0L13 7.29l1.15-1.14a.5.5 0 11.7.7L13.71 8l1.14 1.15a.5.5 0 11-.7.7L13 8.71l-1.15 1.14a.5.5 0 11-.7-.7L12.29 8l-1.14-1.15a.5.5 0 010-.7z" /></svg>'
+    const unmutedSvg = '<svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 2.5a.5.5 0 00-.8-.4L4.65 5H2.5A1.5 1.5 0 001 6.5v3A1.5 1.5 0 002.5 11h2.15l3.05 2.9a.5.5 0 00.8-.4v-11z" /><path d="M10.8 5.2a.5.5 0 01.7.05 3.5 3.5 0 010 5.5.5.5 0 11-.75-.66 2.5 2.5 0 000-4.18.5.5 0 01.05-.71z" /><path d="M12.1 3.6a.5.5 0 01.7.1 6 6 0 010 8.6.5.5 0 11-.8-.6 5 5 0 000-7.4.5.5 0 01.1-.7z" /></svg>'
+    const btn = document.querySelector('[data-testid="clip-mute"]')
+    const state = document.getElementById('state')
+    let muted = false
+    function render() {
+      btn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute')
+      btn.setAttribute('aria-pressed', muted ? 'true' : 'false')
+      btn.innerHTML = muted ? mutedSvg : unmutedSvg
+      state.textContent = muted ? 'muted' : 'unmuted'
+    }
+    btn.addEventListener('click', () => { muted = !muted; render() })
+  </script>
+</body>
+</html>

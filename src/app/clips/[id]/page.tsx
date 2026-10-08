@@ -24,9 +24,12 @@ import SiteFooter from '@/components/SiteFooter'
 import ClipSkeleton from './clip-skeleton'
 import LessonList from '@/components/lessons/lesson-list'
 import { canManageLessons, loadLessons, type LessonItem } from '@/lib/lessons'
+import { isE2eClipFixture } from '@/lib/e2e-clip-fixture'
+import { E2eClipCoachPage } from '../e2e-clip-fixture'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  if (isE2eClipFixture(id)) return <E2eClipCoachPage clipId={id} />
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()

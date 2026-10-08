@@ -1,8 +1,10 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { applyClipAudio, effectiveMuted, initialClipMuted, playClip, readClipMuted, writeClipMuted } from '@/lib/clip-mute'
+import ClipMuteButton from '@/components/clip-mute-button'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -27,9 +29,18 @@ export default function ComparePlayer({ clips }: Props) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState<number[]>(clips.map(() => 0))
   const [speed, setSpeed] = useState(1)
+  const [audioMuted, setAudioMuted] = useState(initialClipMuted)
+  const savedMutedRef = useRef(false)
+  const speedRef = useRef(1)
   const syncingRef = useRef(false)
 
   const SPEEDS = [0.25, 0.5, 1, 1.5] as const
+
+  useEffect(() => {
+    savedMutedRef.current = readClipMuted()
+    void syncAudio()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Add clip inline state
   const [addYtUrl, setAddYtUrl] = useState('')
@@ -58,9 +69,25 @@ export default function ComparePlayer({ clips }: Props) {
   const handlePlay = useCallback(() => {
     setPlaying(true)
     if (!hasYoutube) {
-      clips.forEach((clip, i) => {
-        if (!clip.youtubeId) videoRefs.current[i]?.play()
+      const want = effectiveMuted({
+        savedMuted: savedMutedRef.current,
+        playbackRate: speedRef.current,
+        recording: false,
       })
+      void (async () => {
+        let fellBack = false
+        let anyPlaying = false
+        for (let i = 0; i < clips.length; i++) {
+          if (clips[i].youtubeId) continue
+          const v = videoRefs.current[i]
+          if (!v) continue
+          const audio = await playClip(v, want)
+          if (audio === 'muted' && !want) fellBack = true
+          if (!v.paused) anyPlaying = true
+        }
+        setAudioMuted(want || fellBack)
+        if (!anyPlaying) setPlaying(false)
+      })()
     }
   }, [hasYoutube, clips])
 
@@ -81,14 +108,47 @@ export default function ComparePlayer({ clips }: Props) {
     playing ? handlePause() : handlePlay()
   }
 
+  async function syncAudio() {
+    const want = effectiveMuted({
+      savedMuted: savedMutedRef.current,
+      playbackRate: speedRef.current,
+      recording: false,
+    })
+    const videos = videoRefs.current.filter((v): v is HTMLVideoElement => !!v)
+    if (want) {
+      for (const v of videos) v.muted = true
+      setAudioMuted(true)
+      return
+    }
+    let fellBack = false
+    for (const v of videos) {
+      if (await applyClipAudio(v, false) === 'muted') fellBack = true
+    }
+    if (fellBack) {
+      for (const v of videos) v.muted = true
+      setAudioMuted(true)
+    } else {
+      setAudioMuted(false)
+    }
+  }
+
+  function toggleMute() {
+    const next = !savedMutedRef.current
+    savedMutedRef.current = next
+    writeClipMuted(next)
+    void syncAudio()
+  }
+
   function changeSpeed(s: number) {
     setSpeed(s)
+    speedRef.current = s
     clips.forEach((clip, i) => {
       if (!clip.youtubeId) {
         const v = videoRefs.current[i]
         if (v) v.playbackRate = s
       }
     })
+    void syncAudio()
   }
 
   function stepFrame(direction: -1 | 1) {
@@ -177,6 +237,7 @@ export default function ComparePlayer({ clips }: Props) {
             src={clip.videoUrl}
             className="w-full h-full object-contain"
             playsInline
+            muted={audioMuted}
             preload="metadata"
             onTimeUpdate={() => {
               const v = videoRefs.current[index]
@@ -303,6 +364,12 @@ export default function ComparePlayer({ clips }: Props) {
             >
               ‹
             </button>
+
+            <ClipMuteButton
+              muted={audioMuted}
+              onToggle={toggleMute}
+              className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${audioMuted ? 'bg-[#C8102E] text-white' : 'bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080]'}`}
+            />
 
             {/* Play/Pause */}
             <button

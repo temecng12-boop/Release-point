@@ -30,7 +30,7 @@ export function pickCoachEditableFields(data: Record<string, unknown>): CoachEdi
 
 /** invitePlayer's reply when the email belongs to a player who signed up on their own. */
 export const SELF_SIGNED_UP_PLAYER_MESSAGE =
-  "This player already has their own Release Point account, so they can't be added to your roster by email."
+  "This player already has their own Release Point AI account, so they can't be added to your roster by email."
 
 export type ProfilePageAccess = 'view' | 'redirect-dashboard' | 'not-found'
 

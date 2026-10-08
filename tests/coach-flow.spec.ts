@@ -51,19 +51,18 @@ test('login page has Google sign-in (Apple hidden until enabled)', async ({ page
   await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible()
 })
 
-test('signup page shows role selection', async ({ page }) => {
+test('signup page is invite-only and points to the waitlist', async ({ page }) => {
   await page.goto('/auth/signup')
-  await expect(page.getByRole('heading', { name: /join release point/i })).toBeVisible()
-  // Both role cards visible
-  const coachBtn  = page.getByRole('button', { name: /coach/i }).first()
-  const playerBtn = page.getByRole('button', { name: /player/i }).first()
-  await expect(coachBtn).toBeVisible()
-  await expect(playerBtn).toBeVisible()
+  await expect(page.getByRole('heading', { name: /internal testing/i })).toBeVisible()
+  await expect(page.getByRole('link', { name: /join the waitlist/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /coach/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /player/i })).toHaveCount(0)
 })
 
-test('signup page hides Apple button until enabled', async ({ page }) => {
+test('signup page has no Apple or Google signup buttons', async ({ page }) => {
   await page.goto('/auth/signup')
-  await expect(page.getByRole('button', { name: /continue with apple/i })).toBeHidden()
+  await expect(page.getByRole('button', { name: /continue with apple/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /continue with google/i })).toHaveCount(0)
 })
 
 test('PWA manifest is served', async ({ page }) => {

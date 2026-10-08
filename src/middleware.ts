@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isPublicAssetPath } from '@/lib/public-paths'
+import { isE2eClipFixtureRequest } from '@/lib/e2e-clip-fixture'
 import { frozenGateKind, frozenResponse, isFrozenAccount, SIGN_OUT_ROUTE, type GateDb } from '@/lib/under13-gate'
 import { AGE_SCREEN_MESSAGE, AGE_SCREEN_PATH, isAgeGateSetupPath, needsAgeScreen, type AgeScreenDb } from '@/lib/age-screen-gate'
 
@@ -19,6 +20,10 @@ export async function middleware(request: NextRequest) {
   // Manifest, icons, sw.js, robots, social images, static files: public, no
   // session work (QA-013). The matcher below already skips them; this is a backstop.
   if (isPublicAssetPath(request.nextUrl.pathname)) return NextResponse.next()
+  // Local Playwright: real /clips/[id] and /clips/compare with a seeded file, no auth.
+  if (isE2eClipFixtureRequest(request.nextUrl.pathname, request.nextUrl.searchParams)) {
+    return NextResponse.next()
+  }
 
   let supabaseResponse = NextResponse.next({ request })
 
@@ -106,6 +111,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Keep in step with src/lib/public-paths.ts (tested there).
-    '/((?!_next/static|_next/image|favicon\\.ico$|sw\\.js$|robots\\.txt$|sitemap\\.xml$|manifest\\.webmanifest$|(?:apple-icon|icon)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:/[^/]*)?$|(?:.*/)?(?:opengraph-image|twitter-image)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:/[^/]*)?$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|bmp|html|txt|xml|webmanifest|woff|woff2|ttf|otf)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico$|sw\\.js$|robots\\.txt$|sitemap\\.xml$|manifest\\.webmanifest$|(?:apple-icon|icon)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:/[^/]*)?$|(?:.*/)?(?:opengraph-image|twitter-image)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:/[^/]*)?$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|bmp|html|txt|xml|webmanifest|woff|woff2|ttf|otf|mp4)$).*)',
   ],
 }

@@ -10,7 +10,7 @@ const PUBLIC_FILES = new Set(['/favicon.ico', '/sw.js', '/robots.txt', '/sitemap
 // opengraph-image / twitter-image at any level.
 const ICON_ROUTE = /^\/(?:apple-icon|icon)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:\/[^/]*)?$/
 const SOCIAL_IMAGE = /(?:^|\/)(?:opengraph-image|twitter-image)(?:[0-9]+|-[A-Za-z0-9_-]+)?(?:\/[^/]*)?$/
-export const STATIC_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico', 'bmp', 'html', 'txt', 'xml', 'webmanifest', 'woff', 'woff2', 'ttf', 'otf'] as const
+export const STATIC_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico', 'bmp', 'html', 'txt', 'xml', 'webmanifest', 'woff', 'woff2', 'ttf', 'otf', 'mp4'] as const
 const STATIC_FILE = new RegExp(`\\.(?:${STATIC_EXTENSIONS.join('|')})$`, 'i')
 
 export function isPublicAssetPath(pathname: string): boolean {

@@ -144,16 +144,22 @@ test('cutoff scan: the account-mode page and the stop page carry no cutoff copy'
 })
 
 // ── 2. One screen, once ─────────────────────────────────────────────────────
-test('signup page: the stop cookie is read on the server and the player form shows only the stop message', () => {
+test('signup page: invite-only holding page; the stop cookie is read on onboarding, not here', () => {
   const page = src('app/auth/signup/page.tsx')
-  assert.match(page, /cookies\(\)\)\.get\(AGE_STOP_COOKIE\)/)
-  assert.match(page, /<SignupForm ageStopped=\{ageStopped\} \/>/)
+  assert.doesNotMatch(page, /cookies\(\)|AGE_STOP_COOKIE|SignupForm/)
+  assert.match(page, /invite-only/)
+  assert.match(page, /Join the waitlist/)
+  assert.match(page, /href=["']\/waitlist["']/)
+  assert.match(page, /Release Point AI is in internal testing/)
+  // Invite / confirm flows still use the form; once stopped, only the stop message.
   const form = src('app/auth/signup/signup-form.tsx')
-  assert.match(form, /useState\(ageStopped\)/)
   assert.match(form, /\{stopped \? \(\s*<AgeStopNotice \/>/, 'once stopped, only the stop message (no player, coach or Google/Apple path)')
   assert.match(form, /<AgeConfirmForm mode="signup" action=\{signUpPlayer\} onBack=\{onBack\} onStopped=\{onStopped\} \/>/)
   assert.match(form, /if \(state\?\.stopped\) return <AgeStopNotice \/>/, 'the coach form shows the same stop message')
   assert.doesNotMatch(form, /checkSignupAge|BirthFields|guardian_email|adult_confirmed/)
+  const age = src('app/onboarding/age/page.tsx')
+  assert.match(age, /cookies\(\)\)\.get\(AGE_STOP_COOKIE\)/)
+  assert.match(age, /<AgeStopNotice \/>/)
 })
 
 test('signup page: the Google/Apple buttons only appear after the birth month/year and Terms pass the server check', () => {
@@ -240,8 +246,14 @@ test('account load error: friendly copy, Try Again and Sign Out are 44px, no raw
   assertNoCutoff(html, 'account load error')
 })
 
-test('privacy page: players can sign up themselves or be invited (no "do not self-register")', () => {
+test('privacy page: under-13 cannot sign up; teens need guardian permission (no self-register slogan)', () => {
   const p = src('app/privacy/page.tsx')
-  assert.match(p, /Players can create their own accounts, or their coach can invite them\./)
-  assert.doesNotMatch(p, /self-register|created by their coaches/i)
+  const children = src('lib/privacy-children.ts')
+  assert.match(p, /CHILDREN_AND_TEENS_BODY/)
+  assert.match(children, /Children under 13 cannot sign up/)
+  assert.match(children, /Players 13 to 17 need a parent's or guardian's permission to use Release Point AI/)
+  assert.match(children, /Coaches cannot add players under 13/)
+  assert.doesNotMatch(p + children, /Players can create their own accounts, or their coach can invite them/)
+  assert.doesNotMatch(p + children, /self-register/i)
+  assert.doesNotMatch(p + children, /do not self-register/i)
 })
