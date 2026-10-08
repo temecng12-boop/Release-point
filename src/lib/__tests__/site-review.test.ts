@@ -185,15 +185,24 @@ test('privacy collects birth month/year, Google/Apple, and parent accounts', () 
 
 // ── Sport / AI / pricing wording ─────────────────────────────────────────────
 
-test('sport: broad wording on legal pages, baseball-led marketing and meta', () => {
-  for (const f of ['app/privacy/page.tsx', 'lib/privacy-children.ts']) {
-    assert.match(read(f), /baseball, softball, and other throwing and hitting sports/, f)
+test('sport: zero banned-sport mentions across the repo', () => {
+  const needle = 'soft' + 'ball'
+  const hits: string[] = []
+  for (const f of walk(repo)) {
+    let text: string
+    try { text = readFileSync(f, 'utf8') } catch { continue }
+    if (text.includes('\0')) continue
+    text.split('\n').forEach((line, i) => {
+      if (line.toLowerCase().includes(needle)) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`)
+    })
   }
-  // Terms uses the consistency pass line for coaches ("or another ... sport").
-  assert.match(read('app/terms/page.tsx'), /coaches baseball, softball, or another throwing and hitting sport/)
-  for (const f of ['app/privacy/page.tsx', 'lib/privacy-children.ts', 'app/terms/page.tsx']) {
-    assert.doesNotMatch(read(f), /baseball and softball|a baseball or softball/, f)
-  }
+  assert.deepEqual(hits, [])
+})
+
+test('sport: baseball only on legal pages, baseball-led marketing and meta', () => {
+  assert.match(read('app/privacy/page.tsx'), /is a baseball pitching and hitting development app/)
+  assert.match(read('lib/privacy-children.ts'), /is a baseball pitching and hitting development app/)
+  assert.match(read('app/terms/page.tsx'), /who coaches baseball may create a coach account/)
   assert.match(read('app/page.tsx'), /baseball/)
   assert.match(read('app/layout.tsx'), /Baseball/)
 })

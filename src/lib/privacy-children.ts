@@ -7,7 +7,7 @@
 // 043 is live.
 export const CHILDREN_AND_TEENS_TITLE = '5. Children and Teens'
 
-export const CHILDREN_AND_TEENS_BODY = `Release Point is a pitching and hitting development app for baseball, softball, and other throwing and hitting sports. Its players range from youth to adult, so this section explains how we handle age.
+export const CHILDREN_AND_TEENS_BODY = `Release Point is a baseball pitching and hitting development app. Its players range from youth to adult, so this section explains how we handle age.
 
 **How we check age at signup**
 

@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         {[
           {
             title: '1. Who We Are',
-            body: `Release Point AI ("Release Point," "we," "us," or "our") is a pitching and hitting development app for baseball, softball, and other throwing and hitting sports, used by coaches and players. Release Point AI is operated by Nolan George (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada limited liability company, once formed). This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepointai.com.`,
+            body: `Release Point AI ("Release Point," "we," "us," or "our") is a baseball pitching and hitting development app used by coaches and players. Release Point AI is operated by Nolan George (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada limited liability company, once formed). This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepointai.com.`,
           },
           {
             title: '2. Information We Collect',

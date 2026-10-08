@@ -43,7 +43,7 @@ If you do not agree to these terms, do not use the platform.`,
           },
           {
             title: '2. Who Can Use Release Point',
-            body: `**Coaches:** Any adult (18+) who coaches baseball, softball, or another throwing and hitting sport may create a coach account. You are responsible for the players you add to your account and any content you upload.
+            body: `**Coaches:** Any adult (18+) who coaches baseball may create a coach account. You are responsible for the players you add to your account and any content you upload.
 
 **Players:** Players join by invitation from their coach, or sign up on their own, to work on pitching or hitting. When you join, you enter your birth month and year and accept these Terms. Players 13 to 17 should read these Terms with a parent or guardian.
 

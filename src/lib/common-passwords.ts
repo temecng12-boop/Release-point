@@ -18,7 +18,7 @@ export const COMMON_PASSWORDS: readonly string[] = [
   '1q2w3e4r', 'carolina', 'colorado', 'creative', 'bollocks', 'darkness', 'asdfghjk', 'poohbear',
   'nintendo', 'november', 'password1', 'lacrosse', 'paradise', 'maryjane', 'spitfire', 'anderson',
   'cherokee', 'drowssap', 'marshall', '1qaz2wsx', 'caroline', 'franklin', 'snickers', 'courtney',
-  'westside', 'patricia', 'semperfi', 'freeuser', 'babygirl', 'champion', 'softball', 'security',
+  'westside', 'patricia', 'semperfi', 'freeuser', 'babygirl', 'champion', 'volleyball', 'security',
   'wildcats', 'veronica', 'abcd1234', 'wolverin', 'remember', 'freepass', 'pearljam', 'mistress',
   'peekaboo', 'budlight', 'electric', 'stargate', 'brittany', 'swimming', 'scotland', 'swordfis',
   'blink182', 'virginia', 'passport', 'aaaaaaaa', 'rolltide', 'bulldogs', 'liverpool', 'chevelle',
