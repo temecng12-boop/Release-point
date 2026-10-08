@@ -10,7 +10,8 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   findInviteForEmail,
   findUnlinkedPlayerIds,
@@ -157,7 +158,22 @@ test('auth callback: brand-new users without an invite are deleted, signed out, 
   assert.match(route, /rejectStrayUser\(supabaseAdmin, \(\) => supabase\.auth\.signOut\(\{ scope: 'local' \}\)/, 'the stray is deleted and signed out (this device, QA-012)')
   assert.match(route, /\/waitlist\?reason=invite_only/, 'rejected users land on the waitlist with the reason')
   assert.match(route, /finishInviteAcceptance\(supabaseAdmin, user\)/, 'acceptance is shared with /auth/confirm')
-  assert.match(route, /fragmentFallbackHtml\(next,/, 'old fragment links get the client fallback')
+})
+
+test('no CDN on the sign-in path and no leftover fallback module', () => {
+  const cdnHost = ['esm', '.sh'].join('')
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((n) => {
+      const p = join(dir, n)
+      return statSync(p).isDirectory() ? (n === 'node_modules' ? [] : walk(p)) : /\.(ts|tsx|mjs|js)$/.test(n) ? [p] : []
+    })
+  const hits: string[] = []
+  for (const f of [...walk(new URL('../../', import.meta.url).pathname), ...walk(new URL('../../../scripts/', import.meta.url).pathname)]) {
+    if (readFileSync(f, 'utf8').includes(cdnHost)) hits.push(f)
+  }
+  assert.deepEqual(hits, [], 'zero CDN-host references in src/ and scripts/')
+  assert.doesNotMatch(read('app/auth/callback/route.ts'), /fragment-fallback/, 'the fallback module is gone')
+  assert.equal(existsSync(new URL('../../lib/fragment-fallback.ts', import.meta.url)), false)
 })
 
 test('auth callback: the coach-invite accept path still runs for invited coaches', () => {

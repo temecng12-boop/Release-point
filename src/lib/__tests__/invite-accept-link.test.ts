@@ -52,14 +52,17 @@ test('both auth routes verify server-side and share the invite-only gate', () =>
   }
   const confirm = root('app/auth/confirm/route.ts')
   assert.match(confirm, /supabase\.auth\.verifyOtp\(\{ token_hash, type \}\)/, 'the session is set server-side')
-  assert.match(confirm, /fragmentFallbackHtml\(next,/, 'old fragment links get the client fallback')
+  assert.match(confirm, /\/auth\/complete\?next=/, 'old fragment links finish in the bundled complete page')
+  assert.match(confirm, /status: 303/, 'redirects keep the fragment (Location carries none of its own)')
   assert.match(confirm, /invite_expired/, 'expired links get an honest error, not a silent redirect')
   assert.doesNotMatch(root('app/auth/confirm/route.ts'), /page\.tsx/, 'no stale client page alongside the route')
 })
 
-test('the callback serves the fragment fallback when no session and no params', () => {
+test('the callback sends fragment-suspect requests to /auth/complete with a 303', () => {
   const src = root('app/auth/callback/route.ts')
-  assert.match(src, /fragmentFallbackHtml\(next,/, 'old fragment links can still sign in')
+  assert.match(src, /\/auth\/complete\?next=/, 'old fragment links can still sign in')
+  assert.match(src, /status: 303/, 'the fragment survives the redirect')
+  assert.equal(src.includes(['esm', '.sh'].join('')), false, 'no CDN on the sign-in path')
 })
 
 test('failed token links land on login with honest errors, never a silent dashboard redirect', () => {
@@ -69,4 +72,28 @@ test('failed token links land on login with honest errors, never a silent dashbo
   assert.match(login, /urlError === 'invite_failed'/, 'other failures explained')
   const confirm = root('app/auth/confirm/route.ts')
   assert.doesNotMatch(confirm, /\/dashboard'\}\)/, 'no silent dashboard redirect on failure')
+})
+
+test('/auth/complete restores the old confirm page on bundled code, plus gates', () => {
+  const src = root('app/auth/complete/page.tsx')
+  assert.match(src, /'use client'/, 'client page')
+  assert.match(src, /createClient\(\)/, 'the bundled browser client')
+  assert.match(src, /from '@\/lib\/supabase\/client'/, 'not a CDN import')
+  assert.equal(src.includes(['esm', '.sh'].join('')), false, 'no CDN anywhere')
+  // Restored behaviors of the removed confirm page.
+  assert.match(src, /next === RESET_PATH && \(searchParams\.get\('error'\) \|\| hashParams\.get\('error'\)\)/, 'reset-link errors go back to the reset page')
+  assert.match(src, /\$\{RESET_PATH\}\?error=link/, 'reset page explains it')
+  assert.match(src, /await supabase\.auth\.signOut\(\{ scope: 'local' \}\)/, 'local sign-out before setSession (QA-012)')
+  assert.match(src, /supabase\.auth\.setSession\(\{ access_token: accessToken, refresh_token: refreshToken \}\)/, 'fragment sign-in')
+  assert.match(src, /history\.replaceState\(null, (""|'')/, 'the hash is stripped')
+  assert.match(src, /runAction\(\(\) => linkPlayerRow\(\)\)/, 'linkPlayerRow with retry')
+  assert.match(src, /role="alert"/, 'honest error states')
+  assert.match(src, /Continue Anyway/, 'the continue escape hatch')
+  assert.match(src, /safeRedirectPath\(/, 'every redirect target is sanitized')
+  assert.match(src, /\/auth\/callback\?code=/, 'query codes still forward to the callback')
+  assert.match(src, /Suspense/, 'useSearchParams stays suspended')
+  // Additions: the same gates as the routes, through the server action.
+  assert.match(src, /acceptInviteAndRoute/, 'invite-only reject + age routing server-side')
+  assert.match(src, /link-failed/, 'an unstuck link gets the honest retry state')
+  assert.doesNotMatch(src, /window\.location\.href = safeRedirectPath\(next,/, 'never navigates on without the gate result')
 })

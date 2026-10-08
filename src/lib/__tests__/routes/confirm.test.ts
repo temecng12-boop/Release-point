@@ -6,7 +6,8 @@
  * - a brand-new stranger is deleted, signed out, and sent to the waitlist;
  * - an existing user without an invite is untouched;
  * - expired/invalid tokens redirect to login with an honest error code;
- * - no-params requests get the fragment-fallback page (old implicit emails).
+ * - no-params requests 303 to /auth/complete (old implicit emails keep
+ *   their fragment across the redirect and finish in bundled code).
  * Run with: npx tsx --tsconfig src/lib/__tests__/routes/tsconfig.json --test src/lib/__tests__/routes/*.test.ts
  */
 import { test, beforeEach } from 'node:test'
@@ -79,19 +80,31 @@ test('recovery failure goes back to the reset page, which explains it', async ()
   assert.equal(r.location, `${ORIGIN}/auth/reset?error=link`)
 })
 
-test('no token_hash: fragment-fallback page (old implicit emails), never a silent redirect', async () => {
-  const r = (await confirm(req('/auth/confirm'))) as Response
-  const html = await r.text()
-  assert.match(html, /createBrowserClient/, 'cookie-based browser client (plain setSession only writes localStorage)')
-  assert.match(html, /setSession\(\{ access_token, refresh_token \}\)/, 'reads the hash and establishes the session')
-  assert.match(html, /replaceState/, 'strips the tokens from the URL')
-  assert.match(html, /\/auth\/callback\?next=/, 'routes through the callback gates afterwards')
-  assert.doesNotMatch(html, /H&type=invite/, 'no tokens embedded')
+test('no token_hash: 303 to /auth/complete so the browser keeps the fragment (old implicit emails)', async () => {
+  const r = (await confirm(req('/auth/confirm'))) as unknown as { status: number; location: string }
+  assert.equal(r.status, 303)
+  assert.equal(r.location, `${ORIGIN}/auth/complete?next=%2Fdashboard`)
+  assert.doesNotMatch(r.location, /#/, 'the Location carries no fragment of its own, so browsers keep the hash')
 })
 
-test('callback with no session and no params: same fragment fallback (old emails to /auth/callback)', async () => {
-  const r = (await callback(req('/auth/callback'))) as Response
-  const html = await r.text()
-  assert.match(html, /createBrowserClient/)
-  assert.match(html, /\/auth\/callback\?next=/)
+test('a ?code= link is preserved to /auth/callback (server-readable, no fragment needed)', async () => {
+  const r = (await confirm(req('/auth/confirm?code=C&next=/auth/reset'))) as unknown as { status: number; location: string }
+  assert.equal(r.status, 303)
+  assert.match(r.location, /\/auth\/callback\?code=C&next=%2Fauth%2Freset/)
+})
+
+test('callback with no session and no params: 303 to /auth/complete (old emails to /auth/callback)', async () => {
+  const r = (await callback(req('/auth/callback'))) as unknown as { status: number; location: string }
+  assert.equal(r.status, 303)
+  assert.equal(r.location, `${ORIGIN}/auth/complete?next=%2Fdashboard`)
+  assert.doesNotMatch(r.location, /#/)
+})
+
+test('reset ?error= is forwarded to /auth/complete so the 303 does not drop it', async () => {
+  const r = (await confirm(req('/auth/confirm?next=/auth/reset&error=access_denied'))) as unknown as { status: number; location: string }
+  assert.equal(r.status, 303)
+  assert.equal(r.location, `${ORIGIN}/auth/complete?next=%2Fauth%2Freset&error=link`)
+  const cb = (await callback(req('/auth/callback?next=/auth/reset&error=otp_expired'))) as unknown as { status: number; location: string }
+  assert.equal(cb.status, 303)
+  assert.equal(cb.location, `${ORIGIN}/auth/complete?next=%2Fauth%2Freset&error=link`)
 })

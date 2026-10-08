@@ -13,8 +13,8 @@ export class NextRequest {
 type RedirectResult = { status: number; location: string }
 
 export class NextResponse {
-  static redirect(url: string | URL): RedirectResult {
-    return { status: 307, location: String(url) }
+  static redirect(url: string | URL, init?: { status?: number }): RedirectResult {
+    return { status: init?.status ?? 307, location: String(url) }
   }
   static json(body: unknown, init?: { status?: number }): { status: number; body: unknown } {
     return { status: init?.status ?? 200, body }

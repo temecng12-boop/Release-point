@@ -55,7 +55,7 @@ test('brand-new account with no players row yet is gated but can reach the scree
   ssrFake.player = null
   const r = await middleware(req('/dashboard'))
   assert.match(r.headers.get('location') ?? '', /\/onboarding\/age$/)
-  for (const p of ['/onboarding/age', '/onboarding', '/auth/confirm', '/auth/callback', '/auth/reset']) {
+  for (const p of ['/onboarding/age', '/onboarding', '/auth/confirm', '/auth/callback', '/auth/complete', '/auth/reset']) {
     const ok = await middleware(req(p))
     assert.notEqual(ok.status, 307, `${p}: no redirect loop`)
     assert.notEqual(ok.status, 403, `${p}: reachable`)
