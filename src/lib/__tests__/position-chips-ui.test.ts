@@ -26,7 +26,7 @@ test('chips render all six tags as toggle buttons with aria-pressed and 44px tar
   assert.match(html, /aria-pressed="true"[^>]*>Catcher|aria-pressed="true"[^>]*Catcher/)
   assert.match(html, /min-h-11 min-w-11/)
   assert.match(html, /flex flex-wrap/)
-  assert.match(html, /\(optional\)/)
+  assert.match(html, /Position \(optional\)/)
   assert.doesNotMatch(html, /required/)
 })
 
@@ -62,6 +62,30 @@ test('edit player and settings save the chip array, not a single select value', 
   const settings = src('app/player-settings/player-settings-form.tsx')
   assert.match(settings, /positions,/)
   assert.match(settings, /updatePlayerSelfProfile/)
+})
+
+test('settings and Edit Player use the visible Positions (pick any) heading; chips sit above Physical Info', () => {
+  const settings = src('app/player-settings/player-settings-form.tsx')
+  const edit = src('app/dashboard/edit-player-modal.tsx')
+  assert.match(settings, /POSITIONS_PICK_HEADING/)
+  assert.match(edit, /POSITIONS_PICK_HEADING/)
+  assert.ok(settings.indexOf('settings-positions') < settings.indexOf('Physical Info'))
+  assert.match(settings, /role="status"/)
+  assert.match(settings, /role="alert"/)
+  assert.match(settings, /Profile saved/)
+})
+
+test('player home has a one-tap My Profile link to /player-settings on desktop and iPhone (not hidden)', () => {
+  const dash = src('app/dashboard/page.tsx')
+  const hero = dash.slice(dash.indexOf('Welcome Back'))
+  assert.match(hero, /href="\/player-settings"/)
+  const heroLink = hero.slice(hero.indexOf('href="/player-settings"'), hero.indexOf('</Link>', hero.indexOf('href="/player-settings"')) + 7)
+  assert.doesNotMatch(heroLink, /hidden/)
+  assert.match(heroLink, /min-h-11/)
+  assert.match(heroLink, /My Profile/)
+  const navLink = dash.slice(dash.indexOf("href={isCoach ? '/profile' : '/player-settings'}"), dash.indexOf('</Link>', dash.indexOf("href={isCoach ? '/profile' : '/player-settings'")) + 7)
+  assert.match(navLink, /My Profile/)
+  assert.doesNotMatch(navLink, /hidden/)
 })
 
 test('onboarding continue works with zero chips; consent still required', () => {

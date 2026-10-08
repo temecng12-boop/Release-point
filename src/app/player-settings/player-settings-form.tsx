@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { updatePlayerSelfProfile } from '@/app/actions/player'
 import { COLLEGE_PROGRAMS } from '@/data/college-programs'
 import PositionChips, { positionsFromSource } from '@/components/position-chips'
-import type { PlayerPosition } from '@/lib/positions'
+import { POSITIONS_PICK_HEADING, type PlayerPosition } from '@/lib/positions'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors'
@@ -122,7 +122,16 @@ const HIT_STATS = [
   { key: 'h', label: 'H' },
 ]
 
-export default function PlayerSettingsForm({ player }: { player: Player | null }) {
+type SelfProfileSave = typeof updatePlayerSelfProfile
+
+export default function PlayerSettingsForm({
+  player,
+  onSave,
+}: {
+  player: Player | null
+  /** Playwright /dev page only. Production omits this and uses the server action. */
+  onSave?: SelfProfileSave
+}) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -163,7 +172,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
     setError(null)
     setSaved(false)
 
-    const result = await updatePlayerSelfProfile({
+    const result = await (onSave ?? updatePlayerSelfProfile)({
       height: height || undefined,
       weight: weight || undefined,
       high_school: highSchool || undefined,
@@ -185,13 +194,17 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Physical stats */}
       <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
         <div className="h-1 bg-[#C8102E]" />
+        <div className="p-6">
+          <PositionChips value={positions} onChange={setPositions} id="settings-positions" legend={POSITIONS_PICK_HEADING} />
+        </div>
+      </div>
+
+      {/* Physical stats */}
+      <div className="bg-white border border-[#DDE4ED] rounded-xl overflow-hidden shadow-sm">
         <div className="p-6 space-y-5">
           <p className="text-[13px] text-[#C8102E] tracking-[0.2em]" style={oswald}>Physical Info</p>
-
-          <PositionChips value={positions} onChange={setPositions} id="settings-positions" />
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -345,13 +358,13 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+        <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
           <span className="text-[#C8102E] text-sm">✕</span>
           <p className="text-sm text-[#C8102E]">{error}</p>
         </div>
       )}
       {saved && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+        <div role="status" className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
           <span className="text-green-600 text-sm">✓</span>
           <p className="text-sm text-green-700">Profile saved.</p>
         </div>

@@ -31,4 +31,43 @@ test.describe('position chips and clip toggle', () => {
     await expect(toggle.getByRole('button', { name: 'Hitting' })).toHaveAttribute('aria-pressed', 'false')
     await toggle.screenshot({ path: join(OUT, `${project}-clip-toggle.png`) })
   })
+
+  test('player opens settings from home, picks Catcher + Hitter + Infield, save persists', async ({ page }, info) => {
+    const project = info.project.name === 'Mobile Safari' ? 'iphone' : 'desktop'
+
+    await page.goto('/dev/player-positions')
+    await page.evaluate(() => sessionStorage.removeItem('dev-player-positions'))
+    await page.reload()
+
+    const homeLink = page.getByRole('link', { name: 'My Profile' }).last()
+    await expect(homeLink).toBeVisible()
+    await page.locator('main').screenshot({ path: join(OUT, `${project}-player-home-settings-link.png`) })
+    await homeLink.click()
+
+    await expect(page.getByText('Positions (pick any)')).toBeVisible()
+    const chips = page.getByTestId('settings-positions')
+    await expect(chips.getByRole('button', { name: 'Pitcher' })).toHaveAttribute('aria-pressed', 'true')
+
+    await chips.getByRole('button', { name: 'Pitcher' }).click()
+    await chips.getByRole('button', { name: 'Catcher' }).click()
+    await chips.getByRole('button', { name: 'Hitter' }).click()
+    await chips.getByRole('button', { name: 'Infield' }).click()
+
+    await page.getByRole('button', { name: 'Save Profile' }).click()
+    await expect(page.getByRole('status')).toContainText('Profile saved.')
+    await expect(chips.getByRole('button', { name: 'Catcher' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(chips.getByRole('button', { name: 'Hitter' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(chips.getByRole('button', { name: 'Infield' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(chips.getByRole('button', { name: 'Pitcher' })).toHaveAttribute('aria-pressed', 'false')
+    await chips.screenshot({ path: join(OUT, `${project}-player-settings-positions.png`) })
+
+    await page.reload()
+    const after = page.getByTestId('settings-positions')
+    await expect(page.getByText('Positions (pick any)')).toBeVisible()
+    await expect(after.getByRole('button', { name: 'Catcher' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(after.getByRole('button', { name: 'Hitter' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(after.getByRole('button', { name: 'Infield' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(after.getByRole('button', { name: 'Pitcher' })).toHaveAttribute('aria-pressed', 'false')
+    await after.screenshot({ path: join(OUT, `${project}-player-settings-persisted.png`) })
+  })
 })

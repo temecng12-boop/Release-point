@@ -7,7 +7,7 @@ import { runAction } from '@/lib/action-result'
 import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/age-band'
 import { PARENT_CONSENT_COMING_SOON } from '@/lib/under13-mode'
 import PositionChips, { positionsFromSource } from '@/components/position-chips'
-import type { PlayerPosition } from '@/lib/positions'
+import { POSITIONS_PICK_HEADING, type PlayerPosition } from '@/lib/positions'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -155,7 +155,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             </select>
           </div>
 
-          <PositionChips value={positions} onChange={setPositions} id="edit-player-positions" />
+          <PositionChips value={positions} onChange={setPositions} id="edit-player-positions" legend={POSITIONS_PICK_HEADING} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

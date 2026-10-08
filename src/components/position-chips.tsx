@@ -21,7 +21,7 @@ export default function PositionChips({
   defaultValue,
   onChange,
   name,
-  legend = 'Position',
+  legend = 'Position (optional)',
   hint = 'Optional. Tap any that apply.',
   id = 'position-chips',
 }: {
@@ -46,8 +46,8 @@ export default function PositionChips({
 
   return (
     <fieldset data-testid={id}>
-      <legend className="block text-xs text-[#456080] mb-1.5 tracking-wide" style={os}>
-        {legend} <span className="text-[#3D5166] normal-case tracking-normal">(optional)</span>
+      <legend className="block text-[13px] text-[#C8102E] tracking-[0.12em] mb-2" style={os}>
+        {legend}
       </legend>
       <div className="flex flex-wrap gap-2">
         {PLAYER_POSITIONS.map((tag) => {

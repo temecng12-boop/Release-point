@@ -18,6 +18,7 @@ export const POSITION_LABELS: Record<PlayerPosition, string> = {
 
 export const INVALID_POSITIONS = 'Choose a valid position.'
 export const POSITIONS_UNAVAILABLE = 'Couldn\'t save positions right now. Please try again in a few minutes.'
+export const POSITIONS_PICK_HEADING = 'Positions (pick any)'
 
 const POSITION_SET = new Set<string>(PLAYER_POSITIONS)
 
