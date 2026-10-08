@@ -29,7 +29,7 @@ async function stubVoiceRecording(page: Page) {
     if (!navigator.mediaDevices) {
       Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true })
     }
-    navigator.mediaDevices.getUserMedia = async () => stream as MediaStream
+    navigator.mediaDevices.getUserMedia = async () => stream as unknown as MediaStream
     void devices
 
     class FakeRecorder {
