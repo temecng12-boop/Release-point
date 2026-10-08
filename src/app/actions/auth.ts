@@ -13,7 +13,9 @@ import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
-import { findUnlinkedPlayerIds, ilikeLiteral, normalizeEmail } from '@/lib/invite-gate'
+import { findInviteForEmail, findUnlinkedPlayerIds, ilikeLiteral, isBrandNewUser, normalizeEmail } from '@/lib/invite-gate'
+import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { passwordProblem } from '@/lib/password-rule'
 import { isRateLimited, PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
@@ -308,6 +310,46 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
   }
   return { success: true }
+}
+
+export type AcceptInviteResult =
+  | { redirect: string }
+  | { linkFailed: true; next: string }
+  | { error: string }
+
+/**
+ * Finishes a fragment-link sign-in for /auth/complete (old implicit-flow
+ * emails): the browser already established the session client-side. Runs the
+ * same invite-only gate as the auth routes first (brand-new accounts with no
+ * matching invite are removed and sent to the waitlist), then links the
+ * invite. Returns:
+ *   * { redirect } on success (waitlist for strays, onboarding for newly
+ *     linked players, else next -- the age-screen funnel);
+ *   * { linkFailed: true, next } when an invite existed but the link didn't
+ *     stick, so the page can offer an honest retry instead of a fake success;
+ *   * { error } when there's no session at all.
+ * Link failures are logged server-side and self-heal on the next sign-in.
+ */
+export async function acceptInviteAndRoute(next: string): Promise<AcceptInviteResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Your session has expired. Sign in again.' }
+  const safeNext = safeRedirectPath(next, '/dashboard')
+
+  if (user.email && isBrandNewUser(user)) {
+    const invite = await findInviteForEmail(supabaseAdmin, user.email)
+    if (invite === 'none') {
+      await rejectStrayUser(supabaseAdmin, () => supabase.auth.signOut({ scope: 'local' }), user.id)
+      return { redirect: '/waitlist?reason=invite_only' }
+    }
+  }
+
+  const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
+  if (user.email && linkedPlayers.length === 0) {
+    const stillUnlinked = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
+    if (stillUnlinked.length > 0) return { linkFailed: true, next: safeNext }
+  }
+  return { redirect: postAcceptRedirect(safeNext, linkedPlayers.length) }
 }
 
 /**
