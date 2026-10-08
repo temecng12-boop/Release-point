@@ -221,6 +221,11 @@ test('privacy collects birth month/year, Google/Apple, parent accounts, and repo
   assert.match(privacy, /Problem reports:/)
   assert.match(privacy, /Vercel.*Hosts the Release Point AI website/)
   assert.match(privacy, /Resend.*notifications@releasepointai\.com/)
+  assert.match(privacy, /YouTube Data API/)
+  assert.match(privacy, /sends only the search query text/)
+  assert.match(privacy, /unpkg\.com/)
+  assert.match(privacy, /@ffmpeg\/core/)
+  assert.match(privacy, /sends no user content/)
 })
 
 // ── Sport / AI / pricing wording ─────────────────────────────────────────────

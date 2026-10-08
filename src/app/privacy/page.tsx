@@ -87,9 +87,13 @@ We do not sell your data to third parties. We do not use your data for advertisi
 
 **Google and Apple** (sign-in only): If you choose to sign in with Google (or Apple, where offered), that provider confirms your sign-in and shares your name, email address, and an account ID with us.
 
+**YouTube Data API** (Google): The clip compare search sends only the search query text you type to Google's YouTube Data API (`youtube/v3/search`). We don't send your name, email, or video files. If you paste a YouTube URL to compare, the browser loads that video from youtube.com by its video id.
+
 **Vercel** (vercel.com): Hosts the Release Point AI website and collects anonymous performance analytics. See vercel.com/privacy.
 
 **Resend** (resend.com): Sends our emails (sign-in links, invites, password resets) from notifications@releasepointai.com. See resend.com/privacy.
+
+**unpkg** (unpkg.com): When a coach compresses a large upload in the browser, the browser downloads `@ffmpeg/core` (the ffmpeg web files) from unpkg.com. That download sends no user content. The video file stays in the browser.
 
 We don't sell your data, and we don't share it with anyone except the service providers listed here.`,
           },
