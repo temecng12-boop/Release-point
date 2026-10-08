@@ -134,7 +134,7 @@ test('title: Release Point AI, never doubled', () => {
 // ── Legal consistency ────────────────────────────────────────────────────────
 
 test('legal entity placeholder is one exported constant', () => {
-  assert.match(src('lib/site-meta.ts'), /LEGAL_ENTITY_PLACEHOLDER = '\[LLC NAME\]'/)
+  assert.match(src('lib/site-meta.ts'), /LEGAL_ENTITY_PLACEHOLDER = '\[LEGAL_ENTITY_NAME\]'/)
   assert.match(read('app/privacy/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada limited liability company, once formed/)
   assert.match(read('app/terms/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada limited liability company, once formed/)
 })

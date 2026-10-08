@@ -13,9 +13,10 @@ export const OG_IMAGE_WIDTH = 1200
 export const OG_IMAGE_HEIGHT = 630
 export const OG_IMAGE_ALT = 'Release Point AI: video coaching for pitchers and hitters'
 
-// Operator shown on legal pages. Fill in the Nevada LLC name once formed;
-// the brackets make the placeholder impossible to miss in review.
-export const LEGAL_ENTITY_PLACEHOLDER = '[LLC NAME]'
+// Operator shown on legal pages. Fill in the Nevada LLC name once formed
+// (e.g. Release Point AI LLC, not filed); the brackets make the
+// placeholder impossible to miss in review.
+export const LEGAL_ENTITY_PLACEHOLDER = '[LEGAL_ENTITY_NAME]'
 export const OPERATOR_NAME = 'Nolan George'
 
 // Parent permission for under-13 players ships in late October 2026
