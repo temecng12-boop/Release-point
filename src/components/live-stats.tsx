@@ -13,7 +13,9 @@ const STATS: StatDef[] = [
 ]
 
 function Counter({ value, suffix, decimals = 0, color }: StatDef) {
-  const [display, setDisplay] = useState(0)
+  // Start at the real number so the server-rendered HTML (and no-JS) shows
+  // it; the count-up below replays from zero once the stat scrolls into view.
+  const [display, setDisplay] = useState(value)
   const ref = useRef<HTMLSpanElement>(null)
   const started = useRef(false)
 
@@ -28,6 +30,7 @@ function Counter({ value, suffix, decimals = 0, color }: StatDef) {
       const steps = (duration / 1000) * fps
       const increment = value / steps
       let current = 0
+      setDisplay(0)
       const tick = () => {
         current += increment
         if (current >= value) { setDisplay(value); return }

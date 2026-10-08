@@ -23,7 +23,7 @@ export default function ConsentPage() {
             <p className="text-sm text-[#3D5166] leading-relaxed mb-8">
               Until then, nothing about players under 13 is collected, and video can&apos;t be added for them.
             </p>
-            <Link href="/" className="inline-flex items-center min-h-11 text-sm text-[#0F1F33] hover:underline">Back to Release Point</Link>
+            <Link href="/" className="inline-flex items-center min-h-11 text-sm text-[#0F1F33] hover:underline">Back to Release Point AI</Link>
           </div>
         </div>
       </div>

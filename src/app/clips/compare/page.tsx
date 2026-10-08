@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import type { Viewport } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canViewPlayerContent } from '@/lib/clip-access'
@@ -6,6 +7,14 @@ import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ComparePlayer, { ClipData } from './compare-player'
 import ClipPicker from './clip-picker'
+
+// Pinch-zoom stays off on the compare viewer, like the clip viewer:
+// side-by-side annotation needs a fixed canvas.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string; c?: string; d?: string }> }) {
   const { a, b, c, d } = await searchParams

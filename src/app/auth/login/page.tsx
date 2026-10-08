@@ -7,6 +7,7 @@ import { signIn } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import { requestPasswordReset, RESET_SENT_HINT } from '@/lib/password-reset'
 import { requestEmailLink } from '@/lib/email-link'
+import { APPLE_SIGNIN_ENABLED } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -104,7 +105,7 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-        <p className="text-xs text-slate-300">Release Point. Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-slate-300">Release Point AI. Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
       {/* Right panel */}
@@ -288,6 +289,7 @@ export default function LoginPage() {
                   <span className="text-[10px] text-slate-400 tracking-widest shrink-0" style={os}>Or</span>
                   <div className="flex-1 h-px bg-slate-200" />
                 </div>
+                {APPLE_SIGNIN_ENABLED && (
                 <button
                   type="button"
                   onClick={signInWithApple}
@@ -298,6 +300,7 @@ export default function LoginPage() {
                   </svg>
                   Continue with Apple
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={signInWithGoogle}

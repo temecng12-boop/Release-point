@@ -4,7 +4,7 @@ import Logo from '@/components/Logo'
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 export const metadata = {
-  title: 'Internal testing · Release Point',
+  title: 'Internal testing',
   description: 'Release Point is in internal testing. Join the waitlist for early access.',
 }
 
@@ -26,7 +26,7 @@ export default function SignupPage() {
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-md rounded-2xl p-8 text-center" style={{ background: '#F8FAFC', border: '1px solid #DDE4ED' }}>
           <h1 className="text-2xl sm:text-3xl text-[#0F1F33] mb-4" style={os}>
-            Release Point is in internal testing
+            Release Point AI is in internal testing
           </h1>
           <p className="text-[#456080] text-sm mb-8 leading-relaxed">
             New accounts are invite-only for now. Join the waitlist and we&apos;ll reach out when your spot is ready.

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '@/lib/password-rule'
 import AgeConfirmForm from '@/components/age-confirm-form'
 import AgeStopNotice from '@/components/age-stop-notice'
+import { APPLE_SIGNIN_ENABLED } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -110,7 +111,7 @@ function RoleSelect({ onSelect }: { onSelect: (role: 'coach' | 'player') => void
   return (
     <div className="space-y-4">
       <div className="mb-7">
-        <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Join Release Point</h1>
+        <h1 className="text-xl text-slate-950 mb-1 tracking-tighter" style={os}>Join Release Point AI</h1>
         <p className="text-sm text-slate-500">Are you a coach or a player?</p>
       </div>
 
@@ -171,6 +172,7 @@ function ProviderButtons() {
   }
   return (
     <div className="space-y-2">
+      {APPLE_SIGNIN_ENABLED && (
       <button
         type="button"
         onClick={signInWithApple}
@@ -181,6 +183,7 @@ function ProviderButtons() {
         </svg>
         Continue with Apple
       </button>
+      )}
       <button
         type="button"
         onClick={signInWithGoogle}
@@ -206,7 +209,7 @@ function ProviderButtons() {
 function OAuthSignup({ onBack, onStopped }: { onBack: () => void; onStopped: () => void }) {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-950 tracking-tight" style={os}>Sign Up With Google or Apple</p>
+      <p className="text-sm text-slate-950 tracking-tight" style={os}>Sign Up With Google{APPLE_SIGNIN_ENABLED ? ' or Apple' : ''}</p>
       <AgeConfirmForm mode="oauth" action={startOAuthSignup} onBack={onBack} onStopped={onStopped} readyContent={<ProviderButtons />} />
     </div>
   )
@@ -226,7 +229,7 @@ function OAuthChoice({ onSelect }: { onSelect: () => void }) {
         className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-all active:scale-95 min-h-11"
         style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
       >
-        Continue with Google or Apple
+        Continue with Google{APPLE_SIGNIN_ENABLED ? ' or Apple' : ''}
       </button>
     </div>
   )
@@ -266,7 +269,7 @@ export default function SignupForm({ ageStopped = false }: { ageStopped?: boolea
             ))}
           </div>
         </div>
-        <p className="text-xs text-slate-300">Release Point. Pitching &amp; hitting mechanics analyzer</p>
+        <p className="text-xs text-slate-300">Release Point AI. Pitching &amp; hitting mechanics analyzer</p>
       </div>
 
       {/* Right panel */}

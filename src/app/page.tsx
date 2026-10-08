@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
 import SiteFooter from '@/components/SiteFooter'
 import SpotlightCard from '@/components/spotlight-card'
@@ -7,8 +8,14 @@ import MagneticButton from '@/components/magnetic-button'
 import LiveStats from '@/components/live-stats'
 import PitchMetrics from '@/components/pitch-metrics'
 import { createClient } from '@/lib/supabase/server'
+import { pageMetadata } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+// Canonical + social URL for the root page (/home sets its own pair).
+export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
+  return pageMetadata('/', parent)
+}
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -106,11 +113,11 @@ export default async function HomePage() {
               </div>
 
               <p className="text-sm text-slate-500 leading-relaxed max-w-md mb-6">
-                Release Point is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
-                get AI Coach insights, and share it all with their players, from youth to pro.
+                Release Point AI is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
+                get AI Coach insights, and share it all with their players, from high school to pro.
               </p>
               <div className="flex items-center gap-5 flex-wrap">
-                {['Pitching and hitting', 'Youth through pro'].map((t) => (
+                {['Pitching and hitting', 'High school through pro'].map((t) => (
                   <div key={t} className="flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5 text-[#C8031E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -248,7 +255,7 @@ export default async function HomePage() {
       <div className="border-y border-slate-100">
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-slate-100">
           {[
-            { n: 'All Levels', sub: 'Youth → Pro',          color: '#C8031E' },
+            { n: 'All Levels', sub: 'High School → Pro', color: '#C8031E' },
             { n: 'Mechanics',  sub: 'Pitching & hitting',    color: '#3B82F6' },
             { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#10B981' },
           ].map((s) => (
@@ -336,7 +343,7 @@ export default async function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 · Pitch Analytics</p>
+              <p className="text-[10px] tracking-[0.2em] text-[#3B82F6] mb-4" style={os}>02 · Pitching & Hitting Data</p>
               <h3 className="text-[clamp(22px,3vw,32px)] leading-[0.9] text-slate-950 mb-2 tracking-tight" style={os}>
                 Data That<br />Means<br />Something.
               </h3>
@@ -398,9 +405,9 @@ export default async function HomePage() {
           <p className="text-[10px] tracking-[0.35em] text-slate-400 mb-16 text-center" style={os}>How It Works</p>
           <div className="grid md:grid-cols-3 gap-10">
             {[
-              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They set up their account and join the roster.' },
+              { n: '01', t: 'Build Your Program',   d: 'Create teams by age group. Invite players by email. They confirm their age, accept the Terms, and join the roster.' },
               { n: '02', t: 'Upload & Analyze',     d: 'Add clips, annotate mechanics, and record pitching and hitting metrics. Everything linked to the player.' },
-              { n: '03', t: 'Players Get It All',   d: 'Every annotation, metric, and AI insight is shared with the player instantly.' },
+              { n: '03', t: 'Players Get It All',   d: 'Every annotation and metric is shared with the player. Players can ask AI Coach about their clips.' },
             ].map((s, i) => (
               <div key={s.n} className="group">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110"
@@ -419,7 +426,7 @@ export default async function HomePage() {
       <section className="max-w-4xl mx-auto px-6 py-20 text-center">
         <p className="text-[10px] tracking-[0.3em] text-slate-400 mb-6" style={os}>All pitchers and hitters welcome · All levels</p>
         <div className="flex items-center justify-center flex-wrap gap-2">
-          {['Youth', 'Middle School', 'High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches', 'Hitting Coaches'].map((age) => (
+          {['High School', 'College', 'Professional', 'Pitching Coordinators', 'Pitching Coaches', 'Hitting Coaches'].map((age) => (
             <span key={age}
               className="px-5 py-2 rounded-lg text-xs text-slate-500 hover:text-[#C8031E] hover:border-[#C8031E]/30 hover:bg-red-50 transition-all cursor-default"
               style={{ ...os, border: '1px solid #e2e8f0' }}
@@ -438,7 +445,7 @@ export default async function HomePage() {
             Be part of what&apos;s<br />being built.
           </h2>
           <p className="text-base text-slate-500 text-center max-w-xl mx-auto mb-14 leading-relaxed">
-            Release Point is an early-stage platform growing with coaches and players. Get early access or follow along as we build.
+            Release Point AI is an early-stage platform growing with coaches and players. Get early access or follow along as we build.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -480,7 +487,7 @@ export default async function HomePage() {
               </div>
               <div>
                 <p className="text-slate-900 text-sm mb-1" style={os}>Follow on LinkedIn</p>
-                <p className="text-slate-500 text-xs leading-relaxed">Follow Release Point for product updates, baseball development insights, and launch news.</p>
+                <p className="text-slate-500 text-xs leading-relaxed">Follow Release Point AI for product updates, baseball development insights, and launch news.</p>
               </div>
               <span className="text-[10px] text-[#0A66C2] mt-auto flex items-center gap-1.5 group-hover:gap-2.5 transition-all" style={os}>
                 Release Point AI
