@@ -30,12 +30,21 @@ function CompleteInner() {
     }
     const routed = await runAction(() => acceptInviteAndRoute(nextUrl))
     setRetrying(false)
-    if (routed.ok) {
-      if ('redirect' in routed.value) window.location.href = safeRedirectPath(routed.value.redirect, '/dashboard', window.location.origin)
-      else setErrorMsg(routed.value.error)
+    if (!routed.ok) {
+      setErrorMsg(routed.error)
       return
     }
-    setErrorMsg(routed.error)
+    if ('redirect' in routed.value) {
+      window.location.href = safeRedirectPath(routed.value.redirect, '/dashboard', window.location.origin)
+      return
+    }
+    if ('linkFailed' in routed.value) {
+      setErrorMsg('You’re signed in, but we couldn’t connect your account to your player profile.')
+      setNextUrl(safeRedirectPath(routed.value.next, '/dashboard', window.location.origin))
+      return
+    }
+    setErrorMsg(routed.value.error)
+    setStatus('error')
   }
 
   useEffect(() => {
