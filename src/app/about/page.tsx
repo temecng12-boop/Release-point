@@ -128,7 +128,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents, one for pitching and one for hitting. Both are built on Claude, set up with pitching and hitting metric frameworks. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
+            Release Point has two AI coaching agents, one for pitching and one for hitting. Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -191,7 +191,7 @@ export default function AboutPage() {
             {[
               {
                 label: 'Secure Video Storage',
-                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the coaches on teams the player is on, and a parent or guardian linked to the player\'s account (once parent accounts launch).',
+                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, and the other coaches on teams the player is on.',
               },
               {
                 label: 'Shared Feedback',
@@ -238,7 +238,7 @@ export default function AboutPage() {
               We are building the software layer that connects coaches, players, and data, so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
             </p>
             <p className="text-[#456080] leading-relaxed">
-              Release Point was founded by Nolan George, a pitcher with a lifetime on the mound. After playing, he built the technical side from scratch. The platform reflects firsthand experience with what coaches have, what players need, and where the current tools fall short.
+              Release Point was founded by Nolan George, a pitcher with a lifetime on the mound, who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects firsthand experience with what coaches have, what players need, and where the current tools fall short.
             </p>
           </div>
         </section>

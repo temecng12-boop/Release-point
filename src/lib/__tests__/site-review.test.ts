@@ -215,13 +215,16 @@ test('sport: baseball only on legal pages, baseball-led marketing and meta', () 
 })
 
 test('AI wording is honest; Barry stays; no pro-career claims', () => {
-  assert.match(read('app/about/page.tsx'), /built on Claude, set up with pitching and hitting metric frameworks/)
+  assert.match(read('app/about/page.tsx'), /Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip/)
   assert.match(read('app/terms/page.tsx'), /AI Coach is powered by Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /AI Coach runs on Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /Video and audio files are never sent/)
   assert.match(read('app/privacy/page.tsx'), /does not train models on customer content.*anthropic\.com\/legal\/commercial-terms/)
   assert.doesNotMatch(read('app/about/page.tsx'), /trained with deep baseball biomechanics/i)
-  assert.doesNotMatch(read('app/about/page.tsx'), /Boise Hawks|Pioneer League|decade of firsthand/)
+  // Nolan: keep the Boise Hawks / Pioneer League line for now (flagged for
+  // him); the "decade of firsthand experience" claim stays out.
+  assert.match(read('app/about/page.tsx'), /Boise Hawks in the Pioneer League/)
+  assert.doesNotMatch(read('app/about/page.tsx'), /decade of firsthand/)
   assert.match(read('app/about/page.tsx'), /lifetime on the mound/)
   assert.match(read('app/about/page.tsx'), /Barry/)
   assert.match(read('app/about/page.tsx'), /database rules add a second layer of protection on direct access/)
