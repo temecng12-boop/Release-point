@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
 import { LEGAL_ENTITY_PLACEHOLDER, OPERATOR_NAME, pageMetadata } from '@/lib/site-meta'
+import { UNDER_13_POLICY_BODY } from '@/lib/privacy-children'
 import { TERMS_VERSION_LABEL } from '@/lib/terms-version'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -49,7 +50,7 @@ If you do not agree to these terms, do not use the platform.`,
 
 **Age information:** Coaches must choose a player's age band (under 13, 13 to 17, or 18 or older) truthfully, and players must enter their own birth month and year truthfully. If the answers don't match, we use the younger band.
 
-**Children under 13** can't use Release Point yet. If the birth month and year show a child is under 13, signup stops: no account is created and nothing is saved. Coaches may not add players under 13, and a coach can't give permission for a parent. Parent permission is expected in late October 2026.`,
+${UNDER_13_POLICY_BODY}`,
           },
           {
             title: '3. Acceptable Use',

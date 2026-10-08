@@ -149,18 +149,23 @@ test('governing law is Nevada, operator named', () => {
   assert.match(src('lib/site-meta.ts'), /OPERATOR_NAME = 'Nolan George'/)
 })
 
-test('under-13 flow reads the same on privacy and terms; waitlist stays neutral', () => {
-  const privacy = read('app/privacy/page.tsx') + read('lib/privacy-children.ts')
-  const terms = read('app/terms/page.tsx')
-  for (const [name, text] of [['privacy', privacy], ['terms', terms]] as const) {
-    assert.match(text, /birth month and year/, `${name} asks birth month/year`)
-    assert.match(text, /[Cc]hildren under 13 can't use|are stopped at signup|signup stops/, `${name} under-13 stopped`)
-    assert.match(text, /late October 2026/, `${name} parent-permission timing`)
-    assert.match(text, /can't give permission (on behalf of|for) a parent/, `${name} coach can't consent`)
-  }
-  const form = read('app/waitlist/waitlist-form.tsx')
-  assert.match(form, /A parent or guardian should join the waitlist/)
-  assert.doesNotMatch(form, /under 13/)
+test('under-13 policy is one identical block on privacy and terms', () => {
+  // The block lives once in lib/privacy-children.ts; both pages render it.
+  assert.match(read('app/terms/page.tsx'), /\$\{UNDER_13_POLICY_BODY\}/)
+  assert.match(read('app/privacy/page.tsx'), /CHILDREN_AND_TEENS_BODY/)
+  assert.match(read('lib/privacy-children.ts'), /\$\{UNDER_13_POLICY_BODY\}/)
+  const block = read('lib/privacy-children.ts')
+  for (const line of [
+    /There are no users under 13\. Until parent accounts ship/,
+    /Children under 13 cannot sign up\./,
+    /signup stops and no account is created\. We don't save the child's name or email/,
+    /an under-13 answer deletes the new account and its name and email/,
+    /Coaches cannot add players under 13, and a coach can't give permission on behalf of a parent or guardian/,
+    /No video can be uploaded for anyone marked under 13/,
+    /we'll freeze it right away\. No one can use it or add to it\. We'll then delete the child's personal information, including video, within 14 days/,
+    /Players 13 to 17 need a parent's or guardian's permission to use Release Point/,
+    /Coaches must have written parent or guardian consent before uploading video of any minor/,
+  ]) assert.match(block, line)
 })
 
 test('who can see video reads identically on about, privacy, and terms', () => {
@@ -236,14 +241,6 @@ test('Apple sign-in hidden behind a default-off flag; Google untouched', () => {
   assert.match(read('app/auth/signup/signup-form.tsx'), /APPLE_SIGNIN_ENABLED/)
   assert.match(read('app/auth/login/page.tsx'), /Continue with Google/)
   assert.match(read('app/auth/signup/signup-form.tsx'), /Continue with Google/)
-})
-
-test('under-13 claims are full strength (enforced by migration 043)', () => {
-  const children = read('lib/privacy-children.ts')
-  assert.match(children, /An under-13 answer here deletes the new account and its name and email/)
-  assert.match(children, /signup stops and no account is created\. We don't save the child's name or email/)
-  assert.match(children, /we'll freeze it right away\. No one can use it or add to it\. We'll then delete the child's personal information, including video, within 14 days/)
-  assert.match(read('app/terms/page.tsx'), /signup stops: no account is created and nothing is saved/)
 })
 
 test('no internal review markers ship in page copy', () => {
