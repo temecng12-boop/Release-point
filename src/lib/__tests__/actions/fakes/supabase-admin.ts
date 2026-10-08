@@ -10,7 +10,9 @@ export const authAdmin = {
   /** auth.admin.updateUserById calls (the under-13 scrub of provider metadata). */
   metadataUpdates: [] as { id: string; user_metadata: Record<string, unknown> }[],
   updateError: null as null | { code?: string; message: string },
-  reset() { this.existingEmails = new Set(); this.linkError = null; this.links = []; this.users = []; this.metadataUpdates = []; this.updateError = null },
+  /** auth.admin.deleteUser calls (the invite-only rejection of stray accounts). */
+  deletedUsers: [] as string[],
+  reset() { this.existingEmails = new Set(); this.linkError = null; this.links = []; this.users = []; this.metadataUpdates = []; this.updateError = null; this.deletedUsers = [] },
 }
 
 export const supabaseAdmin = {
@@ -23,7 +25,7 @@ export const supabaseAdmin = {
         if (authAdmin.existingEmails.has(email)) {
           return { data: null, error: { code: 'email_exists', message: 'A user with this email address has already been registered' } }
         }
-        return { data: { properties: { action_link: `https://auth.test/invite?e=${email}` } }, error: null }
+        return { data: { properties: { action_link: `https://auth.test/invite?e=${email}`, hashed_token: `hashed-${email}` } }, error: null }
       },
       async listUsers({ page = 1, perPage = 1000 }: { page?: number; perPage?: number } = {}) {
         const start = (page - 1) * perPage
@@ -37,6 +39,10 @@ export const supabaseAdmin = {
         const known = authAdmin.users.find(u => u.id === id)
         if (known) return { data: { user: { id: known.id, email: known.email, user_metadata: {} } }, error: null }
         return { data: { user: { id, email: 'coach@example.com', user_metadata: { full_name: 'Coach C' } } }, error: null }
+      },
+      async deleteUser(id: string) {
+        authAdmin.deletedUsers.push(id)
+        return { data: { user: null }, error: null }
       },
     },
   },

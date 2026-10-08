@@ -107,12 +107,20 @@ test('guardian consent page: no consent form (parent consent is coming soon)', (
   assert.match(page, /PARENT_CONSENT_UNAVAILABLE/)
 })
 
-test('auth confirm: a failed player link shows a message with Try again and Continue, sign-in is kept', () => {
-  const src = read('app/auth/confirm/page.tsx')
-  inOrder(src, 'const link = await runAction(() => linkPlayerRow())', 'if (!link.ok) {', "setStatus('link-failed')", 'return', 'window.location.href = safeRedirectPath(next,')
-  inOrder(src, "status === 'link-failed'", '{errorMsg}', 'onClick={retryLink}', 'href={safeRedirectPath(nextUrl)}', 'Continue Anyway')
-  inOrder(fnBody(src, 'retryLink'), 'window.location.href = safeRedirectPath(nextUrl,')
-  assert.doesNotMatch(src, /^\s*await linkPlayerRow\(\)/m)
+test('auth accept: a failed player link is logged server-side and retried on the next sign-in, never a silent success', () => {
+  // The client retry page is gone with the server-side /auth/confirm route:
+  // linking runs in finishInviteAcceptance, which logs failures instead of
+  // throwing, and both auth routes re-run the (idempotent, unlinked-only)
+  // link on every sign-in, so a failure self-heals.
+  const accept = read('lib/invite-accept.ts')
+  assert.match(accept, /console\.error\('\[invite-accept\] player link failed'/, 'link failures are logged')
+  assert.match(accept, /console\.error\('\[invite-accept\] coach invite accept failed'/, 'coach-accept failures are logged')
+  assert.doesNotMatch(accept, /throw new Error/, 'acceptance never throws at the user')
+  assert.match(accept, /findUnlinkedPlayerIds\(db, user\.email\)/, 'only unlinked rows are ever touched')
+  assert.match(accept, /\.is\('user_id', null\)/, 'a linked row is never re-linked')
+  for (const f of ['app/auth/callback/route.ts', 'app/auth/confirm/route.ts']) {
+    assert.match(read(f), /finishInviteAcceptance\(supabaseAdmin, user\)/, `${f}: every sign-in retries the link`)
+  }
 })
 
 test('clip-notes.tsx is gone and nothing imports it', () => {

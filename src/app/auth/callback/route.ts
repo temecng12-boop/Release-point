@@ -3,13 +3,13 @@ import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { sendPlayerJoinedEmail } from '@/lib/email'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
 import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
 import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
-import { acceptCoachInvite } from '@/lib/coach-invite-accept'
-import { findInviteForEmail, findUnlinkedPlayerIds, isBrandNewUser } from '@/lib/invite-gate'
+import { findInviteForEmail, isBrandNewUser } from '@/lib/invite-gate'
+import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
+import { fragmentFallbackHtml } from '@/lib/fragment-fallback'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -49,6 +49,15 @@ export async function GET(request: NextRequest) {
   if (!sessionError) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
+      // No server-side params and no session: this may be an old IMPLICIT-flow
+      // link (tokens in the URL fragment, which never reach the server).
+      // Serve the fragment fallback so those invitees can still sign in;
+      // a stray visit without a hash just lands back on login.
+      if (!code && !(token_hash && type)) {
+        return new Response(fragmentFallbackHtml(next, process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!), {
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
+      }
       return NextResponse.redirect(failed)
     }
     // Invite-only gate (defense in depth behind the Before User Created
@@ -60,63 +69,13 @@ export async function GET(request: NextRequest) {
     if (user.email && isBrandNewUser(user)) {
       const invite = await findInviteForEmail(supabaseAdmin, user.email)
       if (invite === 'none') {
-        try {
-          await supabaseAdmin.from('profiles').delete().eq('id', user.id)
-          await supabaseAdmin.auth.admin.deleteUser(user.id)
-        } catch (err) {
-          console.error('[auth/callback] invite-gate cleanup failed', { userId: user.id, error: err instanceof Error ? err.message : err })
-        }
-        await supabase.auth.signOut({ scope: 'local' })
+        await rejectStrayUser(supabaseAdmin, () => supabase.auth.signOut({ scope: 'local' }), user.id)
         return NextResponse.redirect(`${origin}/waitlist?reason=invite_only`)
       }
     }
-    // Link player row to this auth account (for invited players).
-    // Matched on lower(trim(email)): the roster email may differ in case
-    // or whitespace from the auth email (e.g. a Supabase re-invite).
-    let updatedPlayers: { id: string; full_name: string; coach_id: string | null }[] | null = null
-    if (user.email) {
-      const playerIds = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
-      const { data: linked } = playerIds.length > 0
-        ? await supabaseAdmin
-          .from('players')
-          .update({ user_id: user.id, accepted_at: new Date().toISOString() })
-          .in('id', playerIds)
-          .is('user_id', null)
-          .select('id, full_name, coach_id')
-        : { data: [] as { id: string; full_name: string; coach_id: string | null }[] }
-      updatedPlayers = linked
-
-      // Notify coach that player accepted invite
-      for (const player of updatedPlayers ?? []) {
-        if (player.coach_id) {
-          try {
-            const { data: coachProfile } = await supabaseAdmin
-              .from('profiles')
-              .select('full_name')
-              .eq('id', player.coach_id)
-              .single()
-            const { data: coachUser } = await supabaseAdmin.auth.admin.getUserById(player.coach_id)
-            if (coachUser?.user?.email) {
-              await sendPlayerJoinedEmail({
-                coachEmail: coachUser.user.email,
-                coachName: coachProfile?.full_name ?? 'Coach',
-                playerName: player.full_name,
-                playerId: player.id,
-              })
-            }
-          } catch { /* email is non-critical */ }
-        }
-      }
-    }
-    // Early-access coach invite: mark it used and finish the coach setup
-    // (role + Terms). Best-effort: sign-in itself is never blocked.
-    if (user.email) {
-      try {
-        await acceptCoachInvite(supabaseAdmin, user)
-      } catch (err) {
-        console.error('[auth/callback] coach invite accept failed', { userId: user.id, error: err instanceof Error ? err.message : err })
-      }
-    }
+    // Link the invited players row, notify the coach, consume a pending
+    // coach invite (shared with /auth/confirm).
+    const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
     // Google/Apple from the signup page: the birth month/year and Terms were
     // asked before the buttons (startOAuthSignup). Store that answer once, so
     // the age screen isn't shown again; read the cookie once, then clear it.
@@ -129,13 +88,7 @@ export async function GET(request: NextRequest) {
     // A frozen under-13 account signing in again: Supabase copies the
     // provider's name and photo back into the auth metadata; remove them.
     if (code) await rescrubFrozenAccount(supabaseAdmin, user.id)
-    if (user.email) {
-      // New invited player — send to onboarding to pick position + give consent
-      if ((updatedPlayers ?? []).length > 0 && next !== RESET_PATH) {
-        return NextResponse.redirect(`${origin}/onboarding`)
-      }
-    }
-    return NextResponse.redirect(`${origin}${safeRedirectPath(next, '/dashboard', origin)}`)
+    return NextResponse.redirect(`${origin}${postAcceptRedirect(next, linkedPlayers.length)}`)
   }
 
   return NextResponse.redirect(failed)

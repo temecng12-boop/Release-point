@@ -104,8 +104,12 @@ const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
   options: { data: { role: 'coach', full_name: name }, redirectTo: `${site}/auth/confirm` },
 })
 if (linkErr) throw new Error(`invite link failed: ${linkErr.message}`)
-const inviteUrl = linkData?.properties?.action_link
-if (!inviteUrl) throw new Error('invite link came back empty')
+// Server-side accept link (PKCE-style): the raw action_link carries implicit-flow
+// fragment tokens the server never sees, so the email points at /auth/confirm
+// with the hashed token instead (same as the in-product invite).
+const hashedToken = linkData?.properties?.hashed_token
+if (!hashedToken) throw new Error('invite link came back empty')
+const inviteUrl = `${site}/auth/confirm?token_hash=${encodeURIComponent(hashedToken)}&type=invite&next=${encodeURIComponent('/dashboard')}`
 
 const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">

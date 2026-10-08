@@ -103,10 +103,10 @@ test('reset links reach /auth/reset on main: middleware lets a signed-in recover
   const mw = read('middleware.ts')
   assert.match(mw, /pathname !== '\/auth\/reset'/)
   const cb = read('app/auth/callback/route.ts')
-  assert.match(cb, /next === RESET_PATH \? `\$\{origin\}\$\{RESET_PATH\}\?error=link`/)
-  assert.match(cb, /length > 0 && next !== RESET_PATH/)
-  const confirm = read('app/auth/confirm/page.tsx')
-  assert.match(confirm, /next === RESET_PATH && \(searchParams\.get\('error'\) \|\| hashParams\.get\('error'\)\)/)
+  assert.match(cb, /postAcceptRedirect\(next, linkedPlayers\.length\)/, 'the shared redirect keeps recovery on /auth/reset')
+  assert.match(read('lib/invite-accept.ts'), /if \(linkedCount > 0 && next !== RESET_PATH\) return '\/onboarding'/, 'linked players go to onboarding, recovery stays')
+  const confirm = read('app/auth/confirm/route.ts')
+  assert.match(confirm, /next === RESET_PATH \? `\$\{origin\}\$\{RESET_PATH\}\?error=link`/, 'a bad recovery link goes back to the reset page, which explains it')
 })
 
 test('reset page and login form: 44px targets and accessible errors', () => {

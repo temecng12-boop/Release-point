@@ -154,16 +154,16 @@ test('auth callback: brand-new users without an invite are deleted, signed out, 
   const route = read('app/auth/callback/route.ts')
   assert.match(route, /isBrandNewUser\(user\)/, 'only brand-new accounts are checked')
   assert.match(route, /findInviteForEmail\(supabaseAdmin, user\.email\)/, 'the invite lookup runs before any linking')
-  assert.match(route, /findUnlinkedPlayerIds\(supabaseAdmin, user\.email\)/, 'linking matches case-insensitively')
-  assert.match(route, /supabaseAdmin\.from\('profiles'\)\.delete\(\)\.eq\('id', user\.id\)/, 'the stray profile is cleaned up')
-  assert.match(route, /supabaseAdmin\.auth\.admin\.deleteUser\(user\.id\)/, 'the stray auth user is deleted')
-  assert.match(route, /await supabase\.auth\.signOut\(\{ scope: 'local' \}\)/, 'the session is signed out (this device, QA-012)')
+  assert.match(route, /rejectStrayUser\(supabaseAdmin, \(\) => supabase\.auth\.signOut\(\{ scope: 'local' \}\)/, 'the stray is deleted and signed out (this device, QA-012)')
   assert.match(route, /\/waitlist\?reason=invite_only/, 'rejected users land on the waitlist with the reason')
+  assert.match(route, /finishInviteAcceptance\(supabaseAdmin, user\)/, 'acceptance is shared with /auth/confirm')
+  assert.match(route, /fragmentFallbackHtml\(next,/, 'old fragment links get the client fallback')
 })
 
 test('auth callback: the coach-invite accept path still runs for invited coaches', () => {
   const route = read('app/auth/callback/route.ts')
-  assert.match(route, /await acceptCoachInvite\(supabaseAdmin, user\)/, 'invited coaches are still upgraded to coach')
+  assert.match(route, /finishInviteAcceptance\(supabaseAdmin, user\)/, 'acceptance (link + notify + coach upgrade) runs')
+  assert.match(read('lib/invite-accept.ts'), /await acceptCoachInvite\(db, user\)/, 'invited coaches are still upgraded to coach')
 })
 
 test('waitlist page shows a friendly invite-only note for ?reason=invite_only', () => {

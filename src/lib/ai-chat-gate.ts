@@ -22,7 +22,11 @@ export const AI_CHAT_NO_PLAYER_ERROR =
 
 export type AiChatGate = { ok: true } | { ok: false; status: 403; error: string }
 
-export async function checkAiChatGate(db: Db, userId: string): Promise<AiChatGate> {
+export type AiChatGateMessages = { ageError?: string; noPlayerError?: string }
+
+export async function checkAiChatGate(db: Db, userId: string, messages: AiChatGateMessages = {}): Promise<AiChatGate> {
+  const ageError = messages.ageError ?? AI_CHAT_AGE_ERROR
+  const noPlayerError = messages.noPlayerError ?? AI_CHAT_NO_PLAYER_ERROR
   const { data: profile } = await db
     .from('profiles')
     .select('role')
@@ -34,8 +38,8 @@ export async function checkAiChatGate(db: Db, userId: string): Promise<AiChatGat
     'age_band, age_band_coach, age_band_self, age_screen_at, age_confirmed_at',
     (cols) => db.from('players').select(cols).eq('user_id', userId).maybeSingle(),
   )
-  if (error || !player) return { ok: false, status: 403, error: AI_CHAT_NO_PLAYER_ERROR }
+  if (error || !player) return { ok: false, status: 403, error: noPlayerError }
   if (isFrozenUnder13(player)) return { ok: false, status: 403, error: UNDER_13_STOP_MESSAGE }
-  if (needsAgeConfirm(player)) return { ok: false, status: 403, error: AI_CHAT_AGE_ERROR }
+  if (needsAgeConfirm(player)) return { ok: false, status: 403, error: ageError }
   return { ok: true }
 }

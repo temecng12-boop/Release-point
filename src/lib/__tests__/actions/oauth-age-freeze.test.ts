@@ -149,7 +149,7 @@ test('applyOAuthSignupAge: an invited player (linked first) keeps the younger an
 test('OAuth callback: links invites, then stores the signup answer from the cookie once and clears it; re-scrubs a frozen account', () => {
   const src = readFileSync(new URL('../../../app/auth/callback/route.ts', import.meta.url), 'utf8')
   const i = (s: string) => { const n = src.indexOf(s); assert.ok(n >= 0, s); return n }
-  assert.ok(i(".is('user_id', null)") < i('cookieStore.get(OAUTH_AGE_COOKIE)'), 'invite linked before the answer is stored')
+  assert.ok(i('finishInviteAcceptance(supabaseAdmin, user)') < i('cookieStore.get(OAUTH_AGE_COOKIE)'), 'invite linked before the answer is stored')
   assert.ok(i('cookieStore.get(OAUTH_AGE_COOKIE)') < i('cookieStore.delete(OAUTH_AGE_COOKIE)'))
   assert.ok(i('cookieStore.delete(OAUTH_AGE_COOKIE)') < i('applyOAuthSignupAge(supabaseAdmin, user, oauthAge)'))
   assert.match(src, /if \(code\) await rescrubFrozenAccount\(supabaseAdmin, user\.id\)/)
