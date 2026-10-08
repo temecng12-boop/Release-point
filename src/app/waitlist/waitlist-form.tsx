@@ -86,8 +86,7 @@ export default function WaitlistForm() {
         {state === 'loading' ? 'Joining…' : 'Join the waitlist'}
       </button>
       <p className="text-[#8096AE] text-[11px] leading-relaxed">
-        Joining for a young player? A parent or guardian should join the waitlist. See how we handle children&apos;s information in our{' '}
-        <Link href="/privacy" className="underline underline-offset-2 hover:text-[#456080]">Privacy Policy</Link>.
+        Release Point AI is for players 13 and older. Players under 18 should sign up with a parent or guardian&apos;s permission.
       </p>
       <p className="text-[#8096AE] text-[11px] leading-relaxed">
         We&apos;ll use your email to contact you about Release Point AI access. See how we handle your information in our{' '}

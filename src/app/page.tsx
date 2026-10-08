@@ -255,7 +255,7 @@ export default async function HomePage() {
       <div className="border-y border-slate-100">
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 divide-x divide-slate-100">
           {[
-            { n: 'All Levels', sub: 'High School → Pro', color: '#C8031E' },
+            { n: 'All Levels', sub: 'High school through pro', color: '#C8031E' },
             { n: 'Mechanics',  sub: 'Pitching & hitting',    color: '#3B82F6' },
             { n: 'AI Coach',   sub: 'Age-group benchmarks',  color: '#10B981' },
           ].map((s) => (

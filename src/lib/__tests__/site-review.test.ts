@@ -122,7 +122,7 @@ test('title: Release Point AI, never doubled', () => {
   const layout = src('app/layout.tsx')
   assert.match(layout, /default: "Release Point AI"/)
   assert.match(layout, /template: "%s \| Release Point AI"/)
-  assert.match(read('app/waitlist/page.tsx'), /title: 'Join the waitlist'/)
+  assert.match(read('app/waitlist/page.tsx'), /title: 'Join the Waitlist'/)
   assert.match(read('app/auth/signup/page.tsx'), /title: 'Internal testing'/)
   for (const f of ['app/waitlist/page.tsx', 'app/auth/signup/page.tsx', 'app/about/page.tsx']) {
     assert.doesNotMatch(read(f), /· Release Point'/, `${f} no brand suffix in title`)

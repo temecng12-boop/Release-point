@@ -8,7 +8,7 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 
 export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
   return pageMetadata('/waitlist', parent, {
-    title: 'Join the waitlist',
+    title: 'Join the Waitlist',
     description:
       'Pitching and hitting video annotation and AI Coach insights for coaches, shared with your players. Now in internal testing.',
   })
@@ -47,7 +47,7 @@ export default async function WaitlistPage({
         </div>
 
         <h1 className="text-4xl sm:text-5xl md:text-6xl text-[#0F1F33] text-center leading-tight mb-4 max-w-2xl" style={os}>
-          Join the waitlist
+          Join the Waitlist
         </h1>
 
         {inviteOnly && (
