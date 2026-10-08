@@ -9,7 +9,6 @@ import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
 import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
 import { findInviteForEmail, isBrandNewUser } from '@/lib/invite-gate'
 import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
-import { fragmentFallbackHtml } from '@/lib/fragment-fallback'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -51,12 +50,12 @@ export async function GET(request: NextRequest) {
     if (!user) {
       // No server-side params and no session: this may be an old IMPLICIT-flow
       // link (tokens in the URL fragment, which never reach the server).
-      // Serve the fragment fallback so those invitees can still sign in;
-      // a stray visit without a hash just lands back on login.
+      // Browsers carry the fragment across a redirect whose Location has no
+      // fragment of its own, so the bundled /auth/complete page can finish
+      // the sign-in there; a stray visit without a hash lands on login.
       if (!code && !(token_hash && type)) {
-        return new Response(fragmentFallbackHtml(next, process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!), {
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        })
+        const errorQ = searchParams.get('error') ? '&error=link' : ''
+        return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}${errorQ}`, { status: 303 })
       }
       return NextResponse.redirect(failed)
     }

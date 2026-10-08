@@ -50,8 +50,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // /auth/reset is opened signed in (the reset link's recovery session).
-  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/reset' && pathname !== SIGN_OUT_ROUTE) {
+  // /auth/reset is opened signed in (the reset link's recovery session), as
+  // are /auth/callback, /auth/confirm and /auth/complete (invite accept).
+  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/complete' && pathname !== '/auth/reset' && pathname !== SIGN_OUT_ROUTE) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

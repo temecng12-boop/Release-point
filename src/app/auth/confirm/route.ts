@@ -7,7 +7,6 @@ import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
 import { findInviteForEmail, isBrandNewUser } from '@/lib/invite-gate'
 import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
-import { fragmentFallbackHtml } from '@/lib/fragment-fallback'
 
 const VALID_TYPES = new Set(['signup', 'invite', 'magiclink', 'recovery', 'email_change'])
 
@@ -25,9 +24,11 @@ function isExpiredError(error: { message?: string | null; code?: string | null }
  * acceptance work as /auth/callback run, and the user is redirected onward.
  *
  * Without token_hash params (an old IMPLICIT-flow email, whose tokens sit in
- * the URL fragment the server never sees, or a stray visit) the fragment
- * fallback page is served instead. Failures redirect to login with an honest,
- * specific error -- never a silent dashboard redirect.
+ * the URL fragment the server never sees, or a stray visit) the request is
+ * 303'd to the bundled /auth/complete page. Browsers keep a Location-less
+ * fragment across that redirect, so setSession can finish in bundled code.
+ * Failures redirect to login with an honest, specific error -- never a
+ * silent dashboard redirect.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -39,11 +40,21 @@ export async function GET(request: NextRequest) {
     next === RESET_PATH ? `${origin}${RESET_PATH}?error=link` : `${origin}/auth/login?error=${code}`
 
   if (!token_hash || !type) {
-    // Old fragment link or stray visit: let the browser finish it, or bounce
-    // a hash-less visit back to login from the fallback page.
-    return new Response(fragmentFallbackHtml(next, process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!), {
-      headers: { 'content-type': 'text/html; charset=utf-8' },
-    })
+    // A ?code= link (e.g. Supabase-sent recovery) is server-readable: keep it
+    // in the query and let /auth/callback verify it. Anything else may be an
+    // old IMPLICIT-flow email (tokens in the fragment, which never reach the
+    // server) or a stray visit: 303 to the bundled /auth/complete page, whose
+    // Location carries no fragment of its own so browsers keep the hash.
+    // A reset ?error= is forwarded as a flag so the complete page can send
+    // it back to /auth/reset (the 303 would otherwise drop the query).
+    if (searchParams.get('code')) {
+      const url = new URL(`${origin}/auth/callback`)
+      url.searchParams.set('code', searchParams.get('code') as string)
+      url.searchParams.set('next', next)
+      return NextResponse.redirect(url, { status: 303 })
+    }
+    const errorQ = searchParams.get('error') ? '&error=link' : ''
+    return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}${errorQ}`, { status: 303 })
   }
 
   const cookieStore = await cookies()
