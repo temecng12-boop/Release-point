@@ -5,7 +5,7 @@
 export type Row = Record<string, unknown>
 export type DbError = { code?: string; message: string }
 type Action = 'select' | 'insert' | 'update' | 'upsert' | 'delete' | 'rpc'
-type Filter = { kind: 'eq' | 'is' | 'in'; column: string; value: unknown }
+type Filter = { kind: 'eq' | 'is' | 'in' | 'ilike'; column: string; value: unknown }
 export type Op = { table: string; action: Action; values?: unknown; filters: Filter[]; via: Via }
 type Via = 'admin' | 'session'
 /** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
@@ -59,8 +59,26 @@ function matches(row: Row, filters: Filter[]) {
   return filters.every(f => {
     if (f.kind === 'eq') return row[f.column] === f.value
     if (f.kind === 'is') return (row[f.column] ?? null) === f.value
+    if (f.kind === 'ilike') return likeMatch(String(row[f.column] ?? ''), String(f.value))
     return (f.value as unknown[]).includes(row[f.column])
   })
+}
+
+/** Case-insensitive LIKE match honoring % wildcards and backslash escapes. */
+function likeMatch(value: string, pattern: string): boolean {
+  let re = ''
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]
+    if (c === '\\' && i + 1 < pattern.length) { re += escapeRegExp(pattern[++i]); continue }
+    if (c === '%') { re += '.*'; continue }
+    if (c === '_') { re += '.'; continue }
+    re += escapeRegExp(c)
+  }
+  return new RegExp(`^${re}$`, 'i').test(value)
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function project(row: Row, columns: string | undefined) {
@@ -87,6 +105,7 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   eq(column: string, value: unknown) { this.filters.push({ kind: 'eq', column, value }); return this }
   is(column: string, value: unknown) { this.filters.push({ kind: 'is', column, value }); return this }
   in(column: string, value: unknown[]) { this.filters.push({ kind: 'in', column, value }); return this }
+  ilike(column: string, value: string) { this.filters.push({ kind: 'ilike', column, value }); return this }
   order() { return this }
   limit(n: number) { this.max = n; return this }
   single() { this.mode = 'single'; return this }

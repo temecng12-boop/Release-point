@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { checkAiChatGate } from '@/lib/ai-chat-gate'
 import { formatPhilosophiesForPrompt } from '@/lib/philosophies'
 import { loadAiChatContext, sanitizeChatMessages } from '@/lib/ai-chat-context'
 import { loadClipContext } from '@/lib/ai-coach/clip-context'
@@ -85,6 +86,12 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
+
+  // Invite-only + age screen: coaches pass (their player access is checked
+  // below); anyone else needs a completed age screen and a linked player
+  // account, so the paid AI isn't usable before the one screen.
+  const gate = await checkAiChatGate(supabaseAdmin, user.id)
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status })
 
   const body = await req.json().catch(() => null) as { messages?: unknown; agent?: unknown; context?: { clipId?: unknown; playerId?: unknown } } | null
   if (!body) return new Response('Bad request', { status: 400 })

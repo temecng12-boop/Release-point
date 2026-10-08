@@ -8,6 +8,7 @@ import { findAuthUserByEmail } from '@/lib/team-coaches'
 import { isMissingColumnError } from '@/lib/db-errors'
 import { NAME_REQUIRED, toTitleCase } from '@/lib/signup-fields'
 import { isPlatformAdmin, isValidInviteEmail, normalizeInviteEmail, platformAdminEmails } from '@/lib/platform-admin'
+import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 import { sendCoachInviteEmail } from '@/lib/email'
 
 const NOT_ADMIN = 'Only platform admins can invite coaches.'
@@ -144,7 +145,9 @@ export async function inviteCoach(
     return { success: `${email} already has an account. No email was sent; they can sign in at /auth/login.` }
   }
 
-  const inviteUrl = linkData?.properties?.action_link
+  const inviteUrl = linkData?.properties?.hashed_token
+    ? buildInviteAcceptUrl(siteUrl, linkData.properties.hashed_token, '/dashboard')
+    : undefined
   if (!inviteUrl) return { error: `The invite for ${email} was saved, but the sign-in link could not be created. Resend from the dashboard.` }
 
   const { data: { user: inviterUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)

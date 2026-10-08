@@ -10,7 +10,8 @@
  *   the provider's name and photo from the auth user, marks it for deletion;
  *   the stop cookie alone (no answer from that account) shows the stop and
  *   refuses answers but writes and scrubs nothing;
- * - the coach signup refuses while the 24-hour stop cookie is set;
+ * - the coach signup refuses while the 24-hour stop cookie is set, and
+ *   needs a pending coach invite (coach accounts are invite-only);
  * - the dashboard / age page loop can't happen.
  * Run with: TSX_TSCONFIG_PATH=src/lib/__tests__/actions/tsconfig.json npx tsx --test src/lib/__tests__/actions/oauth-age-freeze.test.ts
  */
@@ -148,7 +149,7 @@ test('applyOAuthSignupAge: an invited player (linked first) keeps the younger an
 test('OAuth callback: links invites, then stores the signup answer from the cookie once and clears it; re-scrubs a frozen account', () => {
   const src = readFileSync(new URL('../../../app/auth/callback/route.ts', import.meta.url), 'utf8')
   const i = (s: string) => { const n = src.indexOf(s); assert.ok(n >= 0, s); return n }
-  assert.ok(i(".is('user_id', null)") < i('cookieStore.get(OAUTH_AGE_COOKIE)'), 'invite linked before the answer is stored')
+  assert.ok(i('finishInviteAcceptance(supabaseAdmin, user)') < i('cookieStore.get(OAUTH_AGE_COOKIE)'), 'invite linked before the answer is stored')
   assert.ok(i('cookieStore.get(OAUTH_AGE_COOKIE)') < i('cookieStore.delete(OAUTH_AGE_COOKIE)'))
   assert.ok(i('cookieStore.delete(OAUTH_AGE_COOKIE)') < i('applyOAuthSignupAge(supabaseAdmin, user, oauthAge)'))
   assert.match(src, /if \(code\) await rescrubFrozenAccount\(supabaseAdmin, user\.id\)/)
@@ -305,6 +306,7 @@ test('coach signUp: refused while the 24-hour stop cookie is set, before any Sup
 })
 
 test('coach signUp: without the cookie it still works', async () => {
+  state.tables.coach_invites = [{ id: 'i1', email: 'c@example.com', accepted_at: null }]
   await assert.rejects(signUp(undefined, fd({ email: 'c@example.com', password: 'a-long-unusual-pass', full_name: 'coach c', tos: 'on' })), (e) => e instanceof RedirectSignal && e.url === '/dashboard')
   assert.equal(signUpCalls.length, 1)
 })

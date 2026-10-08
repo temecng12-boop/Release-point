@@ -117,7 +117,7 @@ test('admin invites a new coach: row saved, Supabase invite link, Resend email',
   assert.deepEqual(authAdmin.links, [CASEY])
   assert.equal(emailFake.coachInvites.length, 1)
   assert.equal(emailFake.coachInvites[0].toEmail, CASEY)
-  assert.match(emailFake.coachInvites[0].inviteUrl, /^https:\/\/auth\.test\/invite/)
+  assert.match(emailFake.coachInvites[0].inviteUrl, /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fdashboard/)
 })
 
 // ── Existing accounts are never double-created ───────────────────────────────
@@ -196,7 +196,7 @@ test('invite email not sent: error that says the invite was saved + resend', asy
 test('coach invite success returns the invite link so it can be copied', async () => {
   const r = await inviteCoach(undefined, inviteForm(CASEY, 'Casey Spencer'))
   assert.equal(r.error, undefined)
-  assert.match(r.inviteUrl ?? '', new RegExp(`^https://auth\\.test/invite\\?e=${CASEY.replace('.', '\\.')}$`))
+  assert.match(r.inviteUrl ?? '', /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fdashboard/)
 })
 
 test('coach invite email failure still returns the invite link', async () => {
@@ -204,7 +204,7 @@ test('coach invite email failure still returns the invite link', async () => {
   const r = await inviteCoach(undefined, inviteForm('x@example.com', 'X'))
   assert.match(r.error ?? '', /email could not be sent \(domain not verified\)/)
   assert.equal(r.success, undefined)
-  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=x@example\.com$/)
+  assert.match(r.inviteUrl ?? '', /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fdashboard/)
   assert.equal(state.tables.coach_invites.length, 1, 'retryable from the dashboard')
 })
 

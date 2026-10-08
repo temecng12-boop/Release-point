@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isPublicAssetPath } from '@/lib/public-paths'
 import { frozenGateKind, frozenResponse, isFrozenAccount, SIGN_OUT_ROUTE, type GateDb } from '@/lib/under13-gate'
+import { AGE_SCREEN_MESSAGE, AGE_SCREEN_PATH, isAgeGateSetupPath, needsAgeScreen, type AgeScreenDb } from '@/lib/age-screen-gate'
 
 export async function middleware(request: NextRequest) {
   // Manifest, icons, sw.js, robots, social images, static files: public, no
@@ -49,8 +50,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // /auth/reset is opened signed in (the reset link's recovery session).
-  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/reset' && pathname !== SIGN_OUT_ROUTE) {
+  // /auth/reset is opened signed in (the reset link's recovery session), as
+  // are /auth/callback, /auth/confirm and /auth/complete (invite accept).
+  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/confirm' && pathname !== '/auth/complete' && pathname !== '/auth/reset' && pathname !== SIGN_OUT_ROUTE) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
@@ -58,10 +60,28 @@ export async function middleware(request: NextRequest) {
 
   // Frozen under-13 account (hard stop): the stop screen on every player page,
   // 403 on API routes and server actions (src/lib/under13-gate.ts).
+  // Unanswered age screen (one screen): the age screen on every player page,
+  // 403 on API routes and server actions -- except the setup paths the
+  // account needs to finish (src/lib/age-screen-gate.ts). Coaches and
+  // guardians have no age screen and are never gated.
   if (user) {
     const kind = frozenGateKind(pathname, isServerAction)
     if (kind !== 'open' && (await isFrozenAccount(supabase as unknown as GateDb, user.id))) {
       return frozenResponse(kind, request, supabaseResponse)
+    }
+    if (kind !== 'open' && !isAgeGateSetupPath(pathname) && (await needsAgeScreen(supabase as unknown as AgeScreenDb, user.id))) {
+      let res: NextResponse
+      if (kind === 'api') res = NextResponse.json({ error: AGE_SCREEN_MESSAGE }, { status: 403 })
+      else if (kind === 'action') res = new NextResponse(AGE_SCREEN_MESSAGE, { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+      else {
+        const url = request.nextUrl.clone()
+        url.pathname = AGE_SCREEN_PATH
+        url.search = ''
+        res = NextResponse.redirect(url)
+      }
+      for (const c of supabaseResponse.cookies.getAll()) res.cookies.set(c)
+      res.headers.set('cache-control', 'private, no-store')
+      return res
     }
   }
 

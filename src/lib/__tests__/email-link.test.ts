@@ -1,13 +1,14 @@
 /**
- * Login "Email Link": a rate limit (429) reads the same as a sent link, so it
- * can't reveal which emails have accounts; network and other errors are shown.
+ * Login "Email Link": invite-only, so it never creates an account
+ * (shouldCreateUser:false). Every failure is shown honestly -- an unknown
+ * email, a rate limit, a network error -- never as a fake "sent" message.
  * Also the login page's error boxes (role="alert") and the sign-in copy.
  * Run with: npx tsx --test src/lib/__tests__/email-link.test.ts
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { requestEmailLink, EMAIL_LINK_SENT_MESSAGE, type EmailLinkAuth } from '../email-link'
+import { requestEmailLink, EMAIL_LINK_SENT_MESSAGE, EMAIL_LINK_NO_ACCOUNT_MESSAGE, EMAIL_LINK_RATE_LIMIT_MESSAGE, type EmailLinkAuth } from '../email-link'
 import { NETWORK_ERROR } from '../password-reset'
 
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8')
@@ -26,22 +27,34 @@ function fakeAuth(reply: Awaited<ReturnType<EmailLinkAuth['signInWithOtp']>> | '
 
 const REDIRECT = 'https://releasepointai.com/auth/callback'
 
-test('a sent link: neutral message, email and redirect passed through', async () => {
+test('a sent link: neutral message, email and redirect passed through, never creates a user', async () => {
   const f = fakeAuth({ error: null })
   assert.deepEqual(await requestEmailLink(f.auth, 'p@example.com', REDIRECT), { ok: true, message: EMAIL_LINK_SENT_MESSAGE })
-  assert.deepEqual(f.calls, [{ email: 'p@example.com', options: { emailRedirectTo: REDIRECT } }])
+  assert.deepEqual(f.calls, [{ email: 'p@example.com', options: { emailRedirectTo: REDIRECT, shouldCreateUser: false } }])
   assert.equal(EMAIL_LINK_SENT_MESSAGE, 'Check your email for a sign-in link.')
 })
 
-test('a rate limit (429) reads exactly like a sent link', async () => {
-  const sent = await requestEmailLink(fakeAuth({ error: null }).auth, 'new@example.com', REDIRECT)
+test('an unknown email is rejected honestly, never as sent', async () => {
+  for (const error of [
+    { message: 'User not found', status: 400, code: 'user_not_found' },
+    { message: 'user not found', status: 422 },
+  ]) {
+    const r = await requestEmailLink(fakeAuth({ error }).auth, 'stranger@example.com', REDIRECT)
+    assert.deepEqual(r, { ok: false, error: EMAIL_LINK_NO_ACCOUNT_MESSAGE }, error.message)
+    assert.doesNotMatch(r.error, /check your email/i, 'no fake success')
+  }
+})
+
+test('a rate limit (429) is an honest error, never a fake sent message', async () => {
   for (const error of [
     { message: 'email rate limit exceeded', status: 429, code: 'over_email_send_rate_limit' },
     { message: 'For security purposes, you can only request this after 42 seconds.', status: 429, code: 'over_email_send_rate_limit' },
     { message: 'Request rate limit reached', status: 429, code: 'over_request_rate_limit' },
     { message: 'Too Many Requests', status: 429 },
   ]) {
-    assert.deepEqual(await requestEmailLink(fakeAuth({ error }).auth, 'p@example.com', REDIRECT), sent, error.message)
+    const r = await requestEmailLink(fakeAuth({ error }).auth, 'p@example.com', REDIRECT)
+    assert.deepEqual(r, { ok: false, error: EMAIL_LINK_RATE_LIMIT_MESSAGE }, error.message)
+    assert.doesNotMatch(r.error, /check your email/i, 'no failed action looks like it succeeded')
   }
 })
 

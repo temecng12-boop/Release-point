@@ -72,9 +72,9 @@ test('custom fallback', () => {
   assert.equal(safeRedirectPath(null, '/guardian'), '/guardian')
 })
 
-test('auth/confirm and auth/callback read ?next only through safeRedirectPath', async () => {
+test('auth/confirm, auth/callback and auth/complete read ?next only through safeRedirectPath', async () => {
   const { readFileSync } = await import('node:fs')
-  for (const f of ['../../app/auth/confirm/page.tsx', '../../app/auth/callback/route.ts']) {
+  for (const f of ['../../app/auth/confirm/route.ts', '../../app/auth/callback/route.ts', '../../app/auth/complete/page.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     const reads = src.match(/searchParams\.get\('next'\)/g) ?? []
     const safe = src.match(/safeRedirectPath\(searchParams\.get\('next'\)/g) ?? []
@@ -85,7 +85,7 @@ test('auth/confirm and auth/callback read ?next only through safeRedirectPath', 
 test('every redirect that uses next goes through safeRedirectPath at the point of use', async () => {
   const { readFileSync } = await import('node:fs')
   const files = {
-    '../../app/auth/confirm/page.tsx': /location\.(href|assign|replace)/,
+    '../../app/auth/confirm/route.ts': /NextResponse\.redirect\(/,
     '../../app/auth/callback/route.ts': /NextResponse\.redirect\(/,
   }
   let checked = 0
@@ -93,10 +93,18 @@ test('every redirect that uses next goes through safeRedirectPath at the point o
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     for (const line of src.split('\n').filter(l => sink.test(l) && /\bnext\b/.test(l))) {
       checked++
-      // Every use of the next variable on the line is wrapped (the "&next=" query key is not a use).
-      const uses = line.replace(/[&?]next=/g, '').match(/\bnext\b/g) ?? []
+      // `next` is sanitized once at definition (previous test). Downstream
+      // uses of that already-safe value — postAcceptRedirect(next),
+      // encodeURIComponent(next) on the 303 Location, and the ?next= key —
+      // are not a second unsanitized read.
+      const uses = line
+        .replace(/[&?]next=/g, '')
+        .replace(/postAcceptRedirect\(next,/g, 'postAcceptRedirect(SAFE,')
+        .replace(/encodeURIComponent\(next\)/g, 'encodeURIComponent(SAFE)')
+        .match(/\bnext\b/g) ?? []
       assert.equal(uses.length, (line.match(/safeRedirectPath\(next, /g) ?? []).length, `${f}: ${line.trim()}`)
     }
   }
+  // confirm + callback each have the /auth/complete 303 and postAcceptRedirect.
   assert.equal(checked, 4)
 })

@@ -13,6 +13,9 @@ import { TERMS_VERSION } from '@/lib/terms-version'
 import { parentConsentFlowEnabled } from '@/lib/under13-mode'
 import { setAgeStopCookie } from '@/lib/age-stop-cookie'
 import { deleteAccountFlow } from '@/lib/account-deletion'
+import { findInviteForEmail, findUnlinkedPlayerIds, ilikeLiteral, isBrandNewUser, normalizeEmail } from '@/lib/invite-gate'
+import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { passwordProblem } from '@/lib/password-rule'
 import { isRateLimited, PRODUCTION_SITE_URL } from '@/lib/password-reset'
 import { supabaseDeletionDb, supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
@@ -33,6 +36,25 @@ export async function signUp(_prevState: { error?: string; message?: string; sto
   // Same rule as the form; checked here too because the browser check can be skipped.
   const problem = passwordProblem(password)
   if (problem) return { error: problem }
+
+  // Coach accounts are invite-only: only an email with a pending coach_invites
+  // row (matched on lower(trim(email))) may sign up as a coach. Anything
+  // else -- a stranger, or an invited PLAYER email a kid's address -- is
+  // refused BEFORE any account is created, so no role is ever granted here.
+  // (The hook and the auth callback enforce the same rule; this is the
+  // action-level check for the window before the hook is enabled.)
+  const normalized = normalizeEmail(email)
+  const { data: invites } = await supabaseAdmin
+    .from('coach_invites')
+    .select('id, email')
+    .ilike('email', `%${ilikeLiteral(normalized)}%`)
+    .is('accepted_at', null)
+    .limit(50)
+  const coachInvited = (((invites as { email?: string | null }[] | null) ?? []))
+    .some((r) => normalizeEmail(r.email ?? null) === normalized)
+  if (!coachInvited) {
+    return { error: 'Coach accounts are invite-only. If you were invited as a coach, ask for a new invite — otherwise join the waitlist.' }
+  }
 
   const tosAcceptedAt = new Date().toISOString()
   const { data, error } = await supabase.auth.signUp({
@@ -226,12 +248,17 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
 
   // Link to an existing invited player record. Accepting an invite is not
   // guardian consent, and the coach's age choice from the invite stands.
-  const { data: linked, error: linkError } = await supabaseAdmin
-    .from('players')
-    .update({ user_id: user.id, accepted_at: now })
-    .eq('email', user.email)
-    .is('user_id', null)
-    .select('id')
+  // Matched on lower(trim(email)): the roster email may differ in case or
+  // whitespace from the auth email.
+  const invitePlayerIds = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
+  const { data: linked, error: linkError } = invitePlayerIds.length > 0
+    ? await supabaseAdmin
+      .from('players')
+      .update({ user_id: user.id, accepted_at: now })
+      .in('id', invitePlayerIds)
+      .is('user_id', null)
+      .select('id')
+    : { data: [] as { id: string }[], error: null }
   if (linkError) {
     console.error('[linkPlayerRow] invite link failed', { code: linkError.code, message: linkError.message })
     return { error: LINK_FAILED }
@@ -271,7 +298,7 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
         (adultFields) => supabaseAdmin.from('players').insert({
           user_id:     user.id,
           full_name:   fullName,
-          email:       user.email,
+          email:       normalizeEmail(user.email) || user.email,
           accepted_at: now,
           ...adultFields,
         }),
@@ -283,6 +310,46 @@ export async function linkPlayerRow(): Promise<{ success: true } | { error: stri
     }
   }
   return { success: true }
+}
+
+export type AcceptInviteResult =
+  | { redirect: string }
+  | { linkFailed: true; next: string }
+  | { error: string }
+
+/**
+ * Finishes a fragment-link sign-in for /auth/complete (old implicit-flow
+ * emails): the browser already established the session client-side. Runs the
+ * same invite-only gate as the auth routes first (brand-new accounts with no
+ * matching invite are removed and sent to the waitlist), then links the
+ * invite. Returns:
+ *   * { redirect } on success (waitlist for strays, onboarding for newly
+ *     linked players, else next -- the age-screen funnel);
+ *   * { linkFailed: true, next } when an invite existed but the link didn't
+ *     stick, so the page can offer an honest retry instead of a fake success;
+ *   * { error } when there's no session at all.
+ * Link failures are logged server-side and self-heal on the next sign-in.
+ */
+export async function acceptInviteAndRoute(next: string): Promise<AcceptInviteResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Your session has expired. Sign in again.' }
+  const safeNext = safeRedirectPath(next, '/dashboard')
+
+  if (user.email && isBrandNewUser(user)) {
+    const invite = await findInviteForEmail(supabaseAdmin, user.email)
+    if (invite === 'none') {
+      await rejectStrayUser(supabaseAdmin, () => supabase.auth.signOut({ scope: 'local' }), user.id)
+      return { redirect: '/waitlist?reason=invite_only' }
+    }
+  }
+
+  const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
+  if (user.email && linkedPlayers.length === 0) {
+    const stillUnlinked = await findUnlinkedPlayerIds(supabaseAdmin, user.email)
+    if (stillUnlinked.length > 0) return { linkFailed: true, next: safeNext }
+  }
+  return { redirect: postAcceptRedirect(safeNext, linkedPlayers.length) }
 }
 
 /**

@@ -174,7 +174,7 @@ test('already on the roster with an account, new team: will see it next time the
 test('success returns the invite link so the coach can copy it', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'sam@example.com' }))
   assert.equal(r.error, undefined)
-  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=sam@example\.com$/)
+  assert.match(r.inviteUrl ?? '', /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fonboarding/)
 })
 
 test('email failure still returns the invite link so the coach can text it', async () => {
@@ -182,7 +182,7 @@ test('email failure still returns the invite link so the coach can text it', asy
   const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'sam@example.com' }))
   assert.match(r.error ?? '', /invite email could not be sent \(domain not verified\)/)
   assert.equal(r.success, undefined)
-  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=sam@example\.com$/)
+  assert.match(r.inviteUrl ?? '', /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fonboarding/)
 })
 
 test('already-on-roster email failure also returns the invite link', async () => {
@@ -191,7 +191,7 @@ test('already-on-roster email failure also returns the invite link', async () =>
   emailFake.inviteResult = { error: 'domain not verified' }
   const r = await invitePlayer(undefined, form({ player_email: 'kid@example.com' }))
   assert.match(r.error ?? '', /already on your roster/)
-  assert.match(r.inviteUrl ?? '', /^https:\/\/auth\.test\/invite\?e=kid@example\.com$/)
+  assert.match(r.inviteUrl ?? '', /\/auth\/confirm\?token_hash=.+&type=invite&next=%2Fonboarding/)
 })
 
 test('all app mail sends from the verified releasepointai.com address', async () => {

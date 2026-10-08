@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { ageGroupIsUnder13 } from '@/lib/age-band'
 import { parentConsentFlowEnabled, UNDER_13_TEAM_REFUSED } from '@/lib/under13-mode'
 import { sendPlayerInviteEmail } from '@/lib/email'
+import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 
 export async function invitePlayer(
@@ -119,7 +120,9 @@ export async function invitePlayer(
     return { success: existingAccountMessage(playerEmail, alreadyOnRoster, teamIds.length) }
   }
 
-  const inviteUrl = linkData?.properties?.action_link
+  const inviteUrl = linkData?.properties?.hashed_token
+    ? buildInviteAcceptUrl(siteUrl, linkData.properties.hashed_token, '/onboarding')
+    : undefined
   if (!inviteUrl) return { error: `${addedBut(playerEmail, alreadyOnRoster)} the invite email could not be created. Please try again.` }
   const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
   const coachName = coachUser?.user_metadata?.full_name ?? coachUser?.email ?? 'Your coach'

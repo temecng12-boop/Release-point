@@ -1,0 +1,18 @@
+{
+  // Route-handler tests: the real /auth route modules with Supabase and Next
+  // server modules swapped for in-memory fakes. Run with:
+  //   npx tsx --tsconfig src/lib/__tests__/routes/tsconfig.json --test src/lib/__tests__/routes/*.test.ts
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/lib/supabase/admin": ["../actions/fakes/supabase-admin.ts"],
+      "@/lib/email": ["../actions/fakes/email.ts"],
+      "@supabase/ssr": ["./fakes/ssr.ts"],
+      "next/headers": ["../actions/fakes/next-headers.ts"],
+      "next/server": ["./fakes/next-server.ts"],
+      "next/cache": ["../actions/fakes/next-cache.ts"],
+      "next/navigation": ["../actions/fakes/next-navigation.ts"],
+      "@/*": ["../../../*"]
+    }
+  }
+}

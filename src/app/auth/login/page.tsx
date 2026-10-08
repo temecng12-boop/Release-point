@@ -153,7 +153,11 @@ export default function LoginPage() {
                   <p className="text-sm text-[#C8031E]">
                     {urlError === 'confirmation_failed'
                       ? 'That sign-in link has expired or already been used. Request a new one below.'
-                      : 'Sign-in failed. Please try again.'}
+                      : urlError === 'invite_expired'
+                        ? "That invite link has expired or already been used. Ask your coach for a new invite."
+                        : urlError === 'invite_failed'
+                          ? "That invite link didn't work. Ask your coach for a new invite, or try signing in."
+                          : 'Sign-in failed. Please try again.'}
                   </p>
                 </div>
               )}

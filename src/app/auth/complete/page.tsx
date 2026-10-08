@@ -3,14 +3,14 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { linkPlayerRow } from '@/app/actions/auth'
+import { acceptInviteAndRoute, linkPlayerRow } from '@/app/actions/auth'
 import { runAction } from '@/lib/action-result'
 import { safeRedirectPath } from '@/lib/safe-redirect'
-import { RESET_PATH } from '@/lib/password-reset'
+import { completeErrorRedirect, readAuthLinkError } from '@/lib/auth-link-error'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-function ConfirmInner() {
+function CompleteInner() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'error' | 'link-failed'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
@@ -18,28 +18,53 @@ function ConfirmInner() {
   const [nextUrl, setNextUrl] = useState('/dashboard')
 
   // Signed in, but the player row wasn't linked: say so, offer a retry, and
-  // let them continue anyway (the sign-in itself worked).
+  // let them continue anyway (the sign-in itself worked; the age-screen gate
+  // in the middleware still applies on every page).
   async function retryLink() {
     setRetrying(true)
-    const result = await runAction(() => linkPlayerRow())
+    const link = await runAction(() => linkPlayerRow())
+    if (!link.ok) {
+      setErrorMsg(link.error)
+      setRetrying(false)
+      return
+    }
+    const routed = await runAction(() => acceptInviteAndRoute(nextUrl))
     setRetrying(false)
-    if (result.ok) { window.location.href = safeRedirectPath(nextUrl, '/dashboard', window.location.origin); return }
-    setErrorMsg(result.error)
+    if (!routed.ok) {
+      setErrorMsg(routed.error)
+      return
+    }
+    if ('redirect' in routed.value) {
+      window.location.href = safeRedirectPath(routed.value.redirect, '/dashboard', window.location.origin)
+      return
+    }
+    if ('linkFailed' in routed.value) {
+      setErrorMsg('You’re signed in, but we couldn’t connect your account to your player profile.')
+      setNextUrl(safeRedirectPath(routed.value.next, '/dashboard', window.location.origin))
+      return
+    }
+    setErrorMsg(routed.value.error)
+    setStatus('error')
   }
 
   useEffect(() => {
-    async function handleConfirm() {
+    async function handleComplete() {
       const supabase = createClient()
       const next = safeRedirectPath(searchParams.get('next'), '/dashboard', window.location.origin)
 
       const hash = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
+      // Strip tokens and error details from the URL bar before we classify
+      // or set a session — hash params stay in memory on hashParams.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
 
-      // Supabase sends an expired or used reset link back with ?error= (or #error=).
-      if (next === RESET_PATH && (searchParams.get('error') || hashParams.get('error'))) {
-        window.location.replace(`${window.location.origin}${RESET_PATH}?error=link`)
+      const dest = completeErrorRedirect(next, readAuthLinkError(searchParams, hashParams))
+      if (dest) {
+        await supabase.auth.signOut({ scope: 'local' })
+        window.location.replace(`${window.location.origin}${safeRedirectPath(dest, '/auth/login', window.location.origin)}`)
         return
       }
+
       const accessToken  = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
 
@@ -54,15 +79,27 @@ function ConfirmInner() {
           return
         }
 
-        const link = await runAction(() => linkPlayerRow())
-        if (!link.ok) {
-          setErrorMsg(link.error)
+        // Same invite-only gate and age routing as the auth routes: strays go
+        // to the waitlist, newly linked players to onboarding (age screen).
+        const routed = await runAction(() => acceptInviteAndRoute(next))
+        if (!routed.ok) {
+          setErrorMsg(routed.error)
+          setStatus('error')
+          return
+        }
+        if ('redirect' in routed.value) {
+          window.location.href = safeRedirectPath(routed.value.redirect, '/dashboard', window.location.origin)
+          return
+        }
+        if ('linkFailed' in routed.value) {
+          setErrorMsg('You’re signed in, but we couldn’t connect your account to your player profile.')
           // Same-site paths only for the Continue link and retry.
-          setNextUrl(safeRedirectPath(next, '/dashboard', window.location.origin))
+          setNextUrl(safeRedirectPath(routed.value.next, '/dashboard', window.location.origin))
           setStatus('link-failed')
           return
         }
-        window.location.href = safeRedirectPath(next, '/dashboard', window.location.origin)
+        setErrorMsg(routed.value.error)
+        setStatus('error')
         return
       }
 
@@ -83,7 +120,7 @@ function ConfirmInner() {
       window.location.href = '/auth/login'
     }
 
-    handleConfirm()
+    handleComplete()
   }, [searchParams])
 
   if (status === 'link-failed') {
@@ -131,14 +168,14 @@ function ConfirmInner() {
   )
 }
 
-export default function ConfirmPage() {
+export default function CompletePage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
         <p className="text-xs text-[#3D5166]" style={oswald}>Setting up your account…</p>
       </div>
     }>
-      <ConfirmInner />
+      <CompleteInner />
     </Suspense>
   )
 }
