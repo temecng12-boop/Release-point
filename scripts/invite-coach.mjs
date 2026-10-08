@@ -18,7 +18,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
-const FROM = 'Release Point <notifications@releasepointai.com>'
+const FROM = 'Release Point AI <notifications@releasepointai.com>'
 
 function arg(name) {
   const i = process.argv.indexOf(name)
@@ -114,12 +114,12 @@ const inviteUrl = `${site}/auth/confirm?token_hash=${encodeURIComponent(hashedTo
 const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">Coach Early Access</h1>
         </div>
         <p style="color:#0F1F33;font-size:15px;">Hey ${name},</p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
-          You've been invited to coach on Release Point, a professional-grade film room built for baseball.
+          You've been invited to coach on Release Point AI, a professional-grade film room built for baseball.
         </p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
           Accepting creates your own coach account and organization: your teams, your roster, your clips. Nothing is shared with anyone else's account.
@@ -131,7 +131,7 @@ const html = `
         <p style="color:#8096AE;font-size:12px;margin-top:8px;">This link expires in 24 hours. After you accept, you can set a password anytime from Sign in → Forgot password, or keep signing in with an email link.</p>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
           By accepting this invite you agree to the <a href="${site}/terms" style="color:#1C3A5C;">Terms of Service</a> and <a href="${site}/privacy" style="color:#1C3A5C;">Privacy Policy</a>.<br />
-          Release Point · Built for coaches and players.
+          Release Point AI · Built for coaches and players.
         </p>
       </div>
     `
@@ -144,7 +144,7 @@ if (!RESEND_KEY) {
 const res = await fetch('https://api.resend.com/emails', {
   method: 'POST',
   headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ from: FROM, to: email, subject: 'You\u2019re invited to coach on Release Point', html }),
+  body: JSON.stringify({ from: FROM, to: email, subject: 'You\u2019re invited to coach on Release Point AI', html }),
 })
 if (!res.ok) {
   const body = await res.text()

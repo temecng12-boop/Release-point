@@ -151,7 +151,7 @@ export async function inviteCoach(
   if (!inviteUrl) return { error: `The invite for ${email} was saved, but the sign-in link could not be created. Resend from the dashboard.` }
 
   const { data: { user: inviterUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)
-  const inviterName = admin.fullName || inviterUser?.user_metadata?.full_name || inviterUser?.email || 'Release Point'
+  const inviterName = admin.fullName || inviterUser?.user_metadata?.full_name || inviterUser?.email || 'Release Point AI'
   let sent: { error?: string }
   try {
     sent = await sendCoachInviteEmail({ toEmail: email, coachName: fullName, inviterName: String(inviterName), inviteUrl })

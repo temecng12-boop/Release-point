@@ -4,7 +4,7 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 // Verified production sender. Resend only sends from verified domains, so
 // this must stay on releasepointai.com (verified in Resend) — an unverified
 // domain fails every send with "domain not verified".
-const FROM = 'Release Point <notifications@releasepointai.com>'
+const FROM = 'Release Point AI <notifications@releasepointai.com>'
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://releasepointai.com'
 
 // TODO(Compliance): guardian email wording. The coach may enter a guardian's
@@ -26,16 +26,16 @@ export async function sendPlayerInviteEmail({
   const { error } = await resend.emails.send({
     from: FROM,
     to: toEmail,
-    subject: `${coachName} invited you to Release Point`,
+    subject: `${coachName} invited you to Release Point AI`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">You're Invited</h1>
         </div>
         <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
-          <strong style="color:#0F1F33">${coachName}</strong> invited you to join Release Point, a professional-grade film room built for baseball.
+          <strong style="color:#0F1F33">${coachName}</strong> invited you to join Release Point AI, a professional-grade film room built for baseball.
         </p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
           Click below to set up your account and access your clips, annotations, and pitch or swing data.
@@ -46,7 +46,7 @@ export async function sendPlayerInviteEmail({
         </a>
         <p style="color:#8096AE;font-size:12px;margin-top:8px;">This link expires in 24 hours.</p>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
-          Release Point · Built for coaches and players.
+          Release Point AI · Built for coaches and players.
         </p>
       </div>
     `,
@@ -71,16 +71,16 @@ export async function sendCoachInviteEmail({
   const { error } = await resend.emails.send({
     from: FROM,
     to: toEmail,
-    subject: `${inviterName} invited you to coach on Release Point`,
+    subject: `${inviterName} invited you to coach on Release Point AI`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
         <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
-          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point</p>
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
           <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">Coach Early Access</h1>
         </div>
         <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
-          <strong style="color:#0F1F33">${inviterName}</strong> invited you to coach on Release Point, a professional-grade film room built for baseball.
+          <strong style="color:#0F1F33">${inviterName}</strong> invited you to coach on Release Point AI, a professional-grade film room built for baseball.
         </p>
         <p style="color:#456080;font-size:14px;line-height:1.6;">
           Accepting creates your own coach account and organization: your teams, your roster, your clips. Nothing is shared with anyone else's account.
@@ -92,7 +92,7 @@ export async function sendCoachInviteEmail({
         <p style="color:#8096AE;font-size:12px;margin-top:8px;">This link expires in 24 hours. After you accept, you can set a password anytime from Sign in → Forgot password, or keep signing in with an email link.</p>
         <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
           By accepting this invite you agree to the <a href="${SITE}/terms" style="color:#1C3A5C;">Terms of Service</a> and <a href="${SITE}/privacy" style="color:#1C3A5C;">Privacy Policy</a>.<br />
-          Release Point · Built for coaches and players.
+          Release Point AI · Built for coaches and players.
         </p>
       </div>
     `,
