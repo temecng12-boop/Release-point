@@ -157,11 +157,13 @@ export async function writeWithPositions<R extends { error: DbErrorLike | null }
   fields: Record<string, unknown>,
   positions: PlayerPosition[] | undefined,
   run: (fields: Record<string, unknown>) => PromiseLike<R>,
-): Promise<R | { error: { message: string } }> {
+): Promise<R | { data: null; error: { message: string; code?: undefined } }> {
   if (positions === undefined) return run(fields)
   const payload = { ...fields, positions, position: legacyPositionFrom(positions) }
   const first = await run(payload)
   if (!isMissingColumnError(first.error, 'positions')) return first
-  if (!canRepresentAsLegacyPosition(positions)) return { error: { message: POSITIONS_UNAVAILABLE } }
+  if (!canRepresentAsLegacyPosition(positions)) {
+    return { data: null, error: { message: POSITIONS_UNAVAILABLE } }
+  }
   return run({ ...fields, position: legacyPositionFrom(positions) })
 }
