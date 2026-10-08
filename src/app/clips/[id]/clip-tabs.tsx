@@ -9,6 +9,8 @@ import MetricsTab from './metrics-tab'
 import HittingMetricsTab from './hitting-metrics-tab'
 import AiChat from './ai-chat'
 import PhaseChecklist from './phase-checklist'
+import ClipKindToggle from './clip-kind-toggle'
+import type { ClipKind } from '@/lib/positions'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -18,13 +20,7 @@ type PhaseRow = { name: string; rating: 'good' | 'needs_work' | 'critical' | nul
 type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
 type Tab      = 'Timestamps' | 'Notes' | 'Voice' | 'Mechanics' | 'Metrics' | 'AI Coach'
 
-function isPitcherPosition(pos: string | null): boolean {
-  if (!pos) return true
-  const p = pos.toLowerCase()
-  return p === 'pitcher' || p === 'p' || p === 'rhp' || p === 'lhp' || p === 'sp' || p === 'rp' || p === 'cp'
-}
-
-function getTabs(isPitcher: boolean): Tab[] {
+function getTabs(): Tab[] {
   return ['Timestamps', 'Notes', 'Voice', 'Mechanics', 'Metrics', 'AI Coach']
 }
 
@@ -67,6 +63,8 @@ export default function ClipTabs({
   playerName,
   playerAgeGroup,
   playerPosition,
+  initialClipKind,
+  canEditClipKind = true,
   aiCoachAvailable = true,
   canAddMedia,
 }: {
@@ -86,6 +84,10 @@ export default function ClipTabs({
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
+  /** Resolved pitching/hitting for this clip (saved toggle, else default from positions). */
+  initialClipKind: ClipKind
+  /** Coach or player may save the toggle; guardians see it but cannot change it. */
+  canEditClipKind?: boolean
   /** Whether this viewer may use the AI Coach (own coach or the player). */
   aiCoachAvailable?: boolean
   /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
@@ -93,11 +95,18 @@ export default function ClipTabs({
 }) {
   const [active, setActive] = useState<Tab>('Timestamps')
   const [metrics, setMetrics] = useState<Metric[]>(initialMetrics)
-  const isPitcher = isPitcherPosition(playerPosition)
-  const TABS = getTabs(isPitcher)
+  const [clipKind, setClipKind] = useState<ClipKind>(initialClipKind)
+  const isPitcher = clipKind === 'pitching'
+  const TABS = getTabs()
 
   return (
     <div>
+      <ClipKindToggle
+        clipId={clipId}
+        value={clipKind}
+        canEdit={canEditClipKind}
+        onSaved={setClipKind}
+      />
       {/* Tab bar */}
       <div className="relative z-10 flex" style={{ borderBottom: '1px solid #e2e8f0' }}>
         {TABS.map((tab) => {

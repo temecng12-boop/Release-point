@@ -20,6 +20,8 @@ import { clipFilesToRemove } from '@/lib/clip-storage'
 import { checkUploadConsent, uploadBlockedMessageFor } from '@/lib/consent-server'
 import { isConsentPendingError, UPLOAD_BLOCKED_MESSAGE } from '@/lib/consent'
 import { removeClipMediaAsOwnCoach } from '@/lib/clip-media-delete'
+import { canViewPlayerContent } from '@/lib/clip-access'
+import { isClipKind, type ClipKind } from '@/lib/positions'
 
 // Loads the coach and account ids of the player a clip belongs to.
 async function playerForClip(clipId: string) {
@@ -215,6 +217,44 @@ export async function saveHittingMetrics(clipId: string, metrics: HittingMetrics
 
   revalidatePath(`/clips/${clipId}`)
   return { success: true }
+}
+
+const CLIP_KIND_DENIED = 'Only the player or a coach can change pitching or hitting for this clip.'
+const CLIP_KIND_SAVE_FAILED = 'Couldn\'t save pitching/hitting for this clip.'
+
+export async function saveClipKind(clipId: string, kind: unknown): Promise<
+  { error: string } | { success: true; clipKind: ClipKind }
+> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Please sign in again to change this clip.' }
+  if (typeof clipId !== 'string' || !clipId) return { error: 'Clip not found' }
+  if (!isClipKind(kind)) return { error: 'Choose pitching or hitting.' }
+
+  const { data: clip, error: clipError } = await supabaseAdmin
+    .from('clips')
+    .select('id, player_id')
+    .eq('id', clipId)
+    .maybeSingle()
+  if (clipError) return { error: describeDbError('saveClipKind:clip', clipError, CLIP_KIND_SAVE_FAILED) }
+  if (!clip) return { error: 'This clip no longer exists.' }
+
+  const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id as string)
+  if (!access.allowed || access.via === 'guardian') return { error: CLIP_KIND_DENIED }
+
+  const { data: changed, error } = await supabaseAdmin
+    .from('clips')
+    .update({ clip_kind: kind })
+    .eq('id', clipId)
+    .select('id')
+  if (error) return { error: describeDbError('saveClipKind', error, CLIP_KIND_SAVE_FAILED) }
+  if (!changed || changed.length === 0) {
+    console.error('[saveClipKind] update changed 0 rows', clipId)
+    return { error: 'Couldn\'t save pitching/hitting for this clip. Refresh the page and try again.' }
+  }
+
+  revalidatePath(`/clips/${clipId}`)
+  return { success: true, clipKind: kind }
 }
 
 export async function renameClip(clipId: string, title: string) {

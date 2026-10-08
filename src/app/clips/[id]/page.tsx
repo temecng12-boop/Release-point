@@ -26,6 +26,7 @@ import LessonList from '@/components/lessons/lesson-list'
 import { canManageLessons, loadLessons, type LessonItem } from '@/lib/lessons'
 import { isE2eClipFixture } from '@/lib/e2e-clip-fixture'
 import { E2eClipCoachPage } from '../e2e-clip-fixture'
+import { resolveClipKind, resolvePlayerPositions } from '@/lib/positions'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,7 +55,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   // the skeleton.
   return (
     <Suspense fallback={<ClipSkeleton />}>
-      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} canAddMetrics={canAddPitchData(access)} />
+      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} canAddMetrics={canAddPitchData(access)} canEditClipKind={access.via !== 'guardian'} />
     </Suspense>
   )
 }
@@ -70,7 +71,7 @@ type ClipRow = {
   voice_path: string | null
 }
 
-async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics, canAddMetrics }: {
+async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics, canAddMetrics, canEditClipKind }: {
   id: string
   clip: ClipRow
   userId: string
@@ -79,6 +80,7 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
   /** Only the player's direct coach may delete saved pitch rows / hitting data (same rule as RLS). */
   canDeleteMetrics: boolean
   canAddMetrics: boolean
+  canEditClipKind: boolean
 }) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
@@ -109,11 +111,23 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
   const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
   const { data: playerRow } = await selectPlayersWithConsent<
-    { full_name: string | null; age_group: string | null; position: string | null } & PlayerConsentFields
+    { full_name: string | null; age_group: string | null; position: string | null; positions?: string[] | null } & PlayerConsentFields
   >(
-    'full_name, age_group, position',
+    'full_name, age_group, position, positions',
     (cols) => supabaseAdmin.from('players').select(cols).eq('id', clip.player_id).single(),
   )
+
+  // clip_kind is added in 044; a missing column is treated as null (default from positions).
+  let storedClipKind: string | null = null
+  {
+    const { data: kindData, error: kindError } = await supabaseAdmin
+      .from('clips')
+      .select('clip_kind')
+      .eq('id', id)
+      .single()
+    if (!kindError) storedClipKind = (kindData as { clip_kind: string | null } | null)?.clip_kind ?? null
+  }
+  const clipKind = resolveClipKind(storedClipKind, resolvePlayerPositions(playerRow))
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')
@@ -329,6 +343,8 @@ async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetric
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
+            initialClipKind={clipKind}
+            canEditClipKind={canEditClipKind}
             aiCoachAvailable={aiCoachAvailable}
             canAddMedia={canUploadVideo(playerRow)}
           />
