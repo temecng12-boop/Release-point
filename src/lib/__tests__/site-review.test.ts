@@ -173,7 +173,7 @@ test('under-13 policy is one identical block on privacy and terms', () => {
     /If an under-13 answer comes after sign-in, the account is frozen and its profile name is removed/,
     /The sign-in email on the auth account stays/,
     /Coaches cannot add players under 13, and a coach can't give permission on behalf of a parent or guardian/,
-    /No video can be uploaded for anyone marked under 13/,
+    /No video \(clips or lessons\) can be uploaded for anyone marked under 13/,
     /If a player answers under 13 after they have an account, we freeze it right away/,
     /If a coach marks a player under 13, that player can't have video added/,
     /including any video, promptly/,
