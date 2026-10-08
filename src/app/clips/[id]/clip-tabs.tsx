@@ -188,6 +188,7 @@ export default function ClipTabs({
                 playerName={playerName}
                 playerAgeGroup={playerAgeGroup}
                 playerPosition={playerPosition}
+                clipKind={clipKind}
                 metrics={metrics}
                 checklist={initialChecklist}
                 coachNotes={initialNotes}

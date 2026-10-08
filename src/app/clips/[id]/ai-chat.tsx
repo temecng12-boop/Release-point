@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, Fragment } from 'react'
 import { aiCoachAudienceBadge, aiCoachAudienceEyebrow } from '@/lib/ai-coach-badge'
+import type { ClipKind } from '@/lib/positions'
 
 type Agent   = 'randy' | 'barry'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -54,6 +55,7 @@ export default function AIChat({
   clipId,
   available = true,
   role,
+  clipKind = 'pitching',
 }: {
   clipId: string
   /** False for viewers the server won't serve (guardians): show a notice instead of the chat. */
@@ -62,11 +64,14 @@ export default function AIChat({
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
+  /** Default Randy/Barry from the clip toggle; Switch Agent still shows both. */
+  clipKind?: ClipKind
   metrics?: Metric[]
   checklist?: PhaseRow[] | null
   coachNotes?: string | null
 }) {
-  const [agent,     setAgent]     = useState<Agent | null>(null)
+  const defaultAgent: Agent = clipKind === 'hitting' ? 'barry' : 'randy'
+  const [agent,     setAgent]     = useState<Agent | null>(defaultAgent)
   const [messages,  setMessages]  = useState<Message[]>([])
   const [input,     setInput]     = useState('')
   const [streaming, setStreaming] = useState('')
@@ -76,6 +81,13 @@ export default function AIChat({
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, streaming])
+
+  useEffect(() => {
+    setAgent(clipKind === 'hitting' ? 'barry' : 'randy')
+    setMessages([])
+    setStreaming('')
+    setInput('')
+  }, [clipKind])
 
   function chooseAgent(a: Agent) {
     setAgent(a)

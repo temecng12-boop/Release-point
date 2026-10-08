@@ -8,6 +8,7 @@ import { selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
 import PositionTags from '@/components/position-tags'
+import { formatPositionLabels, resolvePlayerPositions } from '@/lib/positions'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -220,7 +221,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
           playerId={player.id}
           playerName={player.full_name}
           playerAgeGroup={player.age_group}
-          playerPosition={player.position}
+          playerPosition={formatPositionLabels(resolvePlayerPositions(player)) || null}
           clips={clips ?? []}
           metrics={metrics}
           notes={notes}
