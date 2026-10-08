@@ -108,3 +108,35 @@ test('reset ?error= is forwarded to /auth/complete so the 303 does not drop it',
   assert.equal(cb.status, 303)
   assert.equal(cb.location, `${ORIGIN}/auth/complete?next=%2Fauth%2Freset&error=link`)
 })
+
+test('confirm and callback forward sanitized error_code and error_description with error=link', async () => {
+  const desc = 'Signup is invite-only. Ask your coach for an invite, or join the waitlist.'
+  const path = `/auth/confirm?error=access_denied&error_code=unexpected_failure&error_description=${encodeURIComponent(desc)}`
+  const r = (await confirm(req(path))) as unknown as { status: number; location: string }
+  assert.equal(r.status, 303)
+  const loc = new URL(r.location)
+  assert.equal(loc.pathname, '/auth/complete')
+  assert.equal(loc.searchParams.get('next'), '/dashboard')
+  assert.equal(loc.searchParams.get('error'), 'link')
+  assert.equal(loc.searchParams.get('error_code'), 'unexpected_failure')
+  assert.equal(loc.searchParams.get('error_description'), desc)
+
+  const cb = (await callback(req(`/auth/callback?error=access_denied&error_code=otp_expired&error_description=${encodeURIComponent(desc)}`))) as unknown as { status: number; location: string }
+  assert.equal(cb.status, 303)
+  const cbLoc = new URL(cb.location)
+  assert.equal(cbLoc.pathname, '/auth/complete')
+  assert.equal(cbLoc.searchParams.get('error'), 'link')
+  assert.equal(cbLoc.searchParams.get('error_code'), 'otp_expired')
+  assert.equal(cbLoc.searchParams.get('error_description'), desc)
+})
+
+test('forwarded error_code and error_description are charset-limited and length-capped', async () => {
+  const long = 'x'.repeat(500)
+  const r = (await confirm(req(`/auth/confirm?error=x&error_code=${encodeURIComponent('otp_expired<script>')}&error_description=${encodeURIComponent(`\n${long}`)}`))) as unknown as { status: number; location: string }
+  const loc = new URL(r.location)
+  assert.equal(loc.searchParams.get('error'), 'link')
+  assert.doesNotMatch(loc.searchParams.get('error_code') ?? '', /<|>|\x00/)
+  assert.ok((loc.searchParams.get('error_code') ?? '').length <= 64)
+  assert.doesNotMatch(loc.searchParams.get('error_description') ?? '', /\n/)
+  assert.ok((loc.searchParams.get('error_description') ?? '').length <= 200)
+})

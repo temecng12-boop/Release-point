@@ -81,8 +81,8 @@ test('/auth/complete restores the old confirm page on bundled code, plus gates',
   assert.match(src, /from '@\/lib\/supabase\/client'/, 'not a CDN import')
   assert.equal(src.includes(['esm', '.sh'].join('')), false, 'no CDN anywhere')
   // Restored behaviors of the removed confirm page.
-  assert.match(src, /next === RESET_PATH && \(searchParams\.get\('error'\) \|\| hashParams\.get\('error'\)\)/, 'reset-link errors go back to the reset page')
-  assert.match(src, /\$\{RESET_PATH\}\?error=link/, 'reset page explains it')
+  assert.match(src, /completeErrorRedirect\(/, 'Supabase ?error= / #error= are classified, never a silent login drop')
+  assert.match(src, /readAuthLinkError\(searchParams, hashParams\)/, 'query or hash')
   assert.match(src, /await supabase\.auth\.signOut\(\{ scope: 'local' \}\)/, 'local sign-out before setSession (QA-012)')
   assert.match(src, /supabase\.auth\.setSession\(\{ access_token: accessToken, refresh_token: refreshToken \}\)/, 'fragment sign-in')
   assert.match(src, /history\.replaceState\(null, (""|'')/, 'the hash is stripped')

@@ -9,6 +9,7 @@ import { OAUTH_AGE_COOKIE } from '@/lib/signup-age-token'
 import { applyOAuthSignupAge, rescrubFrozenAccount } from '@/lib/oauth-signup-age'
 import { findInviteForEmail, isBrandNewUser } from '@/lib/invite-gate'
 import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
+import { forwardedAuthErrorQuery } from '@/lib/auth-link-error'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       // fragment of its own, so the bundled /auth/complete page can finish
       // the sign-in there; a stray visit without a hash lands on login.
       if (!code && !(token_hash && type)) {
-        const errorQ = searchParams.get('error') ? '&error=link' : ''
+        const errorQ = forwardedAuthErrorQuery(searchParams)
         return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}${errorQ}`, { status: 303 })
       }
       return NextResponse.redirect(failed)

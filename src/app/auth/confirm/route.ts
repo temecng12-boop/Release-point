@@ -7,6 +7,7 @@ import { safeRedirectPath } from '@/lib/safe-redirect'
 import { RESET_PATH } from '@/lib/password-reset'
 import { findInviteForEmail, isBrandNewUser } from '@/lib/invite-gate'
 import { finishInviteAcceptance, postAcceptRedirect, rejectStrayUser } from '@/lib/invite-accept'
+import { forwardedAuthErrorQuery } from '@/lib/auth-link-error'
 
 const VALID_TYPES = new Set(['signup', 'invite', 'magiclink', 'recovery', 'email_change'])
 
@@ -45,15 +46,16 @@ export async function GET(request: NextRequest) {
     // old IMPLICIT-flow email (tokens in the fragment, which never reach the
     // server) or a stray visit: 303 to the bundled /auth/complete page, whose
     // Location carries no fragment of its own so browsers keep the hash.
-    // A reset ?error= is forwarded as a flag so the complete page can send
-    // it back to /auth/reset (the 303 would otherwise drop the query).
+    // A reset or auth ?error= is forwarded (plus sanitized error_code /
+    // error_description) so the complete page can classify it — the 303
+    // would otherwise drop the query. The hash, if any, is kept by the browser.
     if (searchParams.get('code')) {
       const url = new URL(`${origin}/auth/callback`)
       url.searchParams.set('code', searchParams.get('code') as string)
       url.searchParams.set('next', next)
       return NextResponse.redirect(url, { status: 303 })
     }
-    const errorQ = searchParams.get('error') ? '&error=link' : ''
+    const errorQ = forwardedAuthErrorQuery(searchParams)
     return NextResponse.redirect(`${origin}/auth/complete?next=${encodeURIComponent(next)}${errorQ}`, { status: 303 })
   }
 

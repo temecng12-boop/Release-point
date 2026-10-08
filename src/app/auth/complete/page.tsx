@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { acceptInviteAndRoute, linkPlayerRow } from '@/app/actions/auth'
 import { runAction } from '@/lib/action-result'
 import { safeRedirectPath } from '@/lib/safe-redirect'
-import { RESET_PATH } from '@/lib/password-reset'
+import { completeErrorRedirect, readAuthLinkError } from '@/lib/auth-link-error'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -54,12 +54,17 @@ function CompleteInner() {
 
       const hash = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
+      // Strip tokens and error details from the URL bar before we classify
+      // or set a session — hash params stay in memory on hashParams.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
 
-      // Supabase sends an expired or used reset link back with ?error= (or #error=).
-      if (next === RESET_PATH && (searchParams.get('error') || hashParams.get('error'))) {
-        window.location.replace(`${window.location.origin}${RESET_PATH}?error=link`)
+      const dest = completeErrorRedirect(next, readAuthLinkError(searchParams, hashParams))
+      if (dest) {
+        await supabase.auth.signOut({ scope: 'local' })
+        window.location.replace(`${window.location.origin}${safeRedirectPath(dest, '/auth/login', window.location.origin)}`)
         return
       }
+
       const accessToken  = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
 
@@ -73,9 +78,6 @@ function CompleteInner() {
           setStatus('error')
           return
         }
-
-        // Strip the tokens from the URL so they never linger in history.
-        window.history.replaceState(null, '', window.location.pathname + window.location.search)
 
         // Same invite-only gate and age routing as the auth routes: strays go
         // to the waitlist, newly linked players to onboarding (age screen).
