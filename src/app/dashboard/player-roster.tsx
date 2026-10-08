@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import PlayerCard from './player-card'
+import { positionSearchText } from '@/lib/positions'
 
 interface Player {
   id: string
@@ -9,6 +10,7 @@ interface Player {
   accepted_at: string | null
   age_group: string | null
   position: string | null
+  positions?: string[] | null
   teamIds: string[]
 }
 
@@ -30,7 +32,7 @@ export default function PlayerRoster({ players, teams, clipCounts }: Props) {
     if (!q) return players
     return players.filter(p =>
       p.full_name.toLowerCase().includes(q) ||
-      (p.position ?? '').toLowerCase().includes(q) ||
+      positionSearchText(p).includes(q) ||
       (p.age_group ?? '').toLowerCase().includes(q)
     )
   }, [players, search])

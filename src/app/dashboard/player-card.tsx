@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { formatPositionLabels, resolvePlayerPositions } from '@/lib/positions'
 
 interface Props {
   player: {
@@ -9,6 +10,7 @@ interface Props {
     accepted_at: string | null
     age_group: string | null
     position: string | null
+    positions?: string[] | null
   }
   clipCount: number
 }
@@ -36,7 +38,7 @@ export default function PlayerCard({ player, clipCount }: Props) {
           {player.full_name}
         </p>
         <p className="text-[11px] text-[#3D5166] truncate capitalize">
-          {[player.position, player.age_group].filter(Boolean).join(' · ') || 'No details yet'}
+          {[formatPositionLabels(resolvePlayerPositions(player)) || null, player.age_group].filter(Boolean).join(' · ') || 'No details yet'}
         </p>
       </div>
 

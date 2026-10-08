@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import { updatePlayerSelfProfile } from '@/app/actions/player'
 import { COLLEGE_PROGRAMS } from '@/data/college-programs'
+import PositionChips, { positionsFromSource } from '@/components/position-chips'
+import type { PlayerPosition } from '@/lib/positions'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const inputClass = 'w-full bg-white border border-[#DDE4ED] rounded-lg px-4 py-3 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] transition-colors'
@@ -30,6 +32,7 @@ interface Player {
   career_stats: Record<string, string> | null
   age_group: string | null
   position: string | null
+  positions?: string[] | null
 }
 
 function CollegePicker({
@@ -141,6 +144,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
   const [offers, setOffers] = useState<string[]>(player?.college_offers ?? [])
   const [showcases, setShowcases] = useState<Showcase[]>(player?.showcases ?? [])
   const [careerStats, setCareerStats] = useState<Record<string, string>>(player?.career_stats ?? {})
+  const [positions, setPositions] = useState<PlayerPosition[]>(() => positionsFromSource(player))
 
   // Showcase helpers
   function addShowcase() {
@@ -171,6 +175,7 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
       college_offers: offers,
       showcases: showcases.filter(s => s.name.trim()),
       career_stats: careerStats,
+      positions,
     })
 
     setSaving(false)
@@ -185,6 +190,8 @@ export default function PlayerSettingsForm({ player }: { player: Player | null }
         <div className="h-1 bg-[#C8102E]" />
         <div className="p-6 space-y-5">
           <p className="text-[13px] text-[#C8102E] tracking-[0.2em]" style={oswald}>Physical Info</p>
+
+          <PositionChips value={positions} onChange={setPositions} id="settings-positions" />
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>

@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { isMissingColumnError } from '@/lib/db-errors'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
@@ -11,6 +12,7 @@ import DeleteTeamButton from './delete-team-button'
 import { loadTeamCoaches } from '@/lib/team-coaches'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
+import PositionTags from '@/components/position-tags'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -21,6 +23,7 @@ type TeamRosterPlayer = {
   accepted_at: string | null
   age_group: string | null
   position: string | null
+  positions?: string[] | null
   coach_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
@@ -84,18 +87,29 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const { data: players } = ownPlayerIds.length > 0
     ? await selectPlayersWithConsent<TeamRosterPlayer[]>(
-        'id, full_name, email, accepted_at, age_group, position, coach_id',
+        'id, full_name, email, accepted_at, age_group, position, positions, coach_id',
         (cols) => supabaseAdmin.from('players').select(cols).in('id', ownPlayerIds).order('full_name', { ascending: true }),
       )
     : { data: [] as TeamRosterPlayer[] }
 
-  const { data: otherPlayers } = otherPlayerIds.length > 0
-    ? await supabaseAdmin
+  let otherPlayers: { id: string; full_name: string; age_group: string | null; position: string | null; positions?: string[] | null }[] | null = []
+  if (otherPlayerIds.length > 0) {
+    const withPos = await supabaseAdmin
+      .from('players')
+      .select('id, full_name, age_group, position, positions')
+      .in('id', otherPlayerIds)
+      .order('full_name', { ascending: true })
+    if (withPos.error && isMissingColumnError(withPos.error, 'positions')) {
+      const fallback = await supabaseAdmin
         .from('players')
         .select('id, full_name, age_group, position')
         .in('id', otherPlayerIds)
         .order('full_name', { ascending: true })
-    : { data: [] }
+      otherPlayers = fallback.data
+    } else {
+      otherPlayers = withPos.data as typeof otherPlayers
+    }
+  }
   const rosterCount = (players?.length ?? 0) + (otherPlayers?.length ?? 0)
 
   const playerIds = players?.map((p) => p.id) ?? []
@@ -237,11 +251,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                         {p.age_group}
                       </span>
                     )}
-                    {p.position && (
-                      <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full capitalize">
-                        {p.position}
-                      </span>
-                    )}
+                    <PositionTags player={p} />
                   </div>
                   <p className="text-xs text-[#3D5166] mt-0.5">Coached by another coach.</p>
                 </div>

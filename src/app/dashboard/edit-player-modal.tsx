@@ -6,6 +6,8 @@ import { updatePlayer, deletePlayer, setPlayerAgeBand } from '@/app/actions/play
 import { runAction } from '@/lib/action-result'
 import { AGE_BANDS, AGE_BAND_LABELS, isAgeBand, type AgeBand } from '@/lib/age-band'
 import { PARENT_CONSENT_COMING_SOON } from '@/lib/under13-mode'
+import PositionChips, { positionsFromSource } from '@/components/position-chips'
+import type { PlayerPosition } from '@/lib/positions'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -14,6 +16,7 @@ interface Props {
     full_name: string
     age_group: string | null
     position: string | null
+    positions?: string[] | null
     adult_confirmed_at?: string | null
     consent_given_at?: string | null
     age_band?: string | null
@@ -27,8 +30,6 @@ interface Props {
 }
 
 const AGE_GROUPS = ['Youth', 'Middle School', 'High School', 'Amateur', 'Professional']
-const POSITIONS = ['pitcher', 'hitter']
-
 function heightOptions() {
   const opts: string[] = []
   for (let ft = 4; ft <= 7; ft++) {
@@ -52,7 +53,7 @@ const WEIGHTS = weightOptions()
 export default function EditPlayerModal({ player, teams, onClose }: Props) {
   const [fullName, setFullName]   = useState(player.full_name)
   const [ageGroup, setAgeGroup]   = useState(player.age_group ?? '')
-  const [position, setPosition]   = useState(player.position ?? '')
+  const [positions, setPositions] = useState<PlayerPosition[]>(() => positionsFromSource(player))
   const [height, setHeight]       = useState('')
   const [weight, setWeight]       = useState('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>(player.teamIds)
@@ -82,7 +83,7 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
     const result = await updatePlayer(player.id, {
       full_name: fullName,
       age_group: ageGroup || undefined,
-      position:  position || undefined,
+      positions,
       teamIds:   selectedTeams,
     })
     if (result?.error) { setSaving(false); setError(result.error); return }
@@ -146,22 +147,15 @@ export default function EditPlayerModal({ player, teams, onClose }: Props) {
             <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-[#456080] mb-1">Age Group</label>
-              <select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)} className={inputClass}>
-                <option value="">— select —</option>
-                {AGE_GROUPS.map((ag) => <option key={ag} value={ag}>{ag}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-[#456080] mb-1">Position</label>
-              <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputClass}>
-                <option value="">— select —</option>
-                {POSITIONS.map((pos) => <option key={pos} value={pos}>{pos.charAt(0).toUpperCase() + pos.slice(1)}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs text-[#456080] mb-1">Age Group</label>
+            <select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)} className={inputClass}>
+              <option value="">— select —</option>
+              {AGE_GROUPS.map((ag) => <option key={ag} value={ag}>{ag}</option>)}
+            </select>
           </div>
+
+          <PositionChips value={positions} onChange={setPositions} id="edit-player-positions" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

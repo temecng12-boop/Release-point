@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
 import { MONTHS } from '@/lib/birth-months'
 import InviteLinkBox from './invite-link-box'
+import PositionChips from '@/components/position-chips'
 
 interface Team { id: string; name: string }
 interface Props {
@@ -56,6 +57,8 @@ export default function InviteForm({ teams, initialState }: Props) {
           <p className="text-[10px] text-[#3D5166] leading-relaxed">
             Players under 13 can&apos;t be added yet. An under-13 date is refused and nothing is saved.
           </p>
+
+          <PositionChips key={state?.success ?? 'idle'} name="positions" id="invite-positions" />
 
           {(teams?.length ?? 0) > 0 && (
             <div>

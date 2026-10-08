@@ -8,6 +8,7 @@ import { parentConsentFlowEnabled, UNDER_13_INVITE_REFUSED, UNDER_13_TEAM_REFUSE
 import { sendPlayerInviteEmail } from '@/lib/email'
 import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
+import { parsePositionsInput, writeWithPositions } from '@/lib/positions'
 
 export async function invitePlayer(
   _prevState: { error?: string; success?: string; inviteUrl?: string } | undefined,
@@ -59,12 +60,15 @@ export async function invitePlayer(
     if (owned.some((t) => ageGroupIsUnder13(t.age_group)) && !parentConsentFlowEnabled()) return { error: UNDER_13_TEAM_REFUSED }
   }
 
-  // Create player row
-  const { data: player, error: playerError } = await supabaseAdmin
-    .from('players')
-    .insert({ coach_id: user.id, full_name: playerName, email: playerEmail })
-    .select('id')
-    .single()
+  const parsedPositions = parsePositionsInput(formData.getAll('positions'))
+  if (!parsedPositions.ok) return { error: parsedPositions.error }
+
+  // Create player row. Positions are optional; zero chips is valid.
+  const { data: player, error: playerError } = await writeWithPositions(
+    { coach_id: user.id, full_name: playerName, email: playerEmail },
+    parsedPositions.positions,
+    (payload) => supabaseAdmin.from('players').insert(payload).select('id').single(),
+  )
 
   if (playerError && playerError.code !== '23505') {
     console.error('[invitePlayer] player insert failed', { code: playerError.code, message: playerError.message })

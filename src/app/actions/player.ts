@@ -9,6 +9,7 @@ import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 import { AVATAR_BUCKET, avatarPathFor, signAvatarUrl } from '@/lib/avatar'
 import { pickFields, OWN_PROFILE_FIELDS, ATHLETE_PROFILE_FIELDS, PLAYER_SELF_FIELDS } from '@/lib/action-fields'
+import { parsePositionsInput, writeWithPositions, type PlayerPosition } from '@/lib/positions'
 import { describeDbError } from '@/lib/db-errors'
 import { avatarFileProblem, avatarBytesMatchType, AVATAR_TOO_BIG, AVATAR_NOT_IMAGE, MAX_AVATAR_BYTES } from '@/lib/avatar-rules'
 
@@ -63,6 +64,7 @@ export async function updatePlayer(playerId: string, data: {
   full_name?: string
   age_group?: string
   position?: string
+  positions?: string[]
   teamIds?: string[]
 }) {
   const supabase = await createClient()
@@ -97,13 +99,17 @@ export async function updatePlayer(playerId: string, data: {
 
   if (fields.full_name) fields.full_name = toTitleCase(fields.full_name)
 
-  if (Object.keys(fields).length > 0) {
-    const { error } = await supabaseAdmin
-      .from('players')
-      .update(fields)
-      .eq('id', playerId)
-      .eq('coach_id', user.id)
+  let positions: PlayerPosition[] | undefined
+  if (data?.positions !== undefined) {
+    const parsed = parsePositionsInput(data.positions)
+    if (!parsed.ok) return { error: parsed.error }
+    positions = parsed.positions
+  }
 
+  if (Object.keys(fields).length > 0 || positions !== undefined) {
+    const { error } = await writeWithPositions(fields, positions, (payload) =>
+      supabaseAdmin.from('players').update(payload).eq('id', playerId).eq('coach_id', user.id),
+    )
     if (error) return { error: error.message }
   }
 
@@ -217,15 +223,17 @@ export async function deletePlayer(playerId: string) {
   return { success: true }
 }
 
-export async function savePlayerPosition(position: 'pitcher' | 'hitter') {
+export async function savePlayerPosition(position: PlayerPosition[] | 'pitcher' | 'hitter') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabaseAdmin
-    .from('players')
-    .update({ position })
-    .eq('user_id', user.id)
+  const parsed = parsePositionsInput(Array.isArray(position) ? position : [position])
+  if (!parsed.ok) return { error: parsed.error }
+
+  const { error } = await writeWithPositions({}, parsed.positions, (payload) =>
+    supabaseAdmin.from('players').update(payload).eq('user_id', user.id),
+  )
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard')
@@ -245,6 +253,7 @@ export async function updatePlayerSelfProfile(data: {
   college_offers?: string[]
   showcases?: { name: string; date: string; location: string }[]
   career_stats?: Record<string, string>
+  positions?: string[]
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -255,13 +264,18 @@ export async function updatePlayerSelfProfile(data: {
   if (!picked.ok) return { error: picked.error }
   const fields = picked.fields
   if (typeof fields.full_name === 'string' && fields.full_name) fields.full_name = toTitleCase(fields.full_name)
-  if (Object.keys(fields).length === 0) return { success: true }
 
-  const { data: changed, error } = await supabaseAdmin
-    .from('players')
-    .update(fields)
-    .eq('user_id', user.id)
-    .select('id')
+  let positions: PlayerPosition[] | undefined
+  if ((data as { positions?: unknown } | null)?.positions !== undefined) {
+    const parsed = parsePositionsInput((data as { positions?: unknown }).positions)
+    if (!parsed.ok) return { error: parsed.error }
+    positions = parsed.positions
+  }
+  if (Object.keys(fields).length === 0 && positions === undefined) return { success: true }
+
+  const { data: changed, error } = await writeWithPositions(fields, positions, (payload) =>
+    supabaseAdmin.from('players').update(payload).eq('user_id', user.id).select('id'),
+  )
 
   if (error) return { error: describeDbError('updatePlayerSelfProfile', error, 'Couldn\'t save your profile.') }
   if (!changed || changed.length === 0) return { error: 'Couldn\'t find your player profile. Please refresh and try again.' }

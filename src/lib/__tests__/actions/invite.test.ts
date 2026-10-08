@@ -127,6 +127,24 @@ test('birth month/year is required: missing fields -> neutral error, nothing wri
   assert.equal(authAdmin.links.length, 0)
 })
 
+test('invite positions are optional: chips write the array; zero chips is valid; unknown tag is refused', async () => {
+  const r = await invitePlayer(undefined, form({ full_name: 'Sam New', player_email: 'sam@example.com', positions: ['catcher', 'infield'] }))
+  assert.equal(r.error, undefined)
+  assert.deepEqual(state.tables.players[0].positions, ['catcher', 'infield'])
+  assert.equal(state.tables.players[0].position, null)
+
+  resetFake({ tables: tables(), user: COACH }); emailFake.reset(); authAdmin.reset()
+  const empty = await invitePlayer(undefined, form({ full_name: 'No Pos', player_email: 'nopos@example.com' }))
+  assert.equal(empty.error, undefined)
+  assert.deepEqual(state.tables.players[0].positions, [])
+  assert.equal(state.tables.players[0].position, null)
+
+  resetFake({ tables: tables(), user: COACH }); emailFake.reset(); authAdmin.reset()
+  const bad = await invitePlayer(undefined, form({ full_name: 'Bad', player_email: 'bad@example.com', positions: ['shortstop'] }))
+  assert.match(bad.error ?? '', /valid position/)
+  assert.equal(state.tables.players.length, 0)
+})
+
 test('the birth month/year is never stored: the row is created with no band, and any age-band fields sent are ignored', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Tia Teen', player_email: 'tia@example.com', age_band: '18_plus', age_status: 'adult' }))
   assert.match(r.success ?? '', /confirm their age when they set up their account/)

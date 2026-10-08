@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { resetFake, fail, state } from './fakes/db'
-import { uploadAvatar, updatePlayer } from '../../../app/actions/player'
+import { uploadAvatar, updatePlayer, savePlayerPosition, updatePlayerSelfProfile } from '../../../app/actions/player'
 
 const COACH = { id: 'coach', email: 'coach@example.com' }
 
@@ -94,4 +94,49 @@ test('updatePlayer: retry after a failed team insert ends with the chosen teams'
   assert.ok('error' in await updatePlayer('p1', { teamIds: ['t2'] }))
   assert.deepEqual(await updatePlayer('p1', { teamIds: ['t2'] }), { success: true })
   assert.deepEqual(state.tables.player_teams.map(r => r.team_id), ['t2'])
+})
+
+test('updatePlayer: multi-select positions dual-write; empty is valid; unknown tag is an error', async () => {
+  seedRoster()
+  const r = await updatePlayer('p1', { positions: ['catcher', 'hitter'] })
+  assert.deepEqual(r, { success: true })
+  assert.deepEqual(state.tables.players[0].positions, ['catcher', 'hitter'])
+  assert.equal(state.tables.players[0].position, 'hitter')
+  assert.deepEqual(await updatePlayer('p1', { positions: [] }), { success: true })
+  assert.deepEqual(state.tables.players[0].positions, [])
+  assert.equal(state.tables.players[0].position, null)
+  const bad = await updatePlayer('p1', { positions: ['shortstop'] })
+  assert.match(String((bad as { error?: string }).error), /valid position/)
+})
+
+test('updatePlayer: missing positions column retries with only the old pitcher/hitter value', async () => {
+  seedRoster()
+  fail({ table: 'players', action: 'update', error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }, times: 1 })
+  const r = await updatePlayer('p1', { positions: ['catcher'] })
+  assert.deepEqual(r, { success: true })
+  assert.equal(state.tables.players[0].position, null)
+})
+
+test('savePlayerPosition: player writes their own chips; empty is valid', async () => {
+  resetFake({
+    user: { id: 'player-1', email: 'p@example.com' },
+    tables: { players: [{ id: 'p1', user_id: 'player-1', position: null }] },
+  })
+  assert.deepEqual(await savePlayerPosition(['infield', 'outfield']), { success: true })
+  assert.deepEqual(state.tables.players[0].positions, ['infield', 'outfield'])
+  assert.equal(state.tables.players[0].position, null)
+  assert.deepEqual(await savePlayerPosition([]), { success: true })
+  assert.deepEqual(state.tables.players[0].positions, [])
+})
+
+test('updatePlayerSelfProfile: positions are written with the profile', async () => {
+  resetFake({
+    user: { id: 'player-1', email: 'p@example.com' },
+    tables: { players: [{ id: 'p1', user_id: 'player-1', height: '6-1' }] },
+  })
+  const r = await updatePlayerSelfProfile({ height: '6-2', positions: ['two-way'] })
+  assert.deepEqual(r, { success: true })
+  assert.equal(state.tables.players[0].height, '6-2')
+  assert.deepEqual(state.tables.players[0].positions, ['two-way'])
+  assert.equal(state.tables.players[0].position, 'pitcher')
 })
