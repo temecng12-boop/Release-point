@@ -82,7 +82,7 @@ for (const shape of ['fresh', 'prod'] as const) {
     const svc = await as(db, 'service',
       `INSERT INTO players (id, coach_id, full_name, email, age_band_coach) VALUES ($1,$2,'Kid','kid2@x','under_13')`, [u(102), COACH])
     assert.match(svc.err, /under 13 can't be added yet/, `service insert refused (${svc.err})`)
-    assert.equal((await db.query(`SELECT count(*) n FROM players`)).rows[0].n, 0, 'nothing saved')
+    assert.equal((await db.query<{ n: number }>(`SELECT count(*) n FROM players`)).rows[0].n, 0, 'nothing saved')
   })
 
   test(`${shape}: bandless and 13_17 inserts still work; 043 stores nothing and changes no existing row`, async () => {
