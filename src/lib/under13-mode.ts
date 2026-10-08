@@ -28,5 +28,5 @@ import { AGE_STOP_MESSAGE } from './stop-message'
 export const UNDER_13_STOP_MESSAGE = AGE_STOP_MESSAGE
 export const PARENT_CONSENT_COMING_SOON = 'Parent consent for players under 13 is coming soon.'
 export const PARENT_CONSENT_UNAVAILABLE = "Parent permission can't be given in the app yet. It's coming soon."
-export const UNDER_13_INVITE_REFUSED = `Players under 13 can't be added yet. ${PARENT_CONSENT_COMING_SOON}`
+export const UNDER_13_INVITE_REFUSED = "Players under 13 can't be added."
 export const UNDER_13_TEAM_REFUSED = `This team's age group is for players under 13, who can't be added yet. ${PARENT_CONSENT_COMING_SOON}`

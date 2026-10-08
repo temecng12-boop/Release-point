@@ -75,13 +75,15 @@ for (const shape of ['fresh', 'prod'] as const) {
     // players_restrict_insert (name order: refuse < restrict < set).
     const coach = await as(db, COACH,
       `INSERT INTO players (id, coach_id, full_name, email, age_band_coach) VALUES ($1,$2,'Kid','kid@x','under_13')`, [u(101), COACH])
-    assert.match(coach.err, /under 13 can't be added yet/, `coach insert refused honestly (${coach.err})`)
+    assert.match(coach.err, /Players under 13 can't be added/, `coach insert refused honestly (${coach.err})`)
+    assert.doesNotMatch(coach.err, /coming soon|yet\./i, 'no promise or timeline')
     assert.doesNotMatch(coach.err, /set by the app/, 'not 037\u2019s restrict message: the new trigger fired first')
     // As the service role (the app/direct path, RLS bypassed): only the
     // trigger can refuse.
     const svc = await as(db, 'service',
       `INSERT INTO players (id, coach_id, full_name, email, age_band_coach) VALUES ($1,$2,'Kid','kid2@x','under_13')`, [u(102), COACH])
-    assert.match(svc.err, /under 13 can't be added yet/, `service insert refused (${svc.err})`)
+    assert.match(svc.err, /Players under 13 can't be added/, `service insert refused (${svc.err})`)
+    assert.doesNotMatch(svc.err, /coming soon|yet\./i, 'no promise or timeline')
     assert.equal((await db.query<{ n: number }>(`SELECT count(*) n FROM players`)).rows[0].n, 0, 'nothing saved')
   })
 

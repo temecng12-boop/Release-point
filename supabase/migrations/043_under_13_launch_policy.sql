@@ -62,7 +62,7 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' AND NEW.age_band_coach = 'under_13' THEN
-    RAISE EXCEPTION 'Players under 13 can''t be added yet. Parent consent for players under 13 is coming soon.'
+    RAISE EXCEPTION 'Players under 13 can''t be added.'
       USING ERRCODE = '42501';
   END IF;
   RETURN NEW;

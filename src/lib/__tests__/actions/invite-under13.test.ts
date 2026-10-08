@@ -50,6 +50,8 @@ const writes = () => state.ops.filter((o) =>
 
 /** A refusal is an honest error only: never a success, never an invite link. */
 function assertRefused(r: { error?: string; success?: string; inviteUrl?: string }) {
+  assert.equal(UNDER_13_INVITE_REFUSED, "Players under 13 can't be added.")
+  assert.doesNotMatch(UNDER_13_INVITE_REFUSED, /coming soon|yet\./i)
   assert.equal(r.error, UNDER_13_INVITE_REFUSED)
   assert.equal(r.success, undefined, 'a refusal must never look like success')
   assert.equal(r.inviteUrl, undefined, 'a refusal must never hand back an invite link')
