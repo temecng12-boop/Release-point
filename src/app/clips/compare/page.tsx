@@ -7,6 +7,8 @@ import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ComparePlayer, { ClipData } from './compare-player'
 import ClipPicker from './clip-picker'
+import { isE2eClipFixture } from '@/lib/e2e-clip-fixture'
+import { E2eComparePage } from '../e2e-clip-fixture'
 
 // Pinch-zoom stays off on the compare viewer, like the clip viewer:
 // side-by-side annotation needs a fixed canvas.
@@ -18,6 +20,7 @@ export const viewport: Viewport = {
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string; c?: string; d?: string }> }) {
   const { a, b, c, d } = await searchParams
+  if (a && b && isE2eClipFixture(a) && isE2eClipFixture(b)) return <E2eComparePage a={a} b={b} />
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')

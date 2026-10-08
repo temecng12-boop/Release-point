@@ -15,6 +15,13 @@ import {
   readClipMuted,
   writeClipMuted,
 } from '../clip-mute'
+import {
+  E2E_CLIP_A,
+  E2E_CLIP_B,
+  e2eClipFixtureEnabled,
+  isE2eClipFixture,
+  isE2eClipFixtureRequest,
+} from '../e2e-clip-fixture'
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
@@ -160,6 +167,33 @@ test('voice-note and timestamp-notes emit recording start/stop/fail/cancel', () 
   assert.match(voice, /emitVoiceRecording\(false\)/)
   assert.ok((voice.match(/emitVoiceRecording\(false\)/g) ?? []).length >= 2, 'voice-note restores on stop and fail/unmount')
   assert.ok((stamps.match(/emitVoiceRecording\(false\)/g) ?? []).length >= 2, 'timestamp-notes restores on stop and fail/unmount')
+})
+
+test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1', () => {
+  const prev = process.env.PLAYWRIGHT_CLIP_FIXTURE
+  delete process.env.PLAYWRIGHT_CLIP_FIXTURE
+  assert.equal(e2eClipFixtureEnabled(), false)
+  assert.equal(isE2eClipFixture(E2E_CLIP_A), false)
+  assert.equal(isE2eClipFixtureRequest(`/clips/${E2E_CLIP_A}`), false)
+  process.env.PLAYWRIGHT_CLIP_FIXTURE = '1'
+  assert.equal(isE2eClipFixture(E2E_CLIP_A), true)
+  assert.equal(isE2eClipFixture('not-a-fixture'), false)
+  assert.equal(isE2eClipFixtureRequest(`/clips/${E2E_CLIP_A}`), true)
+  assert.equal(isE2eClipFixtureRequest(`/clips/${E2E_CLIP_B}`), true)
+  assert.equal(isE2eClipFixtureRequest('/clips/compare', new URLSearchParams(`a=${E2E_CLIP_A}&b=${E2E_CLIP_B}`)), true)
+  assert.equal(isE2eClipFixtureRequest('/clips/compare', new URLSearchParams(`a=${E2E_CLIP_A}`)), false)
+  assert.equal(isE2eClipFixtureRequest('/dashboard'), false)
+  if (prev === undefined) delete process.env.PLAYWRIGHT_CLIP_FIXTURE
+  else process.env.PLAYWRIGHT_CLIP_FIXTURE = prev
+
+  const clipPage = read('../../app/clips/[id]/page.tsx')
+  const comparePage = read('../../app/clips/compare/page.tsx')
+  const middleware = read('../../middleware.ts')
+  assert.match(clipPage, /isE2eClipFixture\(id\)/)
+  assert.match(clipPage, /<E2eClipCoachPage/)
+  assert.match(comparePage, /isE2eClipFixture\(a\) && isE2eClipFixture\(b\)/)
+  assert.match(comparePage, /<E2eComparePage/)
+  assert.match(middleware, /isE2eClipFixtureRequest/)
 })
 
 test('clip mute button: speaker icon, aria-label, 44px tap target', () => {
