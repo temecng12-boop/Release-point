@@ -170,9 +170,11 @@ test('voice-note and timestamp-notes emit recording start/stop/fail/cancel', () 
   assert.ok((stamps.match(/emitVoiceRecording\(false\)/g) ?? []).length >= 2, 'timestamp-notes restores on stop and fail/unmount')
 })
 
-test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1', () => {
+test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1 and not on Vercel', () => {
   const prev = process.env.PLAYWRIGHT_CLIP_FIXTURE
+  const prevVercel = process.env.VERCEL
   delete process.env.PLAYWRIGHT_CLIP_FIXTURE
+  delete process.env.VERCEL
   assert.equal(e2eClipFixtureEnabled(), false)
   assert.equal(isE2eClipFixture(E2E_CLIP_A), false)
   assert.equal(isE2eClipFixtureRequest(`/clips/${E2E_CLIP_A}`), false)
@@ -184,8 +186,14 @@ test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1', () => {
   assert.equal(isE2eClipFixtureRequest('/clips/compare', new URLSearchParams(`a=${E2E_CLIP_A}&b=${E2E_CLIP_B}`)), true)
   assert.equal(isE2eClipFixtureRequest('/clips/compare', new URLSearchParams(`a=${E2E_CLIP_A}`)), false)
   assert.equal(isE2eClipFixtureRequest('/dashboard'), false)
+  process.env.VERCEL = '1'
+  assert.equal(e2eClipFixtureEnabled(), false, 'never on a Vercel deploy')
+  assert.equal(isE2eClipFixture(E2E_CLIP_A), false)
+  assert.equal(isE2eClipFixtureRequest(`/clips/${E2E_CLIP_A}`), false)
   if (prev === undefined) delete process.env.PLAYWRIGHT_CLIP_FIXTURE
   else process.env.PLAYWRIGHT_CLIP_FIXTURE = prev
+  if (prevVercel === undefined) delete process.env.VERCEL
+  else process.env.VERCEL = prevVercel
 
   const clipPage = read('../../app/clips/[id]/page.tsx')
   const comparePage = read('../../app/clips/compare/page.tsx')
@@ -195,6 +203,8 @@ test('e2e clip fixture is off unless PLAYWRIGHT_CLIP_FIXTURE=1', () => {
   assert.match(comparePage, /isE2eClipFixture\(a\) && isE2eClipFixture\(b\)/)
   assert.match(comparePage, /<E2eComparePage/)
   assert.match(middleware, /isE2eClipFixtureRequest/)
+  const gate = read('../e2e-clip-fixture.ts')
+  assert.match(gate, /PLAYWRIGHT_CLIP_FIXTURE === '1' && !process\.env\.VERCEL/)
 })
 
 test('first paint: video starts muted so a saved muted choice cannot leak audio', () => {

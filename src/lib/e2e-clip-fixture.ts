@@ -1,6 +1,8 @@
 /**
  * Local Playwright fixture for the real clip and compare routes.
- * Off unless PLAYWRIGHT_CLIP_FIXTURE=1, so production still requires auth + DB.
+ * On only when PLAYWRIGHT_CLIP_FIXTURE=1 and this is not a Vercel deploy
+ * (VERCEL is always set there). Playwright's webServer is `next dev` today
+ * and must still work if someone later uses `next start`.
  */
 
 export const E2E_CLIP_A = '00000000-0000-4000-a000-000000000001'
@@ -9,7 +11,7 @@ export const E2E_PLAYER_ID = '00000000-0000-4000-a000-0000000000aa'
 export const E2E_CLIP_SRC = '/e2e-clip.mp4'
 
 export function e2eClipFixtureEnabled(): boolean {
-  return process.env.PLAYWRIGHT_CLIP_FIXTURE === '1'
+  return process.env.PLAYWRIGHT_CLIP_FIXTURE === '1' && !process.env.VERCEL
 }
 
 export function isE2eClipId(id: string | undefined | null): boolean {

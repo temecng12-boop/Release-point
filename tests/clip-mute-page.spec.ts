@@ -25,38 +25,39 @@ async function stubVoiceRecording(page: Page) {
       getAudioTracks() { return [track] },
       getVideoTracks() { return [] },
     }
-    const gum = async () => stream
-    const devices = {
-      getUserMedia: gum,
-      enumerateDevices: async () => [],
-      getSupportedConstraints() { return {} },
-    }
+    const gum = async () => stream as unknown as MediaStream
     try {
-      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, get() { return devices } })
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        get() { return { getUserMedia: gum, enumerateDevices: async () => [], getSupportedConstraints() { return {} } } as unknown as MediaDevices },
+      })
     } catch {
       try { navigator.mediaDevices.getUserMedia = gum } catch { /* empty */ }
     }
     try {
-      if (window.MediaDevices && MediaDevices.prototype) MediaDevices.prototype.getUserMedia = gum
+      if (typeof MediaDevices !== 'undefined' && MediaDevices.prototype) MediaDevices.prototype.getUserMedia = gum
     } catch { /* empty */ }
-    function FakeRecorder(_stream, opts) {
-      this.mimeType = (opts && opts.mimeType) || 'audio/webm'
-      this.state = 'inactive'
-      this.ondataavailable = null
-      this.onstop = null
-      this.onerror = null
+    class FakeRecorder {
+      mimeType: string
+      state = 'inactive'
+      ondataavailable: ((e: { data: Blob }) => void) | null = null
+      onstop: (() => void) | null = null
+      onerror: ((e: Event) => void) | null = null
+      constructor(_stream: unknown, opts?: { mimeType?: string }) {
+        this.mimeType = opts?.mimeType ?? 'audio/webm'
+      }
+      start() { this.state = 'recording' }
+      stop() {
+        this.state = 'inactive'
+        this.ondataavailable?.({ data: new Blob([new Uint8Array([1])], { type: this.mimeType }) })
+        this.onstop?.()
+      }
+      static isTypeSupported() { return true }
     }
-    FakeRecorder.prototype.start = function start() { this.state = 'recording' }
-    FakeRecorder.prototype.stop = function stop() {
-      this.state = 'inactive'
-      if (this.ondataavailable) this.ondataavailable({ data: new Blob([new Uint8Array([1])], { type: this.mimeType }) })
-      if (this.onstop) this.onstop()
-    }
-    FakeRecorder.isTypeSupported = function isTypeSupported() { return true }
     try {
       Object.defineProperty(window, 'MediaRecorder', { configurable: true, writable: true, value: FakeRecorder })
     } catch {
-      window.MediaRecorder = FakeRecorder
+      ;(window as unknown as { MediaRecorder: typeof FakeRecorder }).MediaRecorder = FakeRecorder
     }
   })
 }
