@@ -9,7 +9,7 @@ import { collectStorageFiles, removeStorageFiles } from '@/lib/account-deletion'
 import { supabaseDeletionStorage } from '@/lib/account-deletion-supabase'
 import { AVATAR_BUCKET, avatarPathFor, signAvatarUrl } from '@/lib/avatar'
 import { pickFields, OWN_PROFILE_FIELDS, ATHLETE_PROFILE_FIELDS, PLAYER_SELF_FIELDS } from '@/lib/action-fields'
-import { parsePositionsInput, writeWithPositions, type PlayerPosition } from '@/lib/positions'
+import { parsePositionsInput, writeWithPositions, POSITIONS_UNAVAILABLE, type PlayerPosition } from '@/lib/positions'
 import { describeDbError } from '@/lib/db-errors'
 import { avatarFileProblem, avatarBytesMatchType, AVATAR_TOO_BIG, AVATAR_NOT_IMAGE, MAX_AVATAR_BYTES } from '@/lib/avatar-rules'
 
@@ -277,7 +277,10 @@ export async function updatePlayerSelfProfile(data: {
     supabaseAdmin.from('players').update(payload).eq('user_id', user.id).select('id'),
   )
 
-  if (error) return { error: describeDbError('updatePlayerSelfProfile', error, 'Couldn\'t save your profile.') }
+  if (error) {
+    if (error.message === POSITIONS_UNAVAILABLE) return { error: POSITIONS_UNAVAILABLE }
+    return { error: describeDbError('updatePlayerSelfProfile', error, 'Couldn\'t save your profile.') }
+  }
   if (!changed || changed.length === 0) return { error: 'Couldn\'t find your player profile. Please refresh and try again.' }
   revalidatePath('/dashboard')
   revalidatePath('/player-settings')

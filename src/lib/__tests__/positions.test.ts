@@ -13,6 +13,8 @@ import {
   resolveClipKind,
   resolvePlayerPositions,
   writeWithPositions,
+  canRepresentAsLegacyPosition,
+  POSITIONS_UNAVAILABLE,
 } from '../positions'
 
 test('mapLegacyPosition covers every value the app has written, plus two-way spellings', () => {
@@ -74,14 +76,37 @@ test('default clip kind: hitter-only is hitting; everything else is pitching', (
   assert.equal(resolveClipKind('nope', ['hitter', 'pitcher']), 'pitching')
 })
 
-test('writeWithPositions dual-writes and retries without positions when the column is missing', async () => {
-  const calls: Record<string, unknown>[] = []
-  const r = await writeWithPositions({ full_name: 'A' }, ['catcher', 'hitter'], async (fields) => {
-    calls.push(fields)
-    if ('positions' in fields) return { error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" } }
-    return { error: null }
-  })
-  assert.equal(r.error, null)
-  assert.deepEqual(calls[0], { full_name: 'A', positions: ['catcher', 'hitter'], position: 'hitter' })
-  assert.deepEqual(calls[1], { full_name: 'A', position: 'hitter' })
+test('writeWithPositions fallback: only [] / pitcher / hitter retry; others error and write nothing', async () => {
+  const missing = { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }
+  for (const ok of [[] as const, ['pitcher'] as const, ['hitter'] as const]) {
+    const calls: Record<string, unknown>[] = []
+    const r = await writeWithPositions({ full_name: 'A' }, [...ok], async (fields) => {
+      calls.push(fields)
+      if ('positions' in fields) return { error: missing }
+      return { error: null }
+    })
+    assert.equal(r.error, null, String(ok))
+    assert.equal(calls.length, 2, String(ok))
+    assert.deepEqual(calls[1], { full_name: 'A', position: ok[0] ?? null })
+  }
+  for (const bad of [['catcher'], ['infield'], ['outfield'], ['two-way'], ['catcher', 'hitter'], ['pitcher', 'hitter']] as const) {
+    const calls: Record<string, unknown>[] = []
+    const r = await writeWithPositions({ full_name: 'A' }, [...bad], async (fields) => {
+      calls.push(fields)
+      if ('positions' in fields) return { error: missing }
+      return { error: null }
+    })
+    assert.equal(r.error && 'message' in r.error ? r.error.message : '', POSITIONS_UNAVAILABLE, String(bad))
+    assert.equal(calls.length, 1, `must not write the old column for ${String(bad)}`)
+    assert.ok('positions' in calls[0])
+  }
+})
+
+test('canRepresentAsLegacyPosition is only empty, pitcher-only, or hitter-only', () => {
+  assert.equal(canRepresentAsLegacyPosition([]), true)
+  assert.equal(canRepresentAsLegacyPosition(['pitcher']), true)
+  assert.equal(canRepresentAsLegacyPosition(['hitter']), true)
+  assert.equal(canRepresentAsLegacyPosition(['catcher']), false)
+  assert.equal(canRepresentAsLegacyPosition(['two-way']), false)
+  assert.equal(canRepresentAsLegacyPosition(['hitter', 'catcher']), false)
 })

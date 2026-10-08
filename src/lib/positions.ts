@@ -17,6 +17,7 @@ export const POSITION_LABELS: Record<PlayerPosition, string> = {
 }
 
 export const INVALID_POSITIONS = 'Choose a valid position.'
+export const POSITIONS_UNAVAILABLE = 'Couldn\'t save positions right now. Please try again in a few minutes.'
 
 const POSITION_SET = new Set<string>(PLAYER_POSITIONS)
 
@@ -115,6 +116,12 @@ export function legacyPositionFrom(positions: readonly PlayerPosition[]): 'pitch
   return null
 }
 
+/** Sets the old column can store exactly: empty, pitcher-only, or hitter-only. */
+export function canRepresentAsLegacyPosition(positions: readonly PlayerPosition[]): boolean {
+  return positions.length === 0
+    || (positions.length === 1 && (positions[0] === 'pitcher' || positions[0] === 'hitter'))
+}
+
 export type ClipKind = 'pitching' | 'hitting'
 
 export function isClipKind(v: unknown): v is ClipKind {
@@ -141,16 +148,20 @@ export function positionSearchText(row: PositionSource | null | undefined): stri
 
 /**
  * Write `positions` plus a compatible `position`. If the new column is
- * missing (deploy-before-paste), retry with only the old column.
+ * missing (deploy-before-paste), retry with only the old column — but only
+ * when that column can store the pick exactly ([] / pitcher / hitter).
+ * Catcher, infield, outfield, two-way, and combinations are an error and
+ * write nothing, so a dropped tag never looks like success.
  */
 export async function writeWithPositions<R extends { error: DbErrorLike | null }>(
   fields: Record<string, unknown>,
   positions: PlayerPosition[] | undefined,
   run: (fields: Record<string, unknown>) => PromiseLike<R>,
-): Promise<R> {
+): Promise<R | { error: { message: string } }> {
   if (positions === undefined) return run(fields)
   const payload = { ...fields, positions, position: legacyPositionFrom(positions) }
   const first = await run(payload)
   if (!isMissingColumnError(first.error, 'positions')) return first
+  if (!canRepresentAsLegacyPosition(positions)) return { error: { message: POSITIONS_UNAVAILABLE } }
   return run({ ...fields, position: legacyPositionFrom(positions) })
 }

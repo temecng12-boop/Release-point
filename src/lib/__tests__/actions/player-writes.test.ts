@@ -109,12 +109,19 @@ test('updatePlayer: multi-select positions dual-write; empty is valid; unknown t
   assert.match(String((bad as { error?: string }).error), /valid position/)
 })
 
-test('updatePlayer: missing positions column retries with only the old pitcher/hitter value', async () => {
+test('updatePlayer: missing positions column: pitcher falls back; catcher is an error and writes nothing', async () => {
   seedRoster()
+  const before = { ...state.tables.players[0] }
   fail({ table: 'players', action: 'update', error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }, times: 1 })
-  const r = await updatePlayer('p1', { positions: ['catcher'] })
+  const dropped = await updatePlayer('p1', { positions: ['catcher'] })
+  assert.match(String((dropped as { error?: string }).error), /Couldn't save positions right now/)
+  assert.equal(state.tables.players[0].position, before.position)
+  assert.equal(state.tables.players[0].positions, before.positions)
+
+  fail({ table: 'players', action: 'update', error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }, times: 1 })
+  const r = await updatePlayer('p1', { positions: ['pitcher'] })
   assert.deepEqual(r, { success: true })
-  assert.equal(state.tables.players[0].position, null)
+  assert.equal(state.tables.players[0].position, 'pitcher')
 })
 
 test('savePlayerPosition: player writes their own chips; empty is valid', async () => {

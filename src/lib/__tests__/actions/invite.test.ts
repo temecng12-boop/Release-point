@@ -145,6 +145,19 @@ test('invite positions are optional: chips write the array; zero chips is valid;
   assert.equal(state.tables.players.length, 0)
 })
 
+test('invite: missing positions column refuses catcher (no silent drop) and allows pitcher fallback', async () => {
+  fail({ table: 'players', action: 'insert', error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }, times: 1 })
+  const dropped = await invitePlayer(undefined, form({ full_name: 'Catch', player_email: 'catch@example.com', positions: ['catcher'] }))
+  assert.match(dropped.error ?? '', /Couldn't save positions right now/)
+  assert.equal(state.tables.players.length, 0)
+
+  fail({ table: 'players', action: 'insert', error: { code: 'PGRST204', message: "Could not find the 'positions' column of 'players'" }, times: 1 })
+  const ok = await invitePlayer(undefined, form({ full_name: 'Pitch', player_email: 'pitch@example.com', positions: ['pitcher'] }))
+  assert.equal(ok.error, undefined)
+  assert.equal(state.tables.players[0].position, 'pitcher')
+  assert.equal(state.tables.players[0].positions, undefined)
+})
+
 test('the birth month/year is never stored: the row is created with no band, and any age-band fields sent are ignored', async () => {
   const r = await invitePlayer(undefined, form({ full_name: 'Tia Teen', player_email: 'tia@example.com', age_band: '18_plus', age_status: 'adult' }))
   assert.match(r.success ?? '', /confirm their age when they set up their account/)
