@@ -166,7 +166,8 @@ export default async function DashboardPage() {
   if (dashboardRoute(profileRead, isCoach ? null : { data: playerRow, error: playerReadError }) === 'age') redirect('/onboarding/age')
   // Under 13 is a hard stop for now: the account shows only the stop message.
   const frozen = !isCoach && isFrozenUnder13(playerRow)
-  if (!isCoach && playerRow && !playerRow.position && !frozen) redirect('/onboarding')
+  // Position chips are optional: an empty selection is valid, so the dashboard
+  // does not send the player back to the picker.
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
@@ -448,6 +449,13 @@ export default async function DashboardPage() {
                       ? 'Ready to start your development journey?'
                       : `${myClips!.length} clip${myClips!.length === 1 ? '' : 's'} uploaded · Keep grinding.`}
                   </p>
+                  <Link
+                    href="/player-settings"
+                    className="inline-flex items-center justify-center min-h-11 mt-3 px-4 rounded-lg border border-[#e2e8f0] text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                    style={os}
+                  >
+                    My Profile
+                  </Link>
                 </div>
                 {playerRow && (
                   <UploadButton

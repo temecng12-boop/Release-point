@@ -79,6 +79,9 @@ export async function selectPlayersWithConsent<T>(
   run: (select: string) => PromiseLike<QueryResult>,
 ): Promise<{ data: T | null; error: DbErrorLike | null }> {
   const first = await run(`${columns}, ${PLAYER_CONSENT_COLUMNS}`)
+  if (isMissingColumnError(first.error, 'positions') && /\bpositions\b/.test(columns)) {
+    return selectPlayersWithConsent<T>(columns.replace(/(^|,\s*)positions\b/g, '').replace(/^,\s*/, ''), run)
+  }
   if (!isMissingAgeBandColumn(first.error) && !isMissingConsentColumn(first.error)) {
     return first as { data: T | null; error: DbErrorLike | null }
   }

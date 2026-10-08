@@ -11,6 +11,7 @@ import BullpenModal from './bullpen-modal'
 import type { BullpenSession } from './bullpen-modal'
 import { deleteClip } from '@/app/actions/clips'
 import { runAction } from '@/lib/action-result'
+import PositionTags from '@/components/position-tags'
 
 interface Clip {
   id: string
@@ -28,6 +29,7 @@ interface Player {
   accepted_at: string | null
   age_group: string | null
   position: string | null
+  positions?: string[] | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
   age_band?: string | null
@@ -95,11 +97,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                   {player.age_group}
                 </span>
               )}
-              {player.position && (
-                <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full capitalize">
-                  {player.position}
-                </span>
-              )}
+              <PositionTags player={player} />
             </div>
             <p className="text-xs text-[#456080] mt-0.5">{player.email}</p>
           </div>

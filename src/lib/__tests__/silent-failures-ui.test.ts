@@ -61,6 +61,15 @@ test('video player: a lesson save warning is shown instead of "Lesson saved"', (
   assert.match(src, /: <span role="status"[^>]*>\{lessonNotice\}<\/span>/)
 })
 
+test('clip kind toggle: a failed save shows the error and does not flip the kind', () => {
+  const src = read('app/clips/[id]/clip-kind-toggle.tsx')
+  const start = src.indexOf('async function choose')
+  assert.ok(start >= 0)
+  const body = src.slice(start, src.indexOf('return (', start))
+  inOrder(body, 'runAction(() => saveClipKind(clipId, next))', 'if (!result.ok)', 'setError(result.error)', 'return', 'setKind(next)', 'onSaved?.(next)')
+  assert.match(src, /\{error && <p role="alert"/)
+})
+
 test('clip title: a failed rename reverts the title and shows the error', () => {
   const body = fnBody(read('app/clips/[id]/clip-title.tsx'), 'save')
   inOrder(body, 'runAction(() => renameClip(clipId, trimmed))', 'if (!result.ok) {', 'setValue(saved)', 'setError(', 'return', 'setSaved(trimmed)', 'router.refresh()')

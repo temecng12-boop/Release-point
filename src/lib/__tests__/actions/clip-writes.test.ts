@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { resetFake, fail, state } from './fakes/db'
-import { deleteClip, clearAnnotations, saveLessonPath, renameClip, deleteAnnotation, deleteTimestampNote } from '../../../app/actions/clips'
+import { deleteClip, clearAnnotations, saveLessonPath, renameClip, deleteAnnotation, deleteTimestampNote, saveClipKind } from '../../../app/actions/clips'
 
 const P = '11111111-1111-4111-8111-111111111111'
 const C = '33333333-3333-4333-8333-333333333333'
@@ -259,6 +259,51 @@ test('saveLessonPath: lessons insert fails -> error, not success', async () => {
   const r = await saveLessonPath(C, NEW_LESSON)
   assert.ok('error' in r, JSON.stringify(r))
   assert.equal(state.tables.lessons.length, 0)
+})
+
+test('saveClipKind: coach can save hitting; player can too', async () => {
+  seed()
+  assert.deepEqual(await saveClipKind(C, 'hitting'), { success: true, clipKind: 'hitting' })
+  assert.equal(state.tables.clips[0].clip_kind, 'hitting')
+  state.user = { id: 'player-user' }
+  assert.deepEqual(await saveClipKind(C, 'pitching'), { success: true, clipKind: 'pitching' })
+  assert.equal(state.tables.clips[0].clip_kind, 'pitching')
+})
+
+test('saveClipKind: update fails -> error, clip_kind unchanged', async () => {
+  seed()
+  fail({ table: 'clips', action: 'update', error: { message: 'boom' } })
+  const r = await saveClipKind(C, 'hitting')
+  assert.ok('error' in r && r.error)
+  assert.equal(state.tables.clips[0].clip_kind, undefined)
+})
+
+test('saveClipKind: missing clip_kind column is an error, not success', async () => {
+  seed()
+  fail({ table: 'clips', action: 'update', error: { code: 'PGRST204', message: "Could not find the 'clip_kind' column of 'clips'" } })
+  const r = await saveClipKind(C, 'hitting')
+  assert.ok('error' in r && r.error)
+  assert.equal('success' in r, false)
+})
+
+test('saveClipKind: 0-row update is an error, not success', async () => {
+  seed()
+  state.tables.clips = []
+  const r = await saveClipKind(C, 'hitting')
+  assert.ok('error' in r && r.error)
+})
+
+test('saveClipKind: guardian is refused; invalid kind is refused', async () => {
+  seed()
+  state.tables.players[0].guardian_id = 'g1'
+  state.tables.guardians = [{ id: 'g1', user_id: 'guard-1' }]
+  state.user = { id: 'guard-1' }
+  const g = await saveClipKind(C, 'hitting')
+  assert.ok('error' in g && g.error)
+  assert.equal(state.tables.clips[0].clip_kind, undefined)
+  state.user = COACH
+  const bad = await saveClipKind(C, 'fielding')
+  assert.ok('error' in bad && bad.error)
 })
 
 for (const band of [null, 'under_13']) test(`saveLessonPath: player with band ${band} (no video) -> error, nothing changed`, async () => {

@@ -9,6 +9,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { canUseAiCoachFor } from './auth/roster-access'
 import { teamCoachAccess, type AccessDb } from './clip-access'
+import { defaultClipKind, formatPositionLabels, resolvePlayerPositions, type ClipKind } from './positions'
 
 type Db = Pick<SupabaseClient, 'from'>
 
@@ -31,6 +32,8 @@ export type AiChatContext = {
   playerName: string
   ageGroup: string | null
   position: string | null
+  /** From the player's positions when there is no clip toggle (profile chat). */
+  defaultClipKind: ClipKind
   metrics: AiChatMetric[]
   checklist: AiChatPhaseRow[] | null
   coachNotes: string | null
@@ -47,12 +50,19 @@ type PlayerRow = {
   full_name: string | null
   age_group: string | null
   position: string | null
+  positions?: unknown
   coach_id: string | null
   user_id: string | null
   team_id: string | null
 }
 
 async function loadPlayer(db: Db, playerId: string): Promise<PlayerRow | null> {
+  const withPos = await db
+    .from('players')
+    .select('id, full_name, age_group, position, positions, coach_id, user_id, team_id')
+    .eq('id', playerId)
+    .maybeSingle()
+  if (!withPos.error) return (withPos.data as PlayerRow | null) ?? null
   const { data } = await db
     .from('players')
     .select('id, full_name, age_group, position, coach_id, user_id, team_id')
@@ -116,7 +126,8 @@ export async function loadAiChatContext(
     context: {
       playerName: player.full_name ?? '',
       ageGroup: player.age_group,
-      position: player.position,
+      position: formatPositionLabels(resolvePlayerPositions(player)) || player.position,
+      defaultClipKind: defaultClipKind(resolvePlayerPositions(player)),
       metrics,
       checklist,
       coachNotes: clipId ? clipNotes : null,

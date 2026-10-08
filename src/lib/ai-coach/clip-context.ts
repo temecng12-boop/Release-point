@@ -2,12 +2,14 @@
 // signed-in user. Only import from Route Handlers / Server Actions.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canViewPlayerContent } from '@/lib/clip-access'
+import { formatPositionLabels, resolveClipKind, resolvePlayerPositions, type ClipKind } from '@/lib/positions'
 import type { CoachClipDetails, CoachHittingMetrics, CoachMetric, CoachPhaseRow, CoachTimestampNote } from './prompt'
 
 export type LoadedClipContext = {
   playerName: string | null
   ageGroup: string | null
   position: string | null
+  clipKind: ClipKind
   clip: CoachClipDetails
   coachNotes: string | null
   checklist: CoachPhaseRow[] | null
@@ -49,6 +51,24 @@ export async function loadClipContext(userId: string, clipId: string): Promise<C
   if (!player || !access.allowed || access.via === 'guardian') {
     return { ok: false, status: 404, message: 'Clip not found' }
   }
+
+  let storedPositions: unknown
+  {
+    const posRes = await supabaseAdmin.from('players').select('positions').eq('id', clip.player_id).maybeSingle()
+    if (posRes.error) console.warn('[ai-coach] positions unavailable', posRes.error.message)
+    else storedPositions = (posRes.data as { positions?: unknown } | null)?.positions
+  }
+  const positions = resolvePlayerPositions({
+    position: player.position,
+    positions: storedPositions,
+  })
+  let storedClipKind: unknown = null
+  {
+    const kindRes = await supabaseAdmin.from('clips').select('clip_kind').eq('id', clipId).maybeSingle()
+    if (kindRes.error) console.warn('[ai-coach] clip_kind unavailable', kindRes.error.message)
+    else storedClipKind = (kindRes.data as { clip_kind?: unknown } | null)?.clip_kind ?? null
+  }
+  const clipKind = resolveClipKind(storedClipKind, positions)
 
   // Columns added by later migrations are read separately so a missing column
   // only drops that piece of context instead of failing the whole request.
@@ -115,7 +135,8 @@ export async function loadClipContext(userId: string, clipId: string): Promise<C
     context: {
       playerName: player.full_name ?? null,
       ageGroup: player.age_group ?? null,
-      position: player.position ?? null,
+      position: formatPositionLabels(positions) || null,
+      clipKind,
       clip: {
         title: clip.title ?? null,
         session_date: clip.session_date ?? null,

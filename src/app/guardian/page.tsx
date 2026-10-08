@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutForm from '@/components/sign-out-form'
 import ReportProblemButton from '@/components/report-problem'
 import Logo from '@/components/Logo'
+import PositionTags from '@/components/position-tags'
+import { isMissingColumnError } from '@/lib/db-errors'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -32,12 +34,22 @@ export default async function GuardianPage() {
     .eq('user_id', user.id)
     .single()
 
-  const { data: players } = guardian
-    ? await supabase
+  let players: { id: string; full_name: string; age_group: string | null; position: string | null; positions?: string[] | null }[] | null = []
+  if (guardian) {
+    const withPos = await supabase
+      .from('players')
+      .select('id, full_name, age_group, position, positions')
+      .eq('guardian_id', guardian.id)
+    if (withPos.error && isMissingColumnError(withPos.error, 'positions')) {
+      const fallback = await supabase
         .from('players')
         .select('id, full_name, age_group, position')
         .eq('guardian_id', guardian.id)
-    : { data: [] }
+      players = fallback.data
+    } else {
+      players = withPos.data as typeof players
+    }
+  }
 
   const playerIds = players?.map(p => p.id) ?? []
   const { data: clips } = playerIds.length > 0
@@ -82,11 +94,7 @@ export default async function GuardianPage() {
                     {player.age_group}
                   </span>
                 )}
-                {player.position && (
-                  <span className="text-[10px] border border-[#DDE4ED] text-[#456080] px-2 py-0.5 rounded capitalize" style={oswald}>
-                    {player.position}
-                  </span>
-                )}
+                <PositionTags player={player} className="text-[10px] border border-[#DDE4ED] text-[#456080] px-2 py-0.5 rounded" />
               </div>
 
               {playerClips.length === 0 ? (

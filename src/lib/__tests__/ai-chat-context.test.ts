@@ -79,7 +79,7 @@ async function main() {
     const r = await loadAiChatContext(db, COACH, { clipId: CLIP })
     assert(r.ok, "player's own coach: allowed")
     if (r.ok) {
-      assert(r.context.playerName === 'Real Name' && r.context.ageGroup === 'High School' && r.context.position === 'pitcher', 'player details come from the database')
+      assert(r.context.playerName === 'Real Name' && r.context.ageGroup === 'High School' && r.context.position === 'Pitcher' && r.context.defaultClipKind === 'pitching', 'player details come from the database')
       assert(JSON.stringify(r.context.metrics) === JSON.stringify([metric]), "metrics are this clip's, from the database")
       assert(JSON.stringify(r.context.checklist) === JSON.stringify(checklist), 'checklist from the database')
       assert(r.context.coachNotes === 'Stay tall', 'coach notes from the clip row')

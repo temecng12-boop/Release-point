@@ -7,6 +7,8 @@ import UploadButton from '@/app/dashboard/upload-button'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
+import PositionTags from '@/components/position-tags'
+import { formatPositionLabels, resolvePlayerPositions } from '@/lib/positions'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -25,6 +27,7 @@ type ProfilePlayer = {
   accepted_at: string | null
   age_group: string | null
   position: string | null
+  positions?: string[] | null
   coach_id: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
@@ -50,7 +53,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   if (profile?.role !== 'coach') redirect('/dashboard')
 
   const { data: player } = await selectPlayersWithConsent<ProfilePlayer>(
-    'id, full_name, email, accepted_at, age_group, position, coach_id',
+    'id, full_name, email, accepted_at, age_group, position, positions, coach_id',
     (cols) => supabaseAdmin.from('players').select(cols).eq('id', id).single(),
   )
 
@@ -169,9 +172,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   {player.age_group && (
                     <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full">{player.age_group}</span>
                   )}
-                  {player.position && (
-                    <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full capitalize">{player.position}</span>
-                  )}
+                  <PositionTags player={player} />
                   <span
                     className={`text-xs px-2 py-0.5 rounded tracking-wide ${player.accepted_at ? 'bg-green-100 text-green-700' : 'bg-[#EEF2F7] text-[#456080]'}`}
                     style={oswald}
@@ -220,7 +221,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
           playerId={player.id}
           playerName={player.full_name}
           playerAgeGroup={player.age_group}
-          playerPosition={player.position}
+          playerPosition={formatPositionLabels(resolvePlayerPositions(player)) || null}
           clips={clips ?? []}
           metrics={metrics}
           notes={notes}

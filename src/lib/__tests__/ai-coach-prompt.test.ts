@@ -45,6 +45,15 @@ test('the route loads clip context on the server when a clipId is sent', () => {
   assert.match(routeSource, /if \(!loaded\.ok\) return new Response/)
 })
 
+test('AI framing uses the clip toggle, not the player\'s single position', () => {
+  assert.match(routeSource, /clipKind = c\.clipKind/)
+  assert.match(routeSource, /requestedAgent \?\? \(clipKind === 'hitting' \? 'barry' : 'randy'\)/)
+  assert.match(routeSource, /function playerLine\(/)
+  assert.match(routeSource, /This clip:/)
+  assert.match(routeSource, /playerLine\(playerName, ageGroup, position, clipKind\)/)
+  assert.doesNotMatch(routeSource, /isPitcherPosition|player\.position === 'hitter'/)
+})
+
 test('formatMetrics shows axis as clock tilt plus degrees, and the newer columns', () => {
   const text = formatMetrics([
     { pitch_type: 'Fastball', velocity: 84.3, spin_rate: 2310, spin_axis: 37.5, horizontal_break: -2.1, vertical_break: 14.8, extension: 6.1, vaa: -5.2 },

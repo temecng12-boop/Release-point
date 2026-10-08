@@ -6,6 +6,7 @@ import { checkAiChatGate } from '@/lib/ai-chat-gate'
 import { formatPhilosophiesForPrompt } from '@/lib/philosophies'
 import { loadAiChatContext, sanitizeChatMessages } from '@/lib/ai-chat-context'
 import { loadClipContext } from '@/lib/ai-coach/clip-context'
+import type { ClipKind } from '@/lib/positions'
 import {
   VIDEO_ACCESS_NOTE, cleanCoachNotes, formatChecklist, formatClipDetails, formatHittingMetrics, formatMetrics,
   formatTimestampNotes,
@@ -39,7 +40,12 @@ ${clipText}
 ${timestampNotesText ? `\nTIMESTAMPED NOTES FROM THE COACH:\n${timestampNotesText}\n` : ''}`
 }
 
-function buildBarryPrompt(playerName: string | null, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null, clipBlock: string): string {
+function playerLine(playerName: string | null, ageGroup: string | null, position: string | null, clipKind: ClipKind | null): string {
+  const clip = clipKind === 'hitting' ? 'Hitting' : clipKind === 'pitching' ? 'Pitching' : null
+  return `PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}${clip ? ` | This clip: ${clip}` : ''}`
+}
+
+function buildBarryPrompt(playerName: string | null, ageGroup: string | null, position: string | null, metricsText: string, checklistText: string, coachNotes: string | null, clipBlock: string, clipKind: ClipKind | null): string {
   const hb = ageGroup ? HITTING_BENCHMARKS[ageGroup as keyof typeof HITTING_BENCHMARKS] : null
   return `You are Barry — built after Barry Bonds. The greatest hitter who ever lived by the numbers, and the most disciplined one. Bonds walked 232 times in a single season because he refused to give pitchers anything to work with. His approach was simple: know your zone, know your pitch, and make the pitcher come to you. When his pitch came, he didn't miss it.
 
@@ -49,7 +55,7 @@ YOUR VOICE: calm, precise, no wasted words. You don't get excited about mechanic
 
 ${clipBlock}
 
-PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
+${playerLine(playerName, ageGroup, position, clipKind)}
 
 ${hb ? `BENCHMARKS (${ageGroup}):
 Exit velocity — avg ${hb.ev.avg} mph | solid ${hb.ev.good}+ mph | elite ${hb.ev.elite}+ mph
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest) {
   if (!body) return new Response('Bad request', { status: 400 })
   const messages = sanitizeChatMessages(body.messages).filter(m => m.content.trim() !== '')
   if (messages.length === 0) return new Response('No message to answer.', { status: 400 })
-  const agent = body.agent === 'barry' ? 'barry' : 'randy'
+  const requestedAgent = body.agent === 'barry' || body.agent === 'randy' ? body.agent : null
 
   // The client says only which clip or player this is about. Everything the
   // prompt says about the player is loaded here after an access check (their
@@ -105,6 +111,7 @@ export async function POST(req: NextRequest) {
   let playerName: string | null
   let ageGroup: string | null
   let position: string | null
+  let clipKind: ClipKind | null = null
   let metrics: CoachMetric[]
   let hittingMetrics: CoachHittingMetrics | null = null
   let checklist: CoachPhaseRow[] | null
@@ -123,6 +130,7 @@ export async function POST(req: NextRequest) {
     playerName = c.playerName
     ageGroup = c.ageGroup
     position = c.position
+    clipKind = c.clipKind
     metrics = c.metrics
     hittingMetrics = c.hittingMetrics
     checklist = c.checklist
@@ -137,6 +145,7 @@ export async function POST(req: NextRequest) {
     playerName = c.playerName || null
     ageGroup = c.ageGroup
     position = c.position
+    clipKind = c.defaultClipKind
     metrics = c.metrics as CoachMetric[]
     checklist = c.checklist as CoachPhaseRow[] | null
     coachNotes = cleanCoachNotes(c.coachNotes)
@@ -145,13 +154,15 @@ export async function POST(req: NextRequest) {
   const benchmarks    = ageGroup ? AGE_BENCHMARKS[ageGroup as keyof typeof AGE_BENCHMARKS] : null
   const checklistText = formatChecklist(checklist)
   const clipBlock     = buildClipBlock(formatClipDetails(clipDetails), clipDetails ? formatTimestampNotes(timestampNotes) : '')
+  // Honor Switch Agent when the client sends one; otherwise frame from the clip toggle.
+  const agent = requestedAgent ?? (clipKind === 'hitting' ? 'barry' : 'randy')
 
   let systemPrompt: string
 
   if (agent === 'barry') {
     // Barry reads the session's hitting metrics; pitch metrics are Randy's.
     const metricsText = formatHittingMetrics(hittingMetrics)
-    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes, clipBlock)
+    systemPrompt = buildBarryPrompt(playerName, ageGroup, position, metricsText, checklistText, coachNotes, clipBlock, clipKind)
   } else {
     const metricsText = formatMetrics(metrics)
     const philosophiesText = formatPhilosophiesForPrompt()
@@ -163,7 +174,7 @@ YOUR VOICE: blunt, confident, specific. Not mean — just doesn't waste words. I
 
 ${clipBlock}
 
-PLAYER: ${playerName || 'Unknown'} | Level: ${ageGroup || 'Not specified'} | Position: ${position || 'Not specified'}
+${playerLine(playerName, ageGroup, position, clipKind)}
 
 ${benchmarks ? `BENCHMARKS (${ageGroup}):
 Fastball velocity — avg ${benchmarks.velocity.avg} mph | solid ${benchmarks.velocity.good}+ mph | elite ${benchmarks.velocity.elite}+ mph

@@ -5,6 +5,7 @@ import PlayerSettingsForm from './player-settings-form'
 import AvatarUpload from '@/app/profile/avatar-upload'
 import AppHeader from '@/components/app-header'
 import { signAvatarUrl } from '@/lib/avatar'
+import { isMissingColumnError } from '@/lib/db-errors'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -22,11 +23,15 @@ export default async function PlayerSettingsPage() {
   if (profile?.role === 'coach') redirect('/dashboard')
   const avatarUrl = await signAvatarUrl(supabaseAdmin.storage, (profile as { avatar_url?: string | null } | null)?.avatar_url, user.id)
 
-  const { data: player } = await supabaseAdmin
+  const SETTINGS_COLS = 'id, full_name, height, weight, high_school, travel_team, graduation_year, throws, bats, college_interests, college_offers, showcases, career_stats, age_group, position'
+  const withPos = await supabaseAdmin
     .from('players')
-    .select('id, full_name, height, weight, high_school, travel_team, graduation_year, throws, bats, college_interests, college_offers, showcases, career_stats, age_group, position')
+    .select(`${SETTINGS_COLS}, positions`)
     .eq('user_id', user.id)
     .single()
+  const player = (withPos.error && isMissingColumnError(withPos.error, 'positions'))
+    ? (await supabaseAdmin.from('players').select(SETTINGS_COLS).eq('user_id', user.id).single()).data
+    : withPos.data
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
