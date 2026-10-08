@@ -144,6 +144,12 @@ test('legal entity placeholder is one exported constant', () => {
   assert.match(read('app/terms/page.tsx'), /LEGAL_ENTITY_PLACEHOLDER\}, a Nevada LLC, once formed/)
 })
 
+test('effective-date placeholder sits on privacy and terms', () => {
+  for (const f of ['app/privacy/page.tsx', 'app/terms/page.tsx']) {
+    assert.match(read(f), /Last updated: \[EFFECTIVE_DATE\]/, f)
+  }
+})
+
 test('governing law is Nevada, operator named', () => {
   for (const f of ['app/privacy/page.tsx', 'app/terms/page.tsx']) {
     assert.match(read(f), /laws of the State of Nevada and applicable U\.S\. federal law/, f)
