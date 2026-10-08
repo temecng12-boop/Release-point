@@ -204,8 +204,13 @@ test('removed: coach banners, one-tap band buttons, age screen form, debug-clip 
   for (const f of allSource()) assert.doesNotMatch(readFileSync(f, 'utf8'), dead, f)
 })
 
-test('invite forms: no age band; Edit Player: the band picker is optional', () => {
-  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) assert.doesNotMatch(src(f), /age_band|birth_|AgeBand/, f)
+test('invite forms: birth month/year required (no band, no guardian); Edit Player: the band picker is optional', () => {
+  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) {
+    const s = src(f)
+    assert.doesNotMatch(s, /age_band|AgeBand/, `${f}: no band picker`)
+    assert.match(s, /name="birth_month"[^>]*required/, `${f}: birth month is required`)
+    assert.match(s, /name="birth_year"[^>]*required/, `${f}: birth year is required`)
+  }
   const edit = src('app/dashboard/edit-player-modal.tsx')
   assert.match(edit, /Player Age <span[^>]*>\(optional\)<\/span>/)
   assert.doesNotMatch(edit.slice(edit.indexOf('Player Age')), /^[^\n]*type="radio"[^\n]*required/m, 'no required band')

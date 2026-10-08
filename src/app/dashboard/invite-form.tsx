@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
+import { MONTHS } from '@/lib/birth-months'
 import InviteLinkBox from './invite-link-box'
 
 interface Team { id: string; name: string }
@@ -34,6 +35,23 @@ export default function InviteForm({ teams }: Props) {
               <input type="email" name="player_email" placeholder="Email address" required className={inputClass} />
             </div>
           </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="invite-birth-month" className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Birth Month</label>
+              <select id="invite-birth-month" name="birth_month" required defaultValue="" className={inputClass}>
+                <option value="" disabled>Month</option>
+                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="invite-birth-year" className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Birth Year</label>
+              <input id="invite-birth-year" name="birth_year" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} required autoComplete="off" placeholder="Year" className={inputClass} />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#3D5166] leading-relaxed">
+            Players under 13 can&apos;t be added yet. An under-13 date is refused and nothing is saved.
+          </p>
 
           {(teams?.length ?? 0) > 0 && (
             <div>

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
+import { MONTHS } from '@/lib/birth-months'
 import InviteLinkBox from '../../invite-link-box'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -40,6 +41,22 @@ export default function TeamInviteForm({ teamId }: { teamId: string }) {
               </button>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="team-invite-birth-month" className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Birth Month</label>
+              <select id="team-invite-birth-month" name="birth_month" required defaultValue="" className={inputClass}>
+                <option value="" disabled>Month</option>
+                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="team-invite-birth-year" className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={oswald}>Birth Year</label>
+              <input id="team-invite-birth-year" name="birth_year" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} required autoComplete="off" placeholder="Year" className={inputClass} />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#3D5166] leading-relaxed">
+            Players under 13 can&apos;t be added yet. An under-13 date is refused and nothing is saved.
+          </p>
           {state?.error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
               <span className="text-[#C8102E] text-sm">✕</span>
