@@ -1,7 +1,27 @@
 import Link from 'next/link'
+import type { ResolvingMetadata } from 'next'
 import Logo from '@/components/Logo'
+import { LEGAL_ENTITY_PLACEHOLDER, pageMetadata } from '@/lib/site-meta'
+import { CHILDREN_AND_TEENS_BODY, CHILDREN_AND_TEENS_TITLE } from '@/lib/privacy-children'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
+
+export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
+  return pageMetadata('/privacy', parent, {
+    title: 'Privacy Policy',
+    description: 'How Release Point AI collects, uses, and protects your information.',
+  })
+}
+
+// Inline **bold** inside bullet lines (the Children and Teens section uses
+// "- **Label** rest" bullets); other lines keep the block patterns below.
+function renderInlineBold(text: string, keyPrefix: string) {
+  const parts = text.split('**')
+  if (parts.length === 1) return text
+  return parts.map((part, j) =>
+    j % 2 === 1 ? <strong key={`${keyPrefix}-${j}`} className="text-[#0F1F33]">{part}</strong> : <span key={`${keyPrefix}-${j}`}>{part}</span>,
+  )
+}
 
 export default function PrivacyPage() {
   return (
@@ -15,7 +35,7 @@ export default function PrivacyPage() {
         <div>
           <p className="text-xs text-[#C8102E] tracking-widest mb-2" style={oswald}>Legal</p>
           <h1 className="text-4xl text-[#0F1F33] mb-2" style={oswald}>Privacy Policy</h1>
-          <p className="text-xs text-[#3D5166]">Last updated: September 2026</p>
+          <p className="text-xs text-[#3D5166]">Last updated: October 2026</p>
         </div>
 
         <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
@@ -27,19 +47,23 @@ export default function PrivacyPage() {
         {[
           {
             title: '1. Who We Are',
-            body: `Release Point ("we," "us," or "our") is a baseball and softball mechanics analysis platform designed for coaches and players. This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepoint.app.`,
+            body: `Release Point AI ("Release Point," "we," "us," or "our") is a pitching and hitting development app for baseball, softball, and other throwing and hitting sports, used by coaches and players. Release Point AI is operated by Nolan George (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada limited liability company, once formed). This Privacy Policy explains how we collect, use, and protect information when you use our service at releasepointai.com.`,
           },
           {
             title: '2. Information We Collect',
             body: `We collect:
 
-**Account information:** When you sign up, we collect your name, email address, and password (hashed, never stored in plain text).
+**Account information:** When you sign up, we collect your name, email address, birth month and year, and password (hashed, never stored in plain text).
+
+**Sign-in with Google or Apple:** If you sign in with Google (or Apple, where offered), we receive your name, email address, and an account ID from that provider.
+
+**Parent or guardian accounts (once parent accounts launch):** The parent's or guardian's name, email address, relationship to the player, and the consent record, including the signed permission form.
 
 **Profile data:** Role (coach or player), team name, age group, position.
 
 **Video and media files:** Clips you upload, voice recordings attached to clips, and any annotations made on those clips.
 
-**Performance metrics:** Pitch data imported from CSV and PDF exports (velocity, spin rate, spin axis, break measurements).
+**Performance metrics:** Pitching and hitting metrics entered or imported into the platform, including CSV and PDF imports (for example velocity, spin rate, exit velocity, and launch angle).
 
 **Usage data:** Timestamps, clip notes, and coaching feedback entered into the platform.
 
@@ -63,24 +87,23 @@ We do not sell your data to third parties. We do not use your data for advertisi
 
 **Supabase** (supabase.com): Database, authentication, and file storage. Your data is stored on Supabase's infrastructure. See supabase.com/privacy.
 
-**Anthropic** (anthropic.com): Powers the AI Coach feature. When you use AI Coach, the conversation content and player context (name, age group, position, metrics) are sent to Anthropic's API. Anthropic does not train on API data by default. See anthropic.com/privacy.
+**Anthropic** (anthropic.com): AI Coach is built on Claude, made by Anthropic, and set up with pitching and hitting metric frameworks. When you use AI Coach, the conversation text and player context (name, age group, position, metrics) are sent to Anthropic as our service provider. Anthropic does not train on API data by default. See anthropic.com/privacy.
 
-We do not share data with any other third parties.`,
+**Google and Apple** (sign-in only): If you choose to sign in with Google (or Apple, where offered), that provider confirms your sign-in and shares your name, email address, and an account ID with us.
+
+**Vercel** (vercel.com): Hosts the Release Point AI website and collects anonymous performance analytics. See vercel.com/privacy.
+
+**Resend** (resend.com): Sends our emails (sign-in links, invites, password resets) from notifications@releasepointai.com. See resend.com/privacy.
+
+We don't sell your data, and we don't share it with anyone except the service providers listed here.`,
           },
           {
-            title: '5. Children\'s Privacy (COPPA)',
-            body: `Release Point is used to analyze youth athletes, including players under the age of 13. We do not knowingly create accounts for children under 13. Players can create their own accounts, or their coach can invite them.
-
-Coaches are responsible for obtaining appropriate consent from the parents or guardians of any players under 13 before adding them to the platform or uploading video of them.
-
-If you believe a child under 13 has been added to the platform without proper parental consent, contact us immediately at the email below and we will remove the data.`,
+            title: CHILDREN_AND_TEENS_TITLE,
+            body: CHILDREN_AND_TEENS_BODY,
           },
           {
             title: '6. Video and Performance Data',
-            body: `Videos, voice recordings, and pitch metrics uploaded to Release Point are stored securely in Supabase Storage and are accessible only to:
-
-- The coach who uploaded the content
-- The player the content is associated with
+            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the coaches on teams the player is on, and a parent or guardian linked to the player's account (once parent accounts launch).
 
 Videos are served via time-limited signed URLs. Files are not publicly accessible by default.`,
           },
@@ -108,11 +131,11 @@ To exercise any of these rights, contact us at the address below.`,
           },
           {
             title: '10. Changes to This Policy',
-            body: `We may update this Privacy Policy from time to time. We will notify users of material changes via email or a notice in the platform. Continued use of the platform after changes constitutes acceptance of the updated policy.`,
+            body: `We may update this Privacy Policy from time to time. We will notify users of material changes via email or a notice in the platform. Continued use of the platform after changes constitutes acceptance of the updated policy. This policy is governed by the laws of the State of Nevada and applicable U.S. federal law.`,
           },
           {
             title: '11. Contact',
-            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: privacy@releasepoint.app\n\nWe aim to respond to all requests within 5 business days.`,
+            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: privacy@releasepointai.com\n\nWe aim to respond to all requests within 5 business days.`,
           },
         ].map((section) => (
           <div key={section.title}>
@@ -131,7 +154,7 @@ To exercise any of these rights, contact us at the address below.`,
                   )
                 }
                 if (line.startsWith('- ')) {
-                  return <p key={i} className="flex gap-2 mb-1"><span className="text-[#C8102E] shrink-0">–</span>{line.slice(2)}</p>
+                  return <p key={i} className="flex gap-2 mb-1"><span className="text-[#C8102E] shrink-0">–</span><span>{renderInlineBold(line.slice(2), `s5-${i}`)}</span></p>
                 }
                 if (line === '') return <br key={i} />
                 return <p key={i} className="mb-2">{line}</p>

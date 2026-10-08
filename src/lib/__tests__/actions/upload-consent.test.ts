@@ -132,7 +132,7 @@ test('getSignedUploadUrl: 13 to 17 and 18+ (confirmed) get an upload URL; no ban
 
 test('getSignedUploadUrl: under 13 -> the stop message for the player, the under-13 note for the coach', async () => {
   seed({ band: 'under_13', coach: true })
-  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /We need a parent's permission first\. Ask your coach\./)
+  assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /We need a parent's or guardian's permission first\./)
   seed({ band: 'under_13', coach: true, user: COACH })
   assert.match(String((await getSignedUploadUrl(VIDEO) as { error?: string }).error), /This player is under 13, so video can't be added\./)
 })

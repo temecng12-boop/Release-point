@@ -75,12 +75,12 @@ test('about page: security and access claims match the code', () => {
   // that every query is enforced by row-level security.
   assert.doesNotMatch(about, /every database query/i)
   assert.match(about, /checks your access on every request before it shows or changes a player\\'s data/)
-  // Service-role (admin) reads skip RLS, so RLS is a second layer on most direct access, not on every table read.
-  assert.match(about, /database rules add a second layer of protection on most direct access/)
+  // Service-role (admin) reads skip RLS, so RLS is a second layer on direct access, not on every table read.
+  assert.match(about, /database rules add a second layer of protection on direct access/)
   assert.doesNotMatch(about, /protect(s)? every table/i)
   // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
   assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
-  assert.match(about, /the player, their coach, coaches of teams the player is on, and their linked parent or guardian/)
+  assert.match(about, /the player, the coaches on teams the player is on, and a parent or guardian linked to the player\\'s account \(once parent accounts launch\)/)
   const access = read('lib/clip-access.ts')
   for (const via of ["'player'", "'coach'", "'guardian'", "'team_coach'"]) assert.ok(access.includes(via), via)
   // Signed clip links expire after an hour (3600 s) on the clip page.

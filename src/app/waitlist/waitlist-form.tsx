@@ -49,7 +49,7 @@ export default function WaitlistForm() {
         </div>
         <p className="text-[#0F1F33] text-sm font-medium" style={os}>You&apos;re on the list</p>
         <p className="text-[#456080] text-xs">
-          Thanks for your interest in Release Point. We&apos;ll reach out at {email} when your spot is ready.
+          Thanks for your interest in Release Point AI. We&apos;ll reach out at {email} when your spot is ready.
         </p>
       </div>
     )
@@ -86,10 +86,11 @@ export default function WaitlistForm() {
         {state === 'loading' ? 'Joining…' : 'Join the waitlist'}
       </button>
       <p className="text-[#8096AE] text-[11px] leading-relaxed">
-        Players under 13: please ask a parent or guardian to sign up for you.
+        Joining for a young player? A parent or guardian should join the waitlist. See how we handle children&apos;s information in our{' '}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-[#456080]">Privacy Policy</Link>.
       </p>
       <p className="text-[#8096AE] text-[11px] leading-relaxed">
-        We&apos;ll use your email to contact you about Release Point access. See how we handle your information in our{' '}
+        We&apos;ll use your email to contact you about Release Point AI access. See how we handle your information in our{' '}
         <Link href="/privacy" className="underline underline-offset-2 hover:text-[#456080]">Privacy Policy</Link>.
       </p>
       <p className="text-[#456080] text-xs text-center pt-1">

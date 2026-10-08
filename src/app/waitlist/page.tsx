@@ -1,13 +1,17 @@
 import Link from 'next/link'
+import type { ResolvingMetadata } from 'next'
 import WaitlistForm from './waitlist-form'
 import Logo from '@/components/Logo'
+import { pageMetadata } from '@/lib/site-meta'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
-export const metadata = {
-  title: 'Join the waitlist · Release Point',
-  description:
-    'Pitching and hitting video annotation and AI Coach insights for coaches, shared with your players. Now in internal testing.',
+export function generateMetadata(_props: unknown, parent: ResolvingMetadata) {
+  return pageMetadata('/waitlist', parent, {
+    title: 'Join the waitlist',
+    description:
+      'Pitching and hitting video annotation and AI Coach insights for coaches, shared with your players. Now in internal testing.',
+  })
 }
 
 const FEATURES = [
@@ -90,7 +94,7 @@ export default async function WaitlistPage({
       </main>
 
       <footer className="px-6 py-5 text-center border-t border-[#e2e8f0]">
-        <p className="text-[#8096AE] text-xs">&copy; {new Date().getFullYear()} Release Point. All rights reserved.</p>
+        <p className="text-[#8096AE] text-xs">&copy; {new Date().getFullYear()} Release Point AI. All rights reserved.</p>
       </footer>
     </div>
   )

@@ -66,7 +66,7 @@ test('cutoff scan: the rendered one screen (signup, account, stop message) never
   assert.match(account, /kid@example\.com/)
   assert.match(stopped, /data-testid="age-stop"/)
   assert.doesNotMatch(stopped, /name="birth_year"/, 'stop message only, no form')
-  assert.match(stop, /We need a parent(&#x27;|')s permission first\. Ask your coach\./)
+  assert.match(stop, /We need a parent(&#x27;|')s or guardian(&#x27;|')s permission first\./)
   assert.match(oauth, /name="birth_year"/)
   for (const [what, html] of [['signup', signup], ['account', account], ['oauth', oauth], ['stopped', stopped], ['stop notice', stop]] as const) assertNoCutoff(html, what)
   // The year field has no min/max and the month list no hint.
