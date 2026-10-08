@@ -25,6 +25,13 @@ test('/dev/positions-shot 404s without ENABLE_DEV_PAGES=1', () => {
   assert.ok(layout.indexOf('if (!devPagesEnabled())') < layout.indexOf('notFound()'))
 })
 
+test('/dev/* stays closed on Vercel even if ENABLE_DEV_PAGES=1', () => {
+  assert.equal(devPagesEnabled({ ENABLE_DEV_PAGES: '1', VERCEL: '1' }), false)
+  assert.equal(devPagesEnabled({ ENABLE_DEV_PAGES: '1', VERCEL: 'true' }), false)
+  const gate = src('lib/dev-pages.ts')
+  assert.match(gate, /ENABLE_DEV_PAGES === '1' && !env\.VERCEL/)
+})
+
 test('ENABLE_DEV_PAGES=1 is set only in the Playwright webServer, not in app code', () => {
   const pw = src('../playwright.config.ts')
   assert.match(pw, /ENABLE_DEV_PAGES:\s*'1'/)
