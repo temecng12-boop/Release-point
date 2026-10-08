@@ -51,7 +51,7 @@ export default function PrivacyPage() {
 
 **Sign-in with Google or Apple:** If you sign in with Google (or Apple, where offered), we receive your name, email address, and an account ID from that provider.
 
-**Parent or guardian accounts (once parent accounts launch):** The parent's or guardian's name, email address, relationship to the player, and the consent record, including the signed permission form.
+**Parent or guardian accounts:** We don't have parent or guardian accounts yet, so we don't collect a parent's name, email, relationship, or a signed permission form.
 
 **Profile data:** Role (coach or player), team name, age group, position.
 
@@ -109,7 +109,7 @@ Videos are served via time-limited signed URLs. Files are not publicly accessibl
           },
           {
             title: '7. Data Retention',
-            body: `We retain your data for as long as your account is active. If you delete your account, we will delete your personal data and associated media files within 30 days, except where retention is required by law.
+            body: `We retain your data for as long as your account is active. If you delete your account, we delete your personal data and associated media files, except where retention is required by law.
 
 You may request deletion of specific clips or your entire account at any time by contacting us.`,
           },
@@ -135,7 +135,7 @@ To exercise any of these rights, contact us at the address below.`,
           },
           {
             title: '11. Contact',
-            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: privacy@releasepointai.com\n\nWe aim to respond to all requests within 5 business days.`,
+            body: `For privacy questions, data requests, or concerns about a minor's data:\n\nEmail: privacy@releasepointai.com\n\nWe'll reply as soon as we can.`,
           },
         ].map((section) => (
           <div key={section.title}>

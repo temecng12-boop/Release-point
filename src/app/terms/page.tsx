@@ -115,7 +115,7 @@ To the extent the law allows, our total liability for any claim relating to Rele
             title: '9. Termination',
             body: `You may delete your account at any time. We may suspend or terminate your account if you violate these Terms.
 
-Upon termination, your content will be deleted within 30 days unless we are required by law to retain it.`,
+Upon termination, your content is deleted unless we are required by law to retain it.`,
           },
           {
             title: '10. Governing Law',
@@ -123,7 +123,7 @@ Upon termination, your content will be deleted within 30 days unless we are requ
           },
           {
             title: '11. Contact',
-            body: `Questions about these Terms:\n\nEmail: legal@releasepointai.com\n\nWe respond to legal inquiries within 5 business days.`,
+            body: `Questions about these Terms:\n\nEmail: legal@releasepointai.com\n\nWe'll reply as soon as we can.`,
           },
         ].map((section) => (
           <div key={section.title}>

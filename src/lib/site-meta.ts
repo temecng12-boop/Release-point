@@ -20,10 +20,6 @@ export const OG_IMAGE_ALT = 'Release Point AI: video coaching for pitchers and h
 export const LEGAL_ENTITY_PLACEHOLDER = '[LEGAL_ENTITY_NAME]'
 export const OPERATOR_NAME = 'Nolan George'
 
-// Parent permission for under-13 players ships in late October 2026
-// (parent accounts are not live yet). One phrase, used everywhere.
-export const PARENT_CONSENT_TIMELINE = 'in late October 2026'
-
 // Apple sign-in is not enabled yet (Google is live). When Apple ships,
 // flip this to true to show the "Continue with Apple" buttons on the
 // login and signup screens. Auth logic is untouched; this only gates UI.

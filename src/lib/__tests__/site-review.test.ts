@@ -181,8 +181,8 @@ test('under-13 policy is one identical block on privacy and terms', () => {
     /Players 13 to 17 need a parent's or guardian's permission to use Release Point AI/,
     /Coaches must have written parent or guardian consent before uploading video of any minor/,
   ]) assert.match(block, line)
-  assert.doesNotMatch(block, /14 days/)
-  assert.doesNotMatch(block, /late October/)
+  assert.doesNotMatch(block, new RegExp('14 ' + 'days'))
+  assert.doesNotMatch(block, new RegExp('late ' + 'October'))
   assert.doesNotMatch(block, /deletes the new account/)
 })
 
@@ -217,7 +217,7 @@ test('privacy collects birth month/year, Google/Apple, parent accounts, and repo
   assert.match(privacy, /birth month and year/)
   assert.match(privacy, /never stored/)
   assert.match(privacy, /Sign-in with Google or Apple/)
-  assert.match(privacy, /Parent or guardian accounts \(once parent accounts launch\)/)
+  assert.match(privacy, /We don't have parent or guardian accounts yet/)
   assert.match(privacy, /Problem reports:/)
   assert.match(privacy, /Vercel.*Hosts the Release Point AI website/)
   assert.match(privacy, /Resend.*notifications@releasepointai\.com/)
@@ -265,6 +265,17 @@ test('AI wording is honest; Barry stays; no pro-career claims', () => {
   assert.match(read('app/about/page.tsx'), /Barry/)
   assert.match(read('app/about/page.tsx'), /database rules add a second layer of protection on direct access/)
   assert.doesNotMatch(read('app/about/page.tsx'), new RegExp('on most ' + 'direct access'))
+})
+
+test('legal pages make no day-count or dated operational promises', () => {
+  for (const f of ['app/privacy/page.tsx', 'app/terms/page.tsx', 'lib/privacy-children.ts']) {
+    assert.doesNotMatch(read(f), /5 business/)
+    assert.doesNotMatch(read(f), new RegExp('30 ' + 'days'))
+    assert.doesNotMatch(read(f), new RegExp('14 ' + 'days'))
+    assert.doesNotMatch(read(f), new RegExp('late ' + 'October'))
+  }
+  assert.match(read('app/privacy/page.tsx'), /We'll reply as soon as we can/)
+  assert.match(read('app/terms/page.tsx'), /We'll reply as soon as we can/)
 })
 
 test('no pricing anywhere on legal or marketing pages', () => {
