@@ -53,7 +53,7 @@ export default function PrivacyPage() {
             title: '2. Information We Collect',
             body: `We collect:
 
-**Account information:** When you sign up, we collect your name, email address, birth month and year, and password (hashed, never stored in plain text).
+**Account information:** When you sign up, we collect your name, email address, birth month and year, and password (hashed, never stored in plain text). Your birth month and year are used once to confirm your age band and are never stored.
 
 **Sign-in with Google or Apple:** If you sign in with Google (or Apple, where offered), we receive your name, email address, and an account ID from that provider.
 
@@ -66,6 +66,8 @@ export default function PrivacyPage() {
 **Performance metrics:** Pitching and hitting metrics entered or imported into the platform, including CSV and PDF imports (for example velocity, spin rate, exit velocity, and launch angle).
 
 **Usage data:** Timestamps, clip notes, and coaching feedback entered into the platform.
+
+**Problem reports:** If you report a problem, we collect your message plus device, browser, and viewport details, and a screenshot if you attach one.
 
 **Technical data:** Browser type, device type, IP address, and standard server logs collected automatically.`,
           },
@@ -87,7 +89,7 @@ We do not sell your data to third parties. We do not use your data for advertisi
 
 **Supabase** (supabase.com): Database, authentication, and file storage. Your data is stored on Supabase's infrastructure. See supabase.com/privacy.
 
-**Anthropic** (anthropic.com): AI Coach is built on Claude, made by Anthropic, and set up with pitching and hitting metric frameworks. When you use AI Coach, the conversation text and player context (name, age group, position, metrics) are sent to Anthropic as our service provider. Anthropic does not train on API data by default. See anthropic.com/privacy.
+**Anthropic** (anthropic.com): AI Coach runs on Anthropic's Claude. Each conversation sends your message plus the player's name, age group, position, session pitch and hitting metrics, mechanics checklist, coach notes, and clip details such as titles and dates. Video and audio files are never sent — the AI works from text only. Anthropic does not train models on customer content sent through its API (see anthropic.com/legal/commercial-terms).
 
 **Google and Apple** (sign-in only): If you choose to sign in with Google (or Apple, where offered), that provider confirms your sign-in and shares your name, email address, and an account ID with us.
 
@@ -103,7 +105,7 @@ We don't sell your data, and we don't share it with anyone except the service pr
           },
           {
             title: '6. Video and Performance Data',
-            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the coaches on teams the player is on, and a parent or guardian linked to the player's account (once parent accounts launch).
+            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the player's direct coach, and the other coaches on teams the player is on.
 
 Videos are served via time-limited signed URLs. Files are not publicly accessible by default.`,
           },

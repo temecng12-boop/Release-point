@@ -170,8 +170,8 @@ test('under-13 policy is one identical block on privacy and terms', () => {
 
 test('who can see video reads identically on about, privacy, and terms', () => {
   const sentence =
-    "A player's video can be seen by the player, the coaches on teams the player is on, " +
-    "and a parent or guardian linked to the player's account (once parent accounts launch)."
+    "A player's video can be seen by the player, the player's direct coach, " +
+    "and the other coaches on teams the player is on."
   // Privacy keeps the Children and Teens copy in its own module (easy swap).
   const privacy = read('app/privacy/page.tsx') + '\n' + read('lib/privacy-children.ts')
   assert.ok(read('app/about/page.tsx').includes(sentence), 'about viewer sentence')
@@ -179,11 +179,13 @@ test('who can see video reads identically on about, privacy, and terms', () => {
   assert.ok(read('app/terms/page.tsx').includes(sentence), 'terms viewer sentence')
 })
 
-test('privacy collects birth month/year, Google/Apple, and parent accounts', () => {
+test('privacy collects birth month/year, Google/Apple, parent accounts, and reports', () => {
   const privacy = read('app/privacy/page.tsx')
   assert.match(privacy, /birth month and year/)
+  assert.match(privacy, /never stored/)
   assert.match(privacy, /Sign-in with Google or Apple/)
   assert.match(privacy, /Parent or guardian accounts \(once parent accounts launch\)/)
+  assert.match(privacy, /Problem reports:/)
   assert.match(privacy, /Vercel.*Hosts the Release Point AI website/)
   assert.match(privacy, /Resend.*notifications@releasepointai\.com/)
 })
@@ -217,7 +219,9 @@ test('AI wording is honest; Barry stays; no pro-career claims', () => {
   const honestLong = /AI Coach is built on Claude, made by Anthropic, and set up with pitching and hitting metric frameworks/
   assert.match(read('app/about/page.tsx'), honest)
   assert.match(read('app/terms/page.tsx'), honestLong)
-  assert.match(read('app/privacy/page.tsx'), honestLong)
+  assert.match(read('app/privacy/page.tsx'), /AI Coach runs on Anthropic's Claude/)
+  assert.match(read('app/privacy/page.tsx'), /Video and audio files are never sent/)
+  assert.match(read('app/privacy/page.tsx'), /does not train models on customer content.*anthropic\.com\/legal\/commercial-terms/)
   assert.doesNotMatch(read('app/about/page.tsx'), /trained with deep baseball biomechanics/i)
   assert.doesNotMatch(read('app/about/page.tsx'), /Boise Hawks|Pioneer League|decade of firsthand/)
   assert.match(read('app/about/page.tsx'), /lifetime on the mound/)
