@@ -29,12 +29,6 @@ export default function TermsPage() {
           <p className="text-xs text-[#3D5166]">Last updated: {TERMS_VERSION_LABEL}</p>
         </div>
 
-        <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-[#456080] leading-relaxed">
-            <strong className="text-[#0F1F33]">Note:</strong> These Terms of Service are provided in good faith. They do not constitute legal advice. For compliance requirements specific to your organization, consult a licensed attorney.
-          </p>
-        </div>
-
         {[
           {
             title: '1. Agreement to Terms',

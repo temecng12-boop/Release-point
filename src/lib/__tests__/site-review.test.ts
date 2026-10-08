@@ -226,8 +226,6 @@ test('AI wording is honest; Barry stays; no pro-career claims', () => {
   assert.match(read('app/privacy/page.tsx'), /Video and audio files are never sent/)
   assert.match(read('app/privacy/page.tsx'), /does not train models on customer content.*anthropic\.com\/legal\/commercial-terms/)
   assert.doesNotMatch(read('app/about/page.tsx'), /trained with deep baseball biomechanics/i)
-  // Nolan: keep the Boise Hawks / Pioneer League line for now (flagged for
-  // him); the "decade of firsthand experience" claim stays out.
   assert.match(read('app/about/page.tsx'), /Boise Hawks in the Pioneer League/)
   assert.doesNotMatch(read('app/about/page.tsx'), /decade of firsthand/)
   assert.match(read('app/about/page.tsx'), /lifetime on the mound/)
@@ -255,8 +253,22 @@ test('Apple sign-in hidden behind a default-off flag; Google untouched', () => {
 
 test('no internal review markers ship in page copy', () => {
   for (const f of ['app/privacy/page.tsx', 'lib/privacy-children.ts', 'app/terms/page.tsx', 'app/about/page.tsx', 'app/page.tsx', 'app/waitlist/page.tsx', 'app/waitlist/waitlist-form.tsx', 'lib/stop-message.ts']) {
-    assert.doesNotMatch(src(f.replace(/^app\//, 'app/')), /CONFIRM LIVE|BUILD VERIFY|LAWYER/, `${f} no markers`)
+    assert.doesNotMatch(src(f.replace(/^app\//, 'app/')), /CONFIRM LIVE|BUILD VERIFY|legal advice|licensed attorney/, `${f} no markers`)
   }
+})
+
+test('repo: zero review-role notes', () => {
+  const needle = 'law' + 'yer'
+  const hits: string[] = []
+  for (const f of walk(repo)) {
+    let text: string
+    try { text = readFileSync(f, 'utf8') } catch { continue }
+    if (text.includes('\0')) continue
+    text.split('\n').forEach((line, i) => {
+      if (line.toLowerCase().includes(needle)) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`)
+    })
+  }
+  assert.deepEqual(hits, [])
 })
 
 test('seo: robots, sitemap, branded 404 for unknown URLs', () => {

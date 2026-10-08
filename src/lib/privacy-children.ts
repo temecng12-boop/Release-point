@@ -1,7 +1,5 @@
-// Privacy page section 5: Children and Teens (Compliance draft Oct 7, 2026,
-// non-lawyer draft for counsel review, updated to Nolan's pre-launch spec).
-// Kept in its own module so the next Compliance wording pass is a one-file
-// swap.
+// Privacy page section 5: Children and Teens (Nolan's pre-launch spec).
+// Kept in its own module so the next wording pass is a one-file swap.
 //
 // UNDER_13_POLICY_BODY is used word for word on Privacy and Terms, so the
 // policy is identical on every page that states it. System-behavior claims

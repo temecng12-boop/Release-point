@@ -38,12 +38,6 @@ export default function PrivacyPage() {
           <p className="text-xs text-[#3D5166]">Last updated: [EFFECTIVE_DATE]</p>
         </div>
 
-        <div className="bg-white border border-[#DDE4ED] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-[#456080] leading-relaxed">
-            <strong className="text-[#0F1F33]">Note:</strong> This Privacy Policy is provided as a good-faith effort to explain how Release Point handles data. It does not constitute legal advice. If you have specific compliance requirements, consult a licensed attorney.
-          </p>
-        </div>
-
         {[
           {
             title: '1. Who We Are',
