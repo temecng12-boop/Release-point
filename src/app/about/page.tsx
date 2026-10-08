@@ -203,7 +203,7 @@ export default function AboutPage() {
               },
               {
                 label: 'Access Checks',
-                desc: 'The app checks your access on every request before it shows or changes a player\'s data, and database rules add a second layer of protection on direct access. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
+                desc: 'The app checks your access on every request before it shows or changes a player\'s data. Database rules also limit what a signed-in account can read or write if it talks to the database directly. Most app writes go through the server and are not limited by those rules. A coach can see their own players and the players on teams they coach. A player can only see their own data.',
               },
               {
                 label: 'Cross-Device',

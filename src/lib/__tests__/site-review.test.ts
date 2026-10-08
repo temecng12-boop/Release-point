@@ -263,7 +263,9 @@ test('AI wording is honest; Barry stays; no pro-career claims', () => {
   assert.doesNotMatch(read('app/about/page.tsx'), /decade of firsthand/)
   assert.match(read('app/about/page.tsx'), /lifetime on the mound/)
   assert.match(read('app/about/page.tsx'), /Barry/)
-  assert.match(read('app/about/page.tsx'), /database rules add a second layer of protection on direct access/)
+  assert.match(read('app/about/page.tsx'), /Database rules also limit what a signed-in account can read or write if it talks to the database directly/)
+  assert.match(read('app/about/page.tsx'), /Most app writes go through the server and are not limited by those rules/)
+  assert.doesNotMatch(read('app/about/page.tsx'), /second layer of protection/)
   assert.doesNotMatch(read('app/about/page.tsx'), new RegExp('on most ' + 'direct access'))
 })
 

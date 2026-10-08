@@ -75,8 +75,12 @@ test('about page: security and access claims match the code', () => {
   // that every query is enforced by row-level security.
   assert.doesNotMatch(about, /every database query/i)
   assert.match(about, /checks your access on every request before it shows or changes a player\\'s data/)
-  // Service-role (admin) reads skip RLS, so RLS is a second layer on direct access, not on every table read.
-  assert.match(about, /database rules add a second layer of protection on direct access/)
+  // Service-role (admin) reads skip RLS. Do not claim a second layer of protection:
+  // some JWT policies are wider than the app, some are narrower, and expected-policies
+  // through 036 is stale vs later drops (037).
+  assert.match(about, /Database rules also limit what a signed-in account can read or write if it talks to the database directly/)
+  assert.match(about, /Most app writes go through the server and are not limited by those rules/)
+  assert.doesNotMatch(about, /second layer of protection/)
   assert.doesNotMatch(about, /protect(s)? every table/i)
   // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
   assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
