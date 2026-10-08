@@ -30,8 +30,8 @@
 -- transaction, then a read-only report.
 --
 -- Needs 025 (lessons table) and 037 (age bands, player_has_video_consent).
--- Applies on main with or without 042 (#57 merges first; 043 touches
--- nothing 042 creates).
+-- Applies after 042 (invite-only signup hook) on main. 043 touches
+-- nothing 042 creates.
 -- ============================================================================
 BEGIN;
 

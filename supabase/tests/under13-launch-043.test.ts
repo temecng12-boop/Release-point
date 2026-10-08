@@ -15,8 +15,8 @@
  *      age screen) has video blocked on every path (clips, lessons, both
  *      buckets) and matches the frozen-gate predicate.
  *   4. The prod paste is migration 043 verbatim (same statements, same order).
- * Applies on main (037 then 038-041 then 043; 042 lives on #57's branch and 043 needs
- * nothing from it). Each file applies twice.
+ * Applies on main (037 then 038-042 then 043). 043 needs nothing 042 creates.
+ * Each file applies twice.
  * Run with: npx tsx --test supabase/tests/under13-launch-043.test.ts
  */
 import { test } from 'node:test'
@@ -31,6 +31,7 @@ const NEXT_MAIN = [
   '039_terms_history_tos_lock_grade_ranges.sql',
   '040_profile_freeze_marker.sql',
   '041_coach_invites.sql',
+  '042_invite_only_signup_hook.sql',
   '043_under_13_launch_policy.sql',
 ]
 const M035 = M('035_drop_legacy_policies.sql')
