@@ -4,6 +4,17 @@ import { isPublicAssetPath } from '@/lib/public-paths'
 import { frozenGateKind, frozenResponse, isFrozenAccount, SIGN_OUT_ROUTE, type GateDb } from '@/lib/under13-gate'
 import { AGE_SCREEN_MESSAGE, AGE_SCREEN_PATH, isAgeGateSetupPath, needsAgeScreen, type AgeScreenDb } from '@/lib/age-screen-gate'
 
+// Pages and prefixes that exist. Anything else is an unknown URL and falls
+// through to the branded 404 instead of the login redirect.
+const KNOWN_EXACT = new Set(['/', '/home', '/about', '/waitlist', '/privacy', '/terms', '/under-13', '/auth/signout'])
+const KNOWN_PREFIX = ['/auth', '/dashboard', '/clips', '/onboarding', '/player-settings', '/profile', '/guardian', '/api']
+
+export function isKnownPath(pathname: string): boolean {
+  if (KNOWN_EXACT.has(pathname)) return true
+  if (pathname.startsWith('/privacy/') || pathname.startsWith('/terms/')) return true
+  return KNOWN_PREFIX.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
+
 export async function middleware(request: NextRequest) {
   // Manifest, icons, sw.js, robots, social images, static files: public, no
   // session work (QA-013). The matcher below already skips them; this is a backstop.
@@ -43,6 +54,10 @@ export async function middleware(request: NextRequest) {
   // and expect either an RSC response or an `x-action-redirect` header.
   // A plain HTTP redirect causes "An unexpected response was received from the server."
   const isServerAction = Boolean(request.headers.get('next-action'))
+
+  // Unknown URLs render the branded 404 (src/app/not-found.tsx), never a
+  // login redirect. Only known pages and app/API prefixes keep routing.
+  if (!isKnownPath(pathname)) return supabaseResponse
 
   if (!user && !isPublicPath && !isServerAction) {
     const url = request.nextUrl.clone()

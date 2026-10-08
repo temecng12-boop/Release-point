@@ -85,16 +85,21 @@ test('social: og:image 1200x630 with summary_large_image', () => {
   assert.match(layout, /summary_large_image/)
   assert.match(layout, /OG_IMAGE_URL/)
   assert.ok(meta.includes("OG_IMAGE_URL = `${SITE_URL}${OG_IMAGE_PATH}`"))
+  assert.ok(meta.includes("OG_IMAGE_PATH = '/opengraph-image'"))
   assert.ok(meta.includes('OG_IMAGE_WIDTH = 1200') && meta.includes('OG_IMAGE_HEIGHT = 630'))
   assert.ok(meta.includes('OG_IMAGE_ALT = \'Release Point AI: video coaching for pitchers and hitters\''))
   assert.match(layout, /width: OG_IMAGE_WIDTH/)
   assert.match(layout, /height: OG_IMAGE_HEIGHT/)
   assert.match(layout, /alt: OG_IMAGE_ALT/)
-  const png = join(repo, 'public', 'og-image.png')
-  assert.ok(existsSync(png), 'public/og-image.png exists')
-  const buf = readFileSync(png)
-  assert.equal(buf.readUInt32BE(16), 1200, 'og:image width')
-  assert.equal(buf.readUInt32BE(20), 630, 'og:image height')
+  // Generated in code at build time (navy/red/white, logo, tagline, /media
+  // frame) — the old-tagline PNG is not shipped.
+  const route = src('app/opengraph-image.tsx')
+  assert.match(route, /width: 1200/)
+  assert.match(route, /height: 630/)
+  assert.match(route, /See Every/)
+  assert.match(route, /nolan-windup\.jpg/)
+  assert.match(route, /#C8031E/)
+  assert.ok(!existsSync(join(repo, 'public', 'og-image.png')), 'old PNG not shipped')
 })
 
 // ── Canonical / titles / brand ───────────────────────────────────────────────
@@ -252,6 +257,21 @@ test('no internal review markers ship in page copy', () => {
   for (const f of ['app/privacy/page.tsx', 'lib/privacy-children.ts', 'app/terms/page.tsx', 'app/about/page.tsx', 'app/page.tsx', 'app/waitlist/page.tsx', 'app/waitlist/waitlist-form.tsx', 'lib/stop-message.ts']) {
     assert.doesNotMatch(src(f.replace(/^app\//, 'app/')), /CONFIRM LIVE|BUILD VERIFY|LAWYER/, `${f} no markers`)
   }
+})
+
+test('seo: robots, sitemap, branded 404 for unknown URLs', () => {
+  const robots = src('app/robots.ts')
+  for (const p of ['/auth', '/dashboard', '/clips', '/onboarding', '/api']) assert.ok(robots.includes(`'${p}'`), `robots disallows ${p}`)
+  assert.match(robots, /sitemap\.xml/)
+  const sitemap = src('app/sitemap.ts')
+  for (const p of ['/', '/about', '/waitlist', '/privacy', '/terms']) assert.ok(sitemap.includes(`'${p}'`), `sitemap has ${p}`)
+  assert.doesNotMatch(sitemap, /'\/home'/)
+  const middleware = src('middleware.ts')
+  assert.match(middleware, /isKnownPath/)
+  assert.match(middleware, /branded 404/)
+  const notFound = src('app/not-found.tsx')
+  assert.match(notFound, /Page Not Found/)
+  assert.match(notFound, /Logo/)
 })
 
 test('stop message points to a parent or guardian, never a coach', () => {

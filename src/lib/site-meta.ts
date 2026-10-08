@@ -5,9 +5,10 @@ import type { Metadata, ResolvingMetadata } from 'next'
 
 export const SITE_URL = 'https://releasepointai.com'
 
-// Social preview (public/og-image.png). Swap OG_IMAGE_PATH when Design
-// ships a new asset; width/height/alt travel with the metadata below.
-export const OG_IMAGE_PATH = '/og-image.png'
+// Social preview, generated in code at build time
+// (src/app/opengraph-image.tsx: navy/red/white, logo, tagline, /media
+// frame). Swap OG_IMAGE_PATH when Design ships a final PNG.
+export const OG_IMAGE_PATH = '/opengraph-image'
 export const OG_IMAGE_URL = `${SITE_URL}${OG_IMAGE_PATH}`
 export const OG_IMAGE_WIDTH = 1200
 export const OG_IMAGE_HEIGHT = 630
