@@ -43,7 +43,7 @@ export default function AboutPage() {
             Built for the way<br />baseball actually works
           </h1>
           <p className="text-lg text-[#456080] max-w-2xl leading-relaxed">
-            Release Point is a player development platform that connects film, metrics, and coaching feedback in one place, so nothing falls through the cracks and players actually get better.
+            Release Point AI is a player development platform that connects film, metrics, and coaching feedback in one place, so nothing falls through the cracks and players actually get better.
           </p>
         </div>
 
@@ -79,7 +79,7 @@ export default function AboutPage() {
             One platform.<br />Film, metrics, and coaching, connected.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point gives coaches a structured place to upload film, add pitching and hitting metrics, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
+            Release Point AI gives coaches a structured place to upload film, add pitching and hitting metrics, and leave timestamped feedback. Players get a single place to receive all of it. Every clip, every data point, every coaching note lives in the same record.
           </p>
           <div className="space-y-4">
             {[
@@ -128,7 +128,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point has two AI coaching agents, one for pitching and one for hitting. Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
+            Release Point AI has two AI coaching agents, one for pitching and one for hitting. Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -185,7 +185,7 @@ export default function AboutPage() {
             Purpose-built infrastructure<br />for player development data.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point is built on a modern full-stack architecture that lets coaches and players work from the same film, with security and data privacy as a first-class concern.
+            Release Point AI is built on a modern full-stack architecture that lets coaches and players work from the same film, with security and data privacy as a first-class concern.
           </p>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
@@ -232,13 +232,13 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-5 max-w-2xl">
             <p className="text-[#456080] leading-relaxed">
-              Release Point is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Pitch tracking, swing tracking, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
+              Release Point AI is an early-stage company with one focus: closing the gap between the analytics that exist in baseball and the development that actually happens on the field. The data has never been the problem. Pitch tracking, swing tracking, and high-speed video have made it possible to measure almost everything. The problem is that most of that information never reaches the player in a useful form.
             </p>
             <p className="text-[#456080] leading-relaxed">
               We are building the software layer that connects coaches, players, and data, so that a spin rate from a Tuesday bullpen session ends up in the same place as the film from that session, the coach&apos;s notes from that session, and the AI that can put all of it in context. That feedback loop is what development actually looks like when it works.
             </p>
             <p className="text-[#456080] leading-relaxed">
-              Release Point was founded by Nolan George, a pitcher with a lifetime on the mound, who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects firsthand experience with what coaches have, what players need, and where the current tools fall short.
+              Release Point AI was founded by Nolan George, a pitcher with a lifetime on the mound, who competed at the University of Nevada Las Vegas, San Jose State University, and professionally with the Boise Hawks in the Pioneer League. After playing, he built the technical side from scratch. The platform reflects firsthand experience with what coaches have, what players need, and where the current tools fall short.
             </p>
           </div>
         </section>

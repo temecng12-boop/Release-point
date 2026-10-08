@@ -52,12 +52,12 @@ export default async function WaitlistPage({
 
         {inviteOnly && (
           <p role="status" className="text-sm text-[#0F1F33] text-center max-w-md mb-4 leading-relaxed rounded-lg px-4 py-3" style={{ background: '#F0F4F8', border: '1px solid #DDE4ED' }}>
-            Release Point is invite-only right now, so that account wasn&apos;t created. Join the waitlist below and we&apos;ll reach out when your spot is ready.
+            Release Point AI is invite-only right now, so that account wasn&apos;t created. Join the waitlist below and we&apos;ll reach out when your spot is ready.
           </p>
         )}
 
         <p className="text-[#456080] text-sm sm:text-base text-center max-w-md mb-8 leading-relaxed">
-          Release Point is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
+          Release Point AI is a web app for coaches to upload and annotate pitching and hitting video frame by frame,
           get AI Coach insights, and share it all with their players, from youth to pro.
         </p>
 

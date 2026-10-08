@@ -31,12 +31,12 @@ export default function TermsPage() {
         {[
           {
             title: '1. Agreement to Terms',
-            body: `Release Point AI is operated by ${OPERATOR_NAME} (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada LLC, once formed). By creating an account or using Release Point, you agree to these Terms of Service. If you are using Release Point on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
+            body: `Release Point AI is operated by ${OPERATOR_NAME} (${LEGAL_ENTITY_PLACEHOLDER}, a Nevada LLC, once formed). By creating an account or using Release Point AI, you agree to these Terms of Service. If you are using Release Point AI on behalf of an organization (a team, program, or academy), you agree on behalf of that organization.
 
 If you do not agree to these terms, do not use the platform.`,
           },
           {
-            title: '2. Who Can Use Release Point',
+            title: '2. Who Can Use Release Point AI',
             body: `**Coaches:** Any adult (18+) who coaches baseball may create a coach account. You are responsible for the players you add to your account and any content you upload.
 
 **Players:** Players join by invitation from their coach, or sign up on their own, to work on pitching or hitting. When you join, you enter your birth month and year and accept these Terms. Players 13 to 17 should read these Terms with a parent or guardian.
@@ -61,7 +61,7 @@ We reserve the right to suspend or terminate accounts that violate these terms.`
           },
           {
             title: '4. Your Content',
-            body: `You own the videos, metrics, notes, and other content you upload to Release Point. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
+            body: `You own the videos, metrics, notes, and other content you upload to Release Point AI. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
 
 We do not claim ownership of your content. A player's video can be seen by the player, the player's direct coach, and the other coaches on teams the player is on. We share content with service providers only as described in our Privacy Policy.
 
@@ -87,11 +87,11 @@ We are not liable for any decisions made based solely on AI Coach responses.`,
 - Complying with any league, school, or organizational policies regarding video recording and sharing
 - Not sharing player performance data without appropriate consent
 
-Release Point provides tools for coaches to manage their content but is not responsible for how coaches use those tools.`,
+Release Point AI provides tools for coaches to manage their content but is not responsible for how coaches use those tools.`,
           },
           {
             title: '7. Availability and Changes',
-            body: `We aim to keep Release Point available and reliable, but we do not guarantee uninterrupted access. We may:
+            body: `We aim to keep Release Point AI available and reliable, but we do not guarantee uninterrupted access. We may:
 
 - Update or change features with or without notice
 - Temporarily suspend the platform for maintenance
@@ -101,7 +101,7 @@ We reserve the right to modify these Terms at any time. Continued use after chan
           },
           {
             title: '8. Limitation of Liability',
-            body: `To the maximum extent permitted by law, Release Point and its operators are not liable for:
+            body: `To the maximum extent permitted by law, Release Point AI and its operators are not liable for:
 
 - Loss of data, revenue, or profits
 - Decisions made based on AI Coach responses
@@ -109,7 +109,7 @@ We reserve the right to modify these Terms at any time. Continued use after chan
 - Service interruptions or data loss
 - Unauthorized access to your account if caused by your failure to secure your credentials
 
-To the extent the law allows, our total liability for any claim relating to Release Point is limited to the amount, if any, you paid us in the 12 months before the claim.`,
+To the extent the law allows, our total liability for any claim relating to Release Point AI is limited to the amount, if any, you paid us in the 12 months before the claim.`,
           },
           {
             title: '9. Termination',

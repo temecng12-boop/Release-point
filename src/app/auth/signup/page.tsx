@@ -5,7 +5,7 @@ const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform
 
 export const metadata = {
   title: 'Internal testing',
-  description: 'Release Point is in internal testing. Join the waitlist for early access.',
+  description: 'Release Point AI is in internal testing. Join the waitlist for early access.',
 }
 
 /**

@@ -41,7 +41,7 @@ test('home / about / footer / login / signup holding: waitlist CTAs, no public s
     assert.doesNotMatch(src, /href=["']\/auth\/signup["']/, name)
   }
   assert.match(login, /New here\? Join the waitlist/)
-  assert.match(signup, /Release Point is in internal testing/)
+  assert.match(signup, /Release Point AI is in internal testing/)
   assert.match(signup, /invite-only for now/)
   assert.match(signup, /href=["']\/waitlist["']/)
 })

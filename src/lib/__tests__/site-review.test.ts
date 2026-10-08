@@ -167,16 +167,38 @@ test('under-13 policy is one identical block on privacy and terms', () => {
   assert.match(read('lib/privacy-children.ts'), /\$\{UNDER_13_POLICY_BODY\}/)
   const block = read('lib/privacy-children.ts')
   for (const line of [
-    /There are no users under 13\. Until parent accounts ship/,
     /Children under 13 cannot sign up\./,
     /signup stops and no account is created\. We don't save the child's name or email/,
-    /an under-13 answer deletes the new account and its name and email/,
+    /The age question comes before Google sign-in, so an under-13 answer never starts it/,
+    /If an under-13 answer comes after sign-in, the account is frozen and its profile name is removed/,
+    /The sign-in email on the auth account stays/,
     /Coaches cannot add players under 13, and a coach can't give permission on behalf of a parent or guardian/,
     /No video can be uploaded for anyone marked under 13/,
-    /we'll freeze it right away\. No one can use it or add to it\. We'll then delete the child's personal information, including video, within 14 days/,
-    /Players 13 to 17 need a parent's or guardian's permission to use Release Point/,
+    /If a player answers under 13 after they have an account, we freeze it right away/,
+    /If a coach marks a player under 13, that player can't have video added/,
+    /including any video, promptly/,
+    /If we add parent accounts, we'll update this policy first/,
+    /Players 13 to 17 need a parent's or guardian's permission to use Release Point AI/,
     /Coaches must have written parent or guardian consent before uploading video of any minor/,
   ]) assert.match(block, line)
+  assert.doesNotMatch(block, /14 days/)
+  assert.doesNotMatch(block, /late October/)
+  assert.doesNotMatch(block, /deletes the new account/)
+})
+
+test('legal and marketing copy says Release Point AI, not Release Point alone', () => {
+  for (const f of [
+    'app/privacy/page.tsx', 'app/terms/page.tsx', 'lib/privacy-children.ts',
+    'app/about/page.tsx', 'app/waitlist/page.tsx', 'app/waitlist/waitlist-form.tsx',
+    'app/page.tsx',
+  ]) {
+    const text = read(f)
+    text.split('\n').forEach((line, i) => {
+      if (!line.includes('Release Point')) return
+      const leftover = line.replace(/Release Point AI/g, '')
+      assert.ok(!leftover.includes('Release Point'), `${f}:${i + 1} bare brand`)
+    })
+  }
 })
 
 test('who can see video reads identically on about, privacy, and terms', () => {
