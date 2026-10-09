@@ -254,8 +254,8 @@ test('sport: baseball only on legal pages, baseball-led marketing and meta', () 
 })
 
 test('AI wording is honest; Barry stays; no pro-career claims', () => {
-  assert.match(read('app/about/page.tsx'), /Both run on leading enterprise-grade AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip/)
-  assert.doesNotMatch(read('app/about/page.tsx'), /Anthropic|Claude/)
+  assert.match(read('app/about/page.tsx'), /Both run on frontier-grade, enterprise-trusted AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip/)
+  assert.doesNotMatch(read('app/about/page.tsx'), /Anthropic|Claude|GPT|OpenAI|Gemini/)
   assert.match(read('app/terms/page.tsx'), /AI Coach is powered by Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /AI Coach runs on Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /still frames from a clip/)

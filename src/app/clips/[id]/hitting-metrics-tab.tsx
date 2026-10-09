@@ -216,6 +216,8 @@ export default function HittingMetricsTab({
   clipId: string
   role: 'coach' | 'player'
   initial: HittingMetrics | null
+  canDelete?: boolean
+  canEdit?: boolean
 }) {
   const [metrics,   setMetrics]   = useState<HittingMetrics>(() => ({ ...empty(), ...(initial ?? {}) }))
   const [saveState, setSaveState] = useState<SaveState>(initial ? 'saved' : 'idle')

@@ -62,6 +62,17 @@ test('the checker catches the claims it looks for', () => {
   }
 })
 
+const ABOUT_AI_SENTENCE =
+  'Both run on frontier-grade, enterprise-trusted AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip.'
+
+test('about page: exact AI sentence and zero vendor names', () => {
+  const about = read('app/about/page.tsx')
+  assert.ok(about.includes(ABOUT_AI_SENTENCE), 'exact About AI sentence')
+  assert.equal((about.match(/Both run on frontier-grade, enterprise-trusted AI models/g) ?? []).length, 1)
+  assert.doesNotMatch(about, /Claude|Anthropic|GPT|OpenAI|Gemini/)
+  assert.match(read('app/privacy/page.tsx'), /Anthropic/)
+})
+
 test('about page: no realtime claim, and coach access described with team coaches', () => {
   const about = read('app/about/page.tsx')
   assert.doesNotMatch(about, /instantly|real-time data|the moment a coach saves/i)

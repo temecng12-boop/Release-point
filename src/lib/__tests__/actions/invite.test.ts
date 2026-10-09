@@ -110,7 +110,7 @@ test('another coach\'s player and self-signed-up player are still refused', asyn
 
 test('team invite form note no longer promises an email to existing accounts', async () => {
   const { readFileSync } = await import('node:fs')
-  const src = readFileSync(new URL('../../../app/dashboard/team/[id]/team-invite-form.tsx', import.meta.url), 'utf8')
+  const src = readFileSync(new URL('../../../app/dashboard/add-player-modal.tsx', import.meta.url), 'utf8')
   assert.match(src, /already have an account are added without an email/)
 })
 
@@ -183,7 +183,7 @@ test('a grade-range team ("9-12") is not an under-13 group: invite goes out', as
 
 test('the invite forms collect birth month/year (required) but no band and no guardian fields', async () => {
   const { readFileSync, existsSync } = await import('node:fs')
-  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/team/[id]/team-invite-form.tsx']) {
+  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/add-player-modal.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     assert.doesNotMatch(src, /age_band|AgeBandFields|guardian_email|guardian_name/, f)
     assert.match(src, /name="birth_month"[^>]*required/, `${f}: birth month is required`)
@@ -294,7 +294,7 @@ test('clip-uploaded, waitlist, and player-joined emails use Release Point AI', a
 
 test('invite forms surface a copyable invite link on success and on email failure', async () => {
   const { readFileSync } = await import('node:fs')
-  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/team/[id]/team-invite-form.tsx']) {
+  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/add-player-modal.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     assert.match(src, /InviteLinkBox/, f)
     assert.match(src, /state\?\.inviteUrl/, `${f}: link shows in both success and error states`)

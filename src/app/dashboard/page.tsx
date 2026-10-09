@@ -79,7 +79,8 @@ export default async function DashboardPage() {
   // All clips the caller may see (roster + teams). Never another coach's.
   const allClips = isCoach ? await loadActivityClips(user.id) : []
 
-  // Per-team stats computed in JS
+  // Per-team stats computed once per request (server snapshot, not a render tick).
+  // eslint-disable-next-line react-hooks/purity -- request-time window for "active in last 30 days"
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
   const teamStats = teams.map(team => {
@@ -118,7 +119,7 @@ export default async function DashboardPage() {
   const { data: playerRow } = !isCoach
     ? await supabaseAdmin
         .from('players')
-        .select('id, full_name, position')
+        .select('id, full_name, position, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at')
         .eq('user_id', user.id)
         .single()
     : { data: null }
@@ -425,7 +426,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 {playerRow && (
-                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
+                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} />
                 )}
               </div>
 
@@ -462,7 +463,7 @@ export default async function DashboardPage() {
                   <div className="rounded-xl px-6 py-10 text-center" style={{ background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
                     <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
                     <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
-                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} />
+                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} />
                   </div>
                 )}
               </div>

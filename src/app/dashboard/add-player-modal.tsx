@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { invitePlayer } from '@/app/actions/invite'
 import { MONTHS } from '@/lib/birth-months'
+import InviteLinkBox from './invite-link-box'
 import PositionChips from '@/components/position-chips'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -128,6 +129,7 @@ export default function AddPlayerModal({
                   <p className="text-sm text-green-700">{state.success}</p>
                 </div>
               )}
+              {state?.inviteUrl && <InviteLinkBox inviteUrl={state.inviteUrl} />}
 
               <button
                 type="submit"
@@ -137,6 +139,9 @@ export default function AddPlayerModal({
               >
                 {pending ? 'Sending Invite…' : 'Send Player Invite'}
               </button>
+              <p className="text-[10px] text-[#3D5166] leading-relaxed">
+                This email gets an invite to set up the player&apos;s account. Players who already have an account are added without an email.
+              </p>
             </form>
           </div>
         </div>

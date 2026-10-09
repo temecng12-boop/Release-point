@@ -124,7 +124,7 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   single() { this.mode = 'single'; return this }
   maybeSingle() { this.mode = 'maybeSingle'; return this }
 
-  private run(): { data: unknown; error: DbError | null } {
+  private run(): { data: unknown; error: DbError | null; count?: number } {
     state.ops.push({ table: this.table, action: this.action, values: this.values, filters: this.filters, via: this.via })
     const error = takeFailure(f => f.bucket === undefined && (f.table === undefined || f.table === this.table) && (f.action === undefined || f.action === this.action))
     if (error) return { data: null, error }
@@ -143,9 +143,9 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
       out = rows.filter(r => matches(r, this.filters) && visible(r))
       for (const r of out) Object.assign(r, this.values as Row)
     } else if (this.action === 'upsert') {
-      const key = this.upsertOpts.onConflict ?? 'id'
+      const keys = (this.upsertOpts.onConflict ?? 'id').split(',').map(s => s.trim())
       for (const v of (Array.isArray(this.values) ? this.values : [this.values]) as Row[]) {
-        const existing = rows.find(r => r[key] === v[key])
+        const existing = rows.find(r => keys.every(k => r[k] === v[k]))
         if (existing) { if (!this.upsertOpts.ignoreDuplicates) { Object.assign(existing, v); out.push(existing) } }
         else { const r = { ...v }; rows.push(r); out.push(r) }
       }

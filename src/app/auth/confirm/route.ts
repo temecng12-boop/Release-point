@@ -94,12 +94,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
-
-  // Assistant-coach invite: join_team is the team the organizer invited them
-  // to. Never trust the query alone — a pending coach_invites row must exist
-  // for this email, and that inviter must be the organizer of that team.
+  // Assistant-coach invite: authorize join_team while the coach_invites row
+  // is still pending. finishInviteAcceptance marks that row accepted, so a
+  // lookup afterwards would miss it. Never trust the query team_id alone.
   const joinTeam = searchParams.get('join_team')
+  let joinAsAssistant: string | null = null
   if (joinTeam && user.email && (await findInviteForEmail(supabaseAdmin, user.email)) === 'coach') {
     const { data: inviteRow } = await supabaseAdmin
       .from('coach_invites')
@@ -117,16 +116,22 @@ export async function GET(request: NextRequest) {
           .maybeSingle()
       : { data: null }
     if (membership?.role === 'organizer') {
-      const { error: joinErr } = await supabaseAdmin
-        .from('team_coaches')
-        .upsert(
-          { team_id: joinTeam, coach_id: user.id, role: 'assistant' },
-          { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
-        )
-      if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
+      joinAsAssistant = joinTeam
     } else {
       console.warn('[auth/confirm] join_team refused: inviter is not organizer of that team', { joinTeam })
     }
+  }
+
+  const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
+
+  if (joinAsAssistant) {
+    const { error: joinErr } = await supabaseAdmin
+      .from('team_coaches')
+      .upsert(
+        { team_id: joinAsAssistant, coach_id: user.id, role: 'assistant' },
+        { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
+      )
+    if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
   }
 
   if (isBrandNewUser(user) && linkedPlayers.length === 0 && !joinTeam) {
