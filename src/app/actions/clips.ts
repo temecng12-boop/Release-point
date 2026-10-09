@@ -16,6 +16,7 @@ import { sendClipUploadedEmail } from '@/lib/email'
 import { decideStorageAccess } from '@/lib/storage-access'
 import { canUploadForPlayer, playerIdFromStoragePath } from '@/lib/auth/player-access'
 import { canDeleteClip, canDeleteClipItem, isPlayersOwnCoach } from '@/lib/auth/roster-access'
+import { canCoachWriteForPlayer } from '@/lib/team-access'
 import { clipFilesToRemove } from '@/lib/clip-storage'
 import { checkUploadConsent, uploadBlockedMessageFor } from '@/lib/consent-server'
 import { isConsentPendingError, UPLOAD_BLOCKED_MESSAGE } from '@/lib/consent'
@@ -351,7 +352,7 @@ export async function deleteAnnotation(annotationId: string) {
 // coach. Team coaches and players have no delete policy on pitch_metrics, and
 // RLS then deletes 0 rows without an error, so the row count is checked and 0
 // is reported as an error. The screen only drops what the database removed.
-const PITCH_DELETE_DENIED = 'Pitch not deleted. Only the player\'s own coach can delete pitches. Refresh the page and try again.'
+const PITCH_DELETE_DENIED = 'Pitch not deleted. Only a coach of this player can delete pitches. Refresh the page and try again.'
 
 export async function deletePitchMetric(metricId: string) {
   const supabase = await createClient()
@@ -387,7 +388,7 @@ export async function deleteAllPitchMetrics(clipId: string) {
 // lets team coaches update clips, so the direct-coach check is done here
 // first; players have no update policy on clips. The update runs with the
 // user's own client and must report the one clip row it changed.
-const HITTING_DELETE_DENIED = 'Hitting data not deleted. Only the player\'s own coach can delete it. Refresh the page and try again.'
+const HITTING_DELETE_DENIED = 'Hitting data not deleted. Only a coach of this player can delete it. Refresh the page and try again.'
 const HITTING_KEYS = [
   'ev_avg', 'ev_max', 'ev_90th', 'distance_avg', 'distance_max',
   'launch_angle_avg', 'barrel_rate', 'hard_hit_rate', 'sweet_spot_rate',
@@ -407,7 +408,9 @@ async function hittingDeleteContext(clipId: unknown) {
   if (!clip) return { error: HITTING_DELETE_DENIED }
   const { data: player, error: playerError } = await supabase.from('players').select('coach_id').eq('id', (clip as { player_id: string }).player_id).maybeSingle()
   if (playerError) return { error: describeDbError('deleteHittingMetric:player', playerError, 'Could not delete hitting data.') }
-  if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: HITTING_DELETE_DENIED }
+  const playerId = (clip as { player_id: string }).player_id
+  const own = isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)
+  if (!own && !(await canCoachWriteForPlayer(user.id, playerId))) return { error: HITTING_DELETE_DENIED }
   const current = ((clip as { hitting_metrics?: Record<string, number | null> | null }).hitting_metrics ?? null)
   return { supabase, current }
 }
@@ -573,17 +576,15 @@ export async function deleteTimestampNote(noteId: string) {
 export async function saveLessonPath(clipId: string, lessonPath: string, meta: { mime?: string | null; durationMs?: number | null; timeline?: unknown } = {}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  // No new lesson for a player without 18+ confirmation or guardian consent
-  // (#17). Checked only for the player's own coach; anyone else is refused
-  // by saveLessonRecord without learning the player's consent status.
+  // No new lesson for a player without video consent. Checked for the
+  // player's direct coach or a team coach; anyone else is refused by
+  // saveLessonRecord without learning the player's consent status.
   if (user) {
-    const owner = await playerForClip(clipId)
-    if (owner && isPlayersOwnCoach(user.id, owner)) {
-      const { data: clipRow } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
-      if (clipRow) {
-        const consent = await checkUploadConsent(supabaseAdmin, clipRow.player_id as string)
-        if (!consent.ok) return { error: consent.error }
-      }
+    const { data: clipRow } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).maybeSingle()
+    const playerId = clipRow?.player_id as string | undefined
+    if (playerId && (await canCoachWriteForPlayer(user.id, playerId))) {
+      const consent = await checkUploadConsent(supabaseAdmin, playerId)
+      if (!consent.ok) return { error: consent.error }
     }
   }
   const result = await saveLessonRecord(supabaseAdmin, user?.id, clipId, lessonPath, meta)
@@ -632,9 +633,8 @@ export async function saveVoicePath(clipId: string, voicePath: string) {
 
   const { data: clip } = await supabaseAdmin.from('clips').select('player_id').eq('id', clipId).single()
   if (!clip) return { error: 'Clip not found' }
-  // Voice notes are coach commentary: only the player's own (direct) coach.
-  const { data: player } = await supabaseAdmin.from('players').select('coach_id').eq('id', clip.player_id).single()
-  if (!isPlayersOwnCoach(user.id, player as { coach_id: string | null } | null)) return { error: 'Not authorized' }
+  // Voice notes are coach commentary: the player's direct coach or a team coach.
+  if (!(await canCoachWriteForPlayer(user.id, clip.player_id))) return { error: 'Not authorized' }
   if (!isVoicePathFor(voicePath, clip.player_id, clipId)) return { error: 'Invalid storage path' }
   const consent = await checkUploadConsent(supabaseAdmin, clip.player_id)
   if (!consent.ok) return { error: consent.error }

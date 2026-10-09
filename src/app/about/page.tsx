@@ -191,7 +191,7 @@ export default function AboutPage() {
             {[
               {
                 label: 'Secure Video Storage',
-                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, the other coaches on teams the player is on (including assistant coaches), and the player\'s linked guardian.',
+                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, the other coaches on teams the player is on (including assistant coaches), and the player\'s linked guardian. A player\'s video can be uploaded by the player\'s direct coach, the coaches on teams the player is on (including assistant coaches), and the player.',
               },
               {
                 label: 'Shared Feedback',

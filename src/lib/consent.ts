@@ -32,6 +32,13 @@ export type PlayerConsentFields = {
   age_band_coach?: string | null
   age_band_self?: string | null
   age_screen_at?: string | null
+  /**
+   * Account players have a user_id. Roster-only players are `null`.
+   * `undefined` means the caller didn't load it — keep the account-player rule.
+   */
+  user_id?: string | null
+  /** True when a roster-only 13–17 player has a recorded coach consent row. */
+  roster_video_consent?: boolean
   /** Set by the server when migration 023's columns don't exist yet. */
   consent_rules_pending_migration?: boolean
   /** Set by the server when 023 is applied but 037's age columns aren't. */
@@ -74,8 +81,20 @@ export function uploadConsentStatus(player: PlayerConsentFields | null | undefin
   return 'pending'
 }
 
-/** True if video may be uploaded or recorded for this player. */
+/**
+ * True if video may be uploaded or recorded for this player.
+ * Account players (user_id set, or user_id omitted): existing 037 rule
+ * (uploadConsentStatus). Roster-only (user_id === null): coach band 18_plus,
+ * or 13_17 with a recorded consent row. under_13 is never true.
+ */
 export function canUploadVideo(player: PlayerConsentFields | null | undefined): boolean {
+  if (!player) return false
+  if (player.user_id === null && player.consent_rules_pending_migration !== true && player.age_band_pending_migration !== true) {
+    const band = player.age_band_coach ?? player.age_band
+    if (band === '18_plus') return true
+    if (band === '13_17') return player.roster_video_consent === true
+    return false
+  }
   return uploadConsentStatus(player) !== 'pending'
 }
 

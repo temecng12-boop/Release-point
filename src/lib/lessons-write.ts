@@ -1,7 +1,7 @@
 // Server-side writes for lesson recordings (service-role client, caller checked).
-// Rules: only the player's DIRECT coach (players.coach_id) may add or delete
-// lessons; team coaches can view them but not manage them. The lessons-bucket
-// write check (src/lib/storage-access.ts) must also pass, and the path must be a
+// Rules: the player's direct coach or a coach on a team that includes the
+// player may add or delete lessons. The lessons-bucket write check
+// (src/lib/storage-access.ts) must also pass, and the path must be a
 // lesson file for exactly that player and clip (src/lib/lesson-path.ts).
 // New recordings never delete older ones.
 import { lessonTotalMs } from './lesson-recording'
@@ -34,14 +34,13 @@ export type LessonWriteResult = { success: true; warning?: string } | { error: s
 
 export const LESSON_DENIED = 'Only this player\'s coach can save or delete lessons.'
 
-/** Direct coach of the player (players.coach_id), after the storage write check for the path passed. */
-async function isDirectCoachWriter(client: unknown, userId: string, playerId: string, path: string): Promise<{ ok: boolean; reason: string }> {
+/** Direct coach or team coach, after the storage write check for the path passed. */
+async function isCoachLessonWriter(client: unknown, userId: string, playerId: string, path: string): Promise<{ ok: boolean; reason: string }> {
   const access = await decideStorageAccess(client, userId, 'lessons', path, 'write')
   if (!access.allowed) return { ok: false, reason: access.reason }
   if (access.playerId !== playerId.toLowerCase()) return { ok: false, reason: 'path is for another player' }
-  const { data } = await (client as Client).from('players').select('coach_id').eq('id', playerId).maybeSingle()
-  if ((data as { coach_id?: string | null } | null)?.coach_id !== userId) return { ok: false, reason: `not the direct coach (${access.via})` }
-  return { ok: true, reason: 'direct coach' }
+  if (access.via !== 'coach' && access.via !== 'team_coach') return { ok: false, reason: `not a writing coach (${access.via})` }
+  return { ok: true, reason: access.via }
 }
 
 export async function saveLessonRecord(
@@ -60,7 +59,7 @@ export async function saveLessonRecord(
     console.warn('[saveLesson] rejected path', { clipId, lessonPath })
     return { error: 'Invalid lesson file' }
   }
-  const access = await isDirectCoachWriter(client, userId, playerId, lessonPath)
+  const access = await isCoachLessonWriter(client, userId, playerId, lessonPath)
   if (!access.ok) {
     console.warn('[saveLesson] denied', { userId, clipId, reason: access.reason })
     return { error: LESSON_DENIED }
@@ -132,7 +131,7 @@ export async function deleteLessonRecord(client: unknown, userId: string | null 
     if (!row) return { error: 'Lesson not found' }
     clipId = row.clip_id; mediaPath = row.media_path; playerId = row.player_id
   }
-  const access = await isDirectCoachWriter(client, userId, playerId, mediaPath)
+  const access = await isCoachLessonWriter(client, userId, playerId, mediaPath)
   if (!access.ok) {
     console.warn('[deleteLesson] denied', { userId, lessonId, reason: access.reason })
     return { error: LESSON_DENIED }

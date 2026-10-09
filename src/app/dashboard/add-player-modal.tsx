@@ -1,13 +1,16 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
-import { invitePlayer } from '@/app/actions/invite'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
+import { addRosterPlayer } from '@/app/actions/roster'
 import { MONTHS } from '@/lib/birth-months'
-import InviteLinkBox from './invite-link-box'
+import { bandFromBirth } from '@/lib/age-band'
+import { MINOR_CONSENT_LABELS, type MinorConsentKind } from '@/lib/roster-consent'
 import PositionChips from '@/components/position-chips'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
-const inputCls = 'w-full bg-[#F8FAFC] border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#B0BEC5] focus:outline-none focus:border-[#456080] transition-colors'
+const inputCls = 'w-full bg-[#F8FAFC] border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#B0BEC5] focus:outline-none focus:border-[#456080] transition-colors min-h-11'
+
+const CONSENT_KINDS = Object.keys(MINOR_CONSENT_LABELS) as MinorConsentKind[]
 
 export default function AddPlayerModal({
   teamId,
@@ -17,14 +20,25 @@ export default function AddPlayerModal({
   teams?: { id: string; name: string }[]
 }) {
   const [open, setOpen] = useState(false)
-  const [state, action, pending] = useActionState(invitePlayer, undefined)
+  const [state, action, pending] = useActionState(addRosterPlayer, undefined)
   const formRef = useRef<HTMLFormElement>(null)
+  const [month, setMonth] = useState('')
+  const [year, setYear] = useState('')
+
+  const band = useMemo(() => {
+    if (!month || !year) return null
+    const r = bandFromBirth(month, year)
+    return r.ok ? r.band : null
+  }, [month, year])
+  const showConsent = band === '13_17'
 
   useEffect(() => {
     if (state?.success) {
       setTimeout(() => {
         setOpen(false)
         formRef.current?.reset()
+        setMonth('')
+        setYear('')
       }, 1800)
     }
   }, [state?.success])
@@ -40,7 +54,7 @@ export default function AddPlayerModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[11px] px-3 py-2 rounded-lg text-white transition-colors"
+        className="text-[11px] px-3 py-2 rounded-lg text-white transition-colors max-sm:min-h-11"
         style={{ ...os, background: '#C8102E' }}
       >
         + Add Player
@@ -53,7 +67,7 @@ export default function AddPlayerModal({
           onClick={e => { if (e.target === e.currentTarget) setOpen(false) }}
         >
           <div
-            className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
+            className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] overflow-y-auto"
             style={{ background: '#ffffff', border: '1px solid #DDE4ED' }}
           >
             <div className="h-1 bg-[#C8102E]" />
@@ -65,13 +79,13 @@ export default function AddPlayerModal({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form ref={formRef} action={action} className="px-6 py-5 space-y-4">
+            <form ref={formRef} action={action} className="px-6 py-5 space-y-4" data-testid="add-player-form">
               {teamId && <input type="hidden" name="team_id" value={teamId} />}
 
               <div>
@@ -80,26 +94,65 @@ export default function AddPlayerModal({
               </div>
 
               <div>
-                <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={os}>Player Email *</label>
-                <input type="email" name="player_email" placeholder="Player's email address" required className={inputCls} />
+                <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={os}>Player Email (optional)</label>
+                <input type="email" name="player_email" placeholder="Add later to send an invite" className={inputCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={os}>Birth Month *</label>
-                  <select name="birth_month" required defaultValue="" className={inputCls} style={{ appearance: 'none' }}>
+                  <select
+                    name="birth_month"
+                    required
+                    value={month}
+                    onChange={e => setMonth(e.target.value)}
+                    className={inputCls}
+                    style={{ appearance: 'none' }}
+                  >
                     <option value="" disabled>Month</option>
                     {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={os}>Birth Year *</label>
-                  <input name="birth_year" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} required autoComplete="off" placeholder="Year" className={inputCls} />
+                  <input
+                    name="birth_year"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    required
+                    autoComplete="off"
+                    placeholder="Year"
+                    value={year}
+                    onChange={e => setYear(e.target.value)}
+                    className={inputCls}
+                  />
                 </div>
               </div>
               <p className="text-[10px] text-[#3D5166] leading-relaxed">
-                Players under 13 can&apos;t be added yet. An under-13 date is refused and nothing is saved.
+                Players under 13 can&apos;t be added. An under-13 date is refused and nothing is saved.
               </p>
+
+              {showConsent && (
+                <fieldset data-testid="minor-consent" className="space-y-2 border border-[#DDE4ED] rounded-md px-3 py-3">
+                  <legend className="text-[10px] text-[#3D5166] tracking-wide px-1" style={os}>
+                    Permission for this 13–17 player *
+                  </legend>
+                  {CONSENT_KINDS.map((kind) => (
+                    <label key={kind} className="flex items-start gap-2 cursor-pointer min-h-11">
+                      <input
+                        type="radio"
+                        name="minor_consent"
+                        value={kind}
+                        required
+                        className="mt-2 accent-[#C8102E]"
+                      />
+                      <span className="text-sm text-[#0F1F33] leading-snug">{MINOR_CONSENT_LABELS[kind]}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
 
               <PositionChips name="positions" id="add-player-positions" />
 
@@ -108,7 +161,7 @@ export default function AddPlayerModal({
                   <label className="block text-[10px] text-[#3D5166] mb-1.5 tracking-wide" style={os}>Add to Teams</label>
                   <div className="flex flex-wrap gap-2">
                     {teams.map(t => (
-                      <label key={t.id} className="flex items-center gap-1.5 cursor-pointer">
+                      <label key={t.id} className="flex items-center gap-1.5 cursor-pointer min-h-11">
                         <input type="checkbox" name="team_ids" value={t.id} className="accent-[#C8102E]" />
                         <span className="text-xs text-[#456080]">{t.name}</span>
                       </label>
@@ -118,29 +171,28 @@ export default function AddPlayerModal({
               )}
 
               {state?.error && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert" data-testid="add-player-error">
                   <span className="text-[#C8102E] text-sm">✕</span>
                   <p className="text-sm text-[#C8102E]">{state.error}</p>
                 </div>
               )}
               {state?.success && (
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2" role="status">
                   <span className="text-green-600 text-sm">✓</span>
                   <p className="text-sm text-green-700">{state.success}</p>
                 </div>
               )}
-              {state?.inviteUrl && <InviteLinkBox inviteUrl={state.inviteUrl} />}
 
               <button
                 type="submit"
                 disabled={pending}
-                className="w-full py-2.5 rounded-lg text-sm text-white transition-colors disabled:opacity-50"
+                className="w-full py-2.5 rounded-lg text-sm text-white transition-colors disabled:opacity-50 min-h-11"
                 style={{ ...os, background: pending ? '#4A6880' : '#C8102E' }}
               >
-                {pending ? 'Sending Invite…' : 'Send Player Invite'}
+                {pending ? 'Adding…' : 'Add Player'}
               </button>
               <p className="text-[10px] text-[#3D5166] leading-relaxed">
-                This email gets an invite to set up the player&apos;s account. Players who already have an account are added without an email.
+                Adds this player to the roster without creating an account. Email is optional. You can attach an email later and send an invite from the player&apos;s page.
               </p>
             </form>
           </div>

@@ -2,8 +2,10 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { profilePageAccess } from '@/lib/auth/roster-access'
+import { isCoachOnPlayersTeam } from '@/lib/team-access'
 import ProfileTabs from './profile-tabs'
 import UploadButton from '@/app/dashboard/upload-button'
+import AttachEmailForm from '@/app/dashboard/attach-email-form'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
 import AppHeader from '@/components/app-header'
 import LessonFeedbackSection from '@/components/lessons/lesson-feedback-section'
@@ -29,6 +31,8 @@ type ProfilePlayer = {
   position: string | null
   positions?: string[] | null
   coach_id: string | null
+  user_id?: string | null
+  team_id?: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
   age_band?: string | null
@@ -53,15 +57,22 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   if (profile?.role !== 'coach') redirect('/dashboard')
 
   const { data: player } = await selectPlayersWithConsent<ProfilePlayer>(
-    'id, full_name, email, accepted_at, age_group, position, positions, coach_id',
+    'id, full_name, email, accepted_at, age_group, position, positions, coach_id, user_id, team_id',
     (cols) => supabaseAdmin.from('players').select(cols).eq('id', id).single(),
   )
 
-  // Only the player's own coach may view this page. Other coaches, including
-  // for a player with no coach, get a 404 so the player's existence isn't revealed.
-  const access = profilePageAccess(user.id, profile?.role, player)
+  const onTeam = player
+    ? await isCoachOnPlayersTeam(user.id, player.id, player.team_id ?? null)
+    : false
+  const access = profilePageAccess(user.id, profile?.role, player, onTeam)
   if (access === 'redirect-dashboard') redirect('/dashboard')
   if (access !== 'view' || !player) notFound()
+  const canWrite = player.coach_id === user.id || onTeam
+  const consentQuery = !player.user_id
+    ? await supabaseAdmin.from('player_video_consents').select('id').eq('player_id', id).limit(1)
+    : { data: [] as { id: string }[], error: null }
+  const consentHit = consentQuery.error ? [] : (consentQuery.data ?? [])
+  const consent = { ...player, roster_video_consent: consentHit.length > 0 }
 
   // Fetch athlete profile fields separately — fault-tolerant in case columns are new
   let athleteData: Record<string, unknown> = {}
@@ -167,7 +178,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl text-[#0F1F33] truncate" style={oswald}>{player.full_name}</h1>
-                <p className="text-xs text-[#3D5166] mt-0.5 truncate">{player.email}</p>
+                <p className="text-xs text-[#3D5166] mt-0.5 truncate">{player.email || 'No email yet'}</p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   {player.age_group && (
                     <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full">{player.age_group}</span>
@@ -177,22 +188,22 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                     className={`text-xs px-2 py-0.5 rounded tracking-wide ${player.accepted_at ? 'bg-green-100 text-green-700' : 'bg-[#EEF2F7] text-[#456080]'}`}
                     style={oswald}
                   >
-                    {player.accepted_at ? 'Active' : 'Not yet signed up'}
+                    {player.accepted_at ? 'Active' : player.email ? 'Not yet signed up' : 'Roster only'}
                   </span>
                 </div>
               </div>
               {/* Upload button for the player's own coach only. Full width under
                   the name on phones, so a notice never covers the name. */}
               <div className="w-full sm:w-auto sm:max-w-xs">
-              {player.coach_id === user.id ? (
+              {canWrite ? (
               <UploadButton
                 playerId={player.id}
                 playerName={player.full_name}
-                consent={player}
+                consent={consent}
                 maxFiles={50}
               />
               ) : (
-                <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coach can add video.</p>
+                <p className="text-xs text-[#3D5166] max-w-xs">Only this player&apos;s coaches can add video.</p>
               )}
               </div>
             </div>
@@ -215,6 +226,17 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
             </div>
           </div>
         </div>
+
+        {canWrite && !player.user_id && (
+          <div className="bg-white border border-[#DDE4ED] rounded-xl p-5 shadow-sm">
+            <p className="text-[10px] tracking-[0.3em] text-[#C8102E] mb-2" style={oswald}>Account</p>
+            <h2 className="text-sm text-[#0F1F33] mb-3" style={oswald}>Email and invite</h2>
+            <p className="text-xs text-[#3D5166] mb-3 leading-relaxed">
+              Roster-only players have no account. Add an email, then send an invite so they can claim this same player record.
+            </p>
+            <AttachEmailForm playerId={player.id} currentEmail={player.email} />
+          </div>
+        )}
 
         {/* Tabs */}
         <ProfileTabs

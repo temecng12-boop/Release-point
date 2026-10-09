@@ -103,7 +103,7 @@ We don't sell your data, and we don't share it with anyone except the service pr
           },
           {
             title: '6. Video and Performance Data',
-            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the player's direct coach, the other coaches on teams the player is on (including assistant coaches), and the player's linked guardian.
+            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the player's direct coach, the other coaches on teams the player is on (including assistant coaches), and the player's linked guardian. A player's video can be uploaded by the player's direct coach, the coaches on teams the player is on (including assistant coaches), and the player.
 
 Videos are served via time-limited signed URLs. Files are not publicly accessible by default.`,
           },

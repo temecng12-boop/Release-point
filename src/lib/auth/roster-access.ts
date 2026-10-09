@@ -44,9 +44,10 @@ export function profilePageAccess(
   userId: string,
   role: string | null | undefined,
   player: PlayerOwnerRow,
+  onPlayersTeam?: boolean,
 ): ProfilePageAccess {
   if (role !== 'coach') return 'redirect-dashboard'
-  return isPlayersOwnCoach(userId, player) ? 'view' : 'not-found'
+  return isPlayersOwnCoach(userId, player) || onPlayersTeam === true ? 'view' : 'not-found'
 }
 
 export type PlayerAccessIds = { coach_id: string | null; user_id: string | null } | null | undefined

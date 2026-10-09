@@ -96,6 +96,7 @@ test('about page: security and access claims match the code', () => {
   // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
   assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
   assert.match(about, /the player, the player\\'s direct coach, the other coaches on teams the player is on \(including assistant coaches\), and the player\\'s linked guardian/)
+  assert.match(about, /uploaded by the player\\'s direct coach, the coaches on teams the player is on \(including assistant coaches\), and the player/)
   const access = read('lib/clip-access.ts')
   for (const via of ["'player'", "'coach'", "'guardian'", "'team_coach'"]) assert.ok(access.includes(via), via)
   // Signed clip links expire after an hour (3600 s) on the clip page.

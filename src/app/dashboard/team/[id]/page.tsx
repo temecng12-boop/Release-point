@@ -1,9 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { isMissingColumnError } from '@/lib/db-errors'
 import { selectPlayersWithConsent } from '@/lib/consent-server'
-import { ownTeamIdsByPlayer, splitRosterByCoach } from '@/lib/auth/roster-access'
+import { ownTeamIdsByPlayer } from '@/lib/auth/roster-access'
 import PlayerRow from '@/app/dashboard/player-row'
 import TeamInviteForm from './team-invite-form'
 import TeamLeaderboard from './team-leaderboard'
@@ -12,19 +11,19 @@ import DeleteTeamButton from './delete-team-button'
 import { loadTeamCoaches } from '@/lib/team-coaches'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
-import PositionTags from '@/components/position-tags'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 type TeamRosterPlayer = {
   id: string
   full_name: string
-  email: string
+  email: string | null
   accepted_at: string | null
   age_group: string | null
   position: string | null
   positions?: string[] | null
   coach_id: string | null
+  user_id?: string | null
   consent_given_at: string | null
   adult_confirmed_at: string | null
   age_band?: string | null
@@ -72,47 +71,26 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const teamPlayerIds = teamPlayerLinks?.map((r) => r.player_id) ?? []
 
-  // Split the roster into this coach's own players and other coaches' (or
-  // coach-less) players. Only own players get details, clips, sessions,
-  // metrics, a profile link and edit controls; others are listed by name only.
-  const { data: rosterRows } = teamPlayerIds.length > 0
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, coach_id')
-        .in('id', teamPlayerIds)
-    : { data: [] }
-  const roster = splitRosterByCoach(user.id, (rosterRows ?? []) as { id: string; coach_id: string | null }[])
-  const ownPlayerIds = roster.own.map((r) => r.id)
-  const otherPlayerIds = roster.others.map((r) => r.id)
-
-  const { data: players } = ownPlayerIds.length > 0
+  const { data: players } = teamPlayerIds.length > 0
     ? await selectPlayersWithConsent<TeamRosterPlayer[]>(
-        'id, full_name, email, accepted_at, age_group, position, positions, coach_id',
-        (cols) => supabaseAdmin.from('players').select(cols).in('id', ownPlayerIds).order('full_name', { ascending: true }),
+        'id, full_name, email, accepted_at, age_group, position, positions, coach_id, user_id',
+        (cols) => supabaseAdmin.from('players').select(cols).in('id', teamPlayerIds).order('full_name', { ascending: true }),
       )
     : { data: [] as TeamRosterPlayer[] }
 
-  let otherPlayers: { id: string; full_name: string; age_group: string | null; position: string | null; positions?: string[] | null }[] | null = []
-  if (otherPlayerIds.length > 0) {
-    const withPos = await supabaseAdmin
-      .from('players')
-      .select('id, full_name, age_group, position, positions')
-      .in('id', otherPlayerIds)
-      .order('full_name', { ascending: true })
-    if (withPos.error && isMissingColumnError(withPos.error, 'positions')) {
-      const fallback = await supabaseAdmin
-        .from('players')
-        .select('id, full_name, age_group, position')
-        .in('id', otherPlayerIds)
-        .order('full_name', { ascending: true })
-      otherPlayers = fallback.data
-    } else {
-      otherPlayers = withPos.data as typeof otherPlayers
-    }
-  }
-  const rosterCount = (players?.length ?? 0) + (otherPlayers?.length ?? 0)
+  const rosterPlayerIds = (players ?? []).map((p) => p.id)
+  const consentQuery = rosterPlayerIds.length > 0
+    ? await supabaseAdmin.from('player_video_consents').select('player_id').in('player_id', rosterPlayerIds)
+    : { data: [] as { player_id: string }[], error: null }
+  const consentRows = consentQuery.error ? [] : (consentQuery.data ?? [])
+  const consented = new Set((consentRows as { player_id: string }[]).map((r) => r.player_id))
+  const rosterPlayers = (players ?? []).map((p) => ({
+    ...p,
+    roster_video_consent: consented.has(p.id),
+  }))
+  const rosterCount = rosterPlayers.length
 
-  const playerIds = players?.map((p) => p.id) ?? []
+  const playerIds = rosterPlayers.map((p) => p.id)
 
   // The edit form saves the player's full set of this coach's teams, so give
   // it all of the coach's teams and every one of them the player is on.
@@ -178,7 +156,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     if (m.spin_rate != null) playerMetricMap[pid].spinRates.push(m.spin_rate)
   }
 
-  const leaderboardEntries = (players ?? []).map(p => {
+  const leaderboardEntries = rosterPlayers.map(p => {
     const pm = playerMetricMap[p.id]
     const velocities = pm?.velocities ?? []
     const spinRates = pm?.spinRates ?? []
@@ -230,35 +208,20 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
           {rosterCount === 0 ? (
             <div className="bg-white rounded-md border border-[#DDE4ED] shadow-sm px-6 py-10 text-center">
-              <p className="text-sm text-[#3D5166]">No players on this team yet. Invite someone above.</p>
+              <p className="text-sm text-[#3D5166]">No players on this team yet. Add someone above.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {(players ?? []).map((p) => (
+              {rosterPlayers.map((p) => (
                 <PlayerRow
                   key={p.id}
-                  player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
+                  player={{ ...p, email: p.email ?? '', teamIds: teamIdsByPlayer[p.id] ?? [id] }}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
                   teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}
                   sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}
+                  isOwnPlayer={p.coach_id === user.id}
+                  canWrite
                 />
-              ))}
-              {(otherPlayers ?? []).map((p) => (
-                <div
-                  key={p.id}
-                  className="bg-white rounded-xl border border-[#DDE4ED] shadow-sm px-4 py-2.5"
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-[#0F1F33]">{p.full_name}</span>
-                    {p.age_group && (
-                      <span className="text-xs bg-[#EEF2F7] text-[#456080] px-2 py-0.5 rounded-full">
-                        {p.age_group}
-                      </span>
-                    )}
-                    <PositionTags player={p} />
-                  </div>
-                  <p className="text-xs text-[#3D5166] mt-0.5">Coached by another coach.</p>
-                </div>
               ))}
             </div>
           )}
