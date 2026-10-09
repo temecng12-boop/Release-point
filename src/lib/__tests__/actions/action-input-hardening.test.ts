@@ -28,7 +28,7 @@ function seed(user: { id: string; email: string } | null, extra: Record<string, 
     tables: {
       clips: [{ id: C, player_id: P }, { id: OTHER_CLIP, player_id: 'player-2' }],
       players: [
-        { id: P, coach_id: COACH.id, user_id: PLAYER.id, guardian_id: null, consent_given_at: null, adult_confirmed_at: null, college_offers: [] },
+        { id: P, coach_id: COACH.id, user_id: PLAYER.id, guardian_id: null, consent_given_at: null, adult_confirmed_at: null, college_offers: [], team_id: 'team-1' },
         { id: 'player-2', coach_id: 'other-coach', user_id: 'other-player' },
       ],
       profiles: [
@@ -37,6 +37,7 @@ function seed(user: { id: string; email: string } | null, extra: Record<string, 
         { id: TEAM_COACH.id, role: 'coach' },
         { id: GUARDIAN.id, role: 'guardian' },
       ],
+      team_coaches: [{ team_id: 'team-1', coach_id: TEAM_COACH.id, role: 'assistant' }],
       pitch_metrics: [],
       ...extra,
     },
@@ -127,21 +128,19 @@ const pdfForm = (opts: { clipId?: string; bytes?: Uint8Array<ArrayBuffer>; type?
   return fd
 }
 
-test('parseTrackmanPDF: signed-out, team coach, stranger and guardian are refused', async () => {
+test('parseTrackmanPDF: signed-out, off-team stranger and guardian are refused', async () => {
   seed(null)
   assert.match(String((await parseTrackmanPDF(pdfForm({ clipId: C }))).error), /sign in/)
-  for (const user of [TEAM_COACH, { id: 'stranger', email: 's@x' }]) {
-    seed(user)
-    assert.match(String((await parseTrackmanPDF(pdfForm({ clipId: C }))).error), /Only the player's coach or the player/, user.id)
-  }
+  seed({ id: 'stranger', email: 's@x' })
+  assert.match(String((await parseTrackmanPDF(pdfForm({ clipId: C }))).error), /Only the player's coach or the player/)
   seed(GUARDIAN)
   assert.match(String((await parseTrackmanPDF(pdfForm())).error), /Only coaches and players/)
   seed({ id: 'no-profile', email: 'n@x' })
   assert.match(String((await parseTrackmanPDF(pdfForm())).error), /Only coaches and players/)
 })
 
-test('parseTrackmanPDF: direct coach / player pass the check; type, header and size are checked', async () => {
-  for (const user of [COACH, PLAYER]) {
+test('parseTrackmanPDF: direct coach / team coach / player pass the check; type, header and size are checked', async () => {
+  for (const user of [COACH, TEAM_COACH, PLAYER]) {
     seed(user)
     // Passes access and the PDF checks, then fails to parse the fake PDF (friendly message).
     assert.match(String((await quiet(() => parseTrackmanPDF(pdfForm({ clipId: C })))).error), /Could not read the PDF/)

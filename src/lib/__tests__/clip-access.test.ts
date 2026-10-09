@@ -106,12 +106,12 @@ test('directAccess never matches on null ids', () => {
   assert.equal(directAccess('', { ...p, coach_id: '' }, ''), null)
 })
 
-test('metric delete buttons: shown only to the direct coach, hidden from team coaches, player, guardian, others', async () => {
+test('metric delete buttons: shown to the direct coach and team coaches, hidden from player, guardian, others', async () => {
   const db = fakeDb(base())
   const can = async (uid: string, pid: string) => canDeleteSavedMetrics(await canViewPlayerContent(db, uid, pid))
   assert.equal(await can(OWNER, 'p1'), true)
-  assert.equal(await can(ASST, 'p1'), false, 'team assistant (via player_teams)')
-  assert.equal(await can(ASST, 'p2'), false, 'team assistant (via players.team_id)')
+  assert.equal(await can(ASST, 'p1'), true, 'team assistant (via player_teams)')
+  assert.equal(await can(ASST, 'p2'), true, 'team assistant (via players.team_id)')
   assert.equal(await can(OWNER, 'p3'), false, 'player with no coach')
   assert.equal(await can(PLAYER, 'p1'), false)
   assert.equal(await can(GUARD, 'p1'), false)

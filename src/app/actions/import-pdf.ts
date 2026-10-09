@@ -89,9 +89,10 @@ function emptyRow(pitch_type: string): ParsedPitchRow {
 /**
  * Read a TrackMan PDF into pitch rows for the preview (nothing is saved here).
  * Signed-in users only. With a clipId: the same rule as saving pitch data
- * (the player's direct coach or the player). Without one: a coach or player
- * profile. The file must be a PDF (type and %PDF- header) of at most
- * PDF_MAX_BYTES, the same cap the browser checks before sending.
+ * (the player's coach, a coach on the player's team, or the player). Without
+ * one: a coach or player profile. The file must be a PDF (type and %PDF-
+ * header) of at most PDF_MAX_BYTES, the same cap the browser checks before
+ * sending.
  */
 export async function parseTrackmanPDF(formData: FormData): Promise<{ pitches: ParsedPitchRow[]; error?: string }> {
   const supabase = await createClient()

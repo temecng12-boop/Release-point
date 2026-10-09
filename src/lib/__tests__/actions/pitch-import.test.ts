@@ -68,8 +68,15 @@ test('the player imports a TrackMan PDF on their own clip', async () => {
   assert.ok(!('extension' in state.tables.pitch_metrics[0]), 'PDF rows insert the same columns as before')
 })
 
-test('a team coach (read-only, 031), a stranger and a signed-out user are refused; nothing is written', async () => {
-  for (const [user, re] of [[TEAM_COACH, /Only the player's coach or the player/], [STRANGER, /Only the player's coach or the player/], [null, /sign in/]] as const) {
+test('a team coach on the player\'s team can import', async () => {
+  seed(TEAM_COACH)
+  const r = await importPitchMetrics(C, csvPayload())
+  assert.ok('metrics' in r, JSON.stringify(r))
+  assert.equal(r.metrics.length, 3)
+})
+
+test('a stranger and a signed-out user are refused; nothing is written', async () => {
+  for (const [user, re] of [[STRANGER, /Only the player's coach or the player/], [null, /sign in/]] as const) {
     for (const input of [csvPayload(), { source: 'pdf' as const, rows: PDF }]) {
       seed(user)
       const r = await importPitchMetrics(C, input)

@@ -108,6 +108,10 @@ async function main() {
     { label: 'pre-037: neither', player: { ...pre037, adult_confirmed_at: null, consent_given_at: null }, status: 'pending', allowed: false },
     { label: 'pre-037: empty-string timestamps are not a status', player: { ...pre037, adult_confirmed_at: '', consent_given_at: '  ' }, status: 'pending', allowed: false },
     { label: 'pre-037: garbage timestamp is not a status', player: { ...pre037, adult_confirmed_at: 'yes' }, status: 'pending', allowed: false },
+    { label: 'roster-only 18_plus', player: { user_id: null, age_band_coach: '18_plus', age_band: '18_plus' }, status: 'pending', allowed: true },
+    { label: 'roster-only 13_17 without consent row', player: { user_id: null, age_band_coach: '13_17', age_band: '13_17' }, status: 'pending', allowed: false },
+    { label: 'roster-only 13_17 with consent row', player: { user_id: null, age_band_coach: '13_17', age_band: '13_17', roster_video_consent: true }, status: 'pending', allowed: true },
+    { label: 'roster-only under_13', player: { user_id: null, age_band_coach: 'under_13', age_band: 'under_13' }, status: 'pending', allowed: false },
   ]
   for (const c of cases) {
     assert(uploadConsentStatus(c.player) === c.status, `${c.label}: status ${c.status}`, `got ${uploadConsentStatus(c.player)}`)
@@ -142,7 +146,7 @@ async function main() {
     assert(!r.ok && r.error === UPLOAD_BLOCKED_MESSAGE, 'refusal returns the plain blocked message')
     const q = queries[0]
     assert(q?.table === 'players', 'reads the players table')
-    assert(JSON.stringify(opArgs(q, 'select')) === JSON.stringify(['id, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at']), 'selects the consent and age columns')
+    assert(JSON.stringify(opArgs(q, 'select')) === JSON.stringify(['id, user_id, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at']), 'selects the consent, age, and user_id columns')
     assert(JSON.stringify(opArgs(q, 'eq')) === JSON.stringify(['id', PLAYER]), 'filters by player id')
   }
   {
