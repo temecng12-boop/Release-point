@@ -356,11 +356,16 @@ export default function VideoPlayer({
   const lessonRecMuteRef = useRef(false)
   const [tool,            setTool]            = useState('pointer')
   const [inkColor,        setInkColor]        = useState('#E9412F')
-  const [markerCount,     setMarkerCount]     = useState(0)
+  const [markerCount,     setMarkerCount]     = useState(() => initialAnnotations.length)
   const [trackingEnabled, setTrackingEnabled] = useState(true)
   const [videoError,      setVideoError]      = useState(false)
   type MarkItem = { ref: Shape; type: string; color: string; time: number }
-  const [markList,        setMarkList]        = useState<MarkItem[]>([])
+  const [markList,        setMarkList]        = useState<MarkItem[]>(() =>
+    initialAnnotations.map((a) => {
+      const s = dbToShape(a)
+      return { ref: s, type: s.type, color: s.color, time: s.originTime ?? 0 }
+    }),
+  )
 
   // video aspect ratio — used to constrain portrait videos
   const [videoAspect,    setVideoAspect]      = useState<number | null>(null)
@@ -407,17 +412,6 @@ export default function VideoPlayer({
   const shapeIdsRef      = useRef(new ShapeIds())
   const stepFlagRef      = useRef(false)
   const penDownRef       = useRef(0)
-
-  // load initial annotations from DB
-  useEffect(() => {
-    const shapes = initialAnnotations.map(dbToShape)
-    annotationsRef.current = shapes
-    setMarkerCount(shapes.length)
-    setMarkList(shapes.map(s => ({ ref: s, type: s.type, color: s.color, time: s.originTime ?? 0 })))
-    // Use rAF so canvas is sized after video layout
-    requestAnimationFrame(() => { resizeCanvas(); drawFrame() })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ── tracker helpers ──────────────────────────────────────────────────────
   function grabFrame() {
@@ -553,6 +547,14 @@ export default function VideoPlayer({
     canvas.height = video.videoHeight || canvas.offsetHeight
     drawFrame()
   }, [drawFrame])
+
+  // load initial annotations from DB
+  useEffect(() => {
+    const shapes = initialAnnotations.map(dbToShape)
+    annotationsRef.current = shapes
+    requestAnimationFrame(() => { resizeCanvas(); drawFrame() })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function canvasPoint(e: MouseEvent | TouchEvent): Point {
     const canvas = overlayRef.current!
@@ -716,6 +718,26 @@ export default function VideoPlayer({
     }
   }, [src, drawFrame, resizeCanvas])
 
+  function recordingNow() {
+    return voiceRecRef.current || lessonRecMuteRef.current
+  }
+  async function syncAudio() {
+    const want = effectiveMuted({
+      savedMuted: savedMutedRef.current,
+      playbackRate: speedRef.current,
+      recording: recordingNow(),
+    })
+    const v = videoRef.current
+    if (!v) { setAudioMuted(want); return }
+    if (want) {
+      v.muted = true
+      setAudioMuted(true)
+      return
+    }
+    const result = await applyClipAudio(v, false)
+    setAudioMuted(result === 'muted')
+  }
+
   // Saved mute choice + voice-note recording (sibling components dispatch this).
   useEffect(() => {
     savedMutedRef.current = readClipMuted()
@@ -809,25 +831,6 @@ export default function VideoPlayer({
     speedRef.current = s
     setSpeedState(s)
     void syncAudio()
-  }
-  function recordingNow() {
-    return voiceRecRef.current || lessonRecMuteRef.current
-  }
-  async function syncAudio() {
-    const want = effectiveMuted({
-      savedMuted: savedMutedRef.current,
-      playbackRate: speedRef.current,
-      recording: recordingNow(),
-    })
-    const v = videoRef.current
-    if (!v) { setAudioMuted(want); return }
-    if (want) {
-      v.muted = true
-      setAudioMuted(true)
-      return
-    }
-    const result = await applyClipAudio(v, false)
-    setAudioMuted(result === 'muted')
   }
   function toggleMute() {
     const next = !savedMutedRef.current
@@ -1259,6 +1262,8 @@ export default function VideoPlayer({
                     pointerEvents: 'auto',
                     touchAction: 'none',
                   }}
+                  // Crop drag writes a ref in the pointer handler, not during render.
+                  // eslint-disable-next-line react-hooks/refs
                   onPointerDown={e => startCropDrag(e, h.id)}
                   onPointerMove={moveCropDrag}
                   onPointerUp={endCropDrag}
@@ -1268,6 +1273,8 @@ export default function VideoPlayer({
           )
         })()}
         {/* Inner stage — receives the crop transform when not in reframe mode */}
+        {/* Live stage size is measured from a ref so the crop transform matches layout. */}
+        {/* eslint-disable-next-line react-hooks/refs */}
         <div style={cropToInnerStyle()}>
           <video
             ref={videoRef}

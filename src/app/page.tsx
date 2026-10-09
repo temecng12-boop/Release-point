@@ -240,7 +240,7 @@ export default async function HomePage() {
                       </div>
                       <div className="rounded-xl rounded-bl-none px-2 py-1.5 mr-2 text-[9px] leading-snug"
                         style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
-                        +18.7" puts him <span className="text-white font-medium">top 10%</span> at college level.
+                        +18.7&quot; puts him <span className="text-white font-medium">top 10%</span> at college level.
                       </div>
                     </div>
                   </div>

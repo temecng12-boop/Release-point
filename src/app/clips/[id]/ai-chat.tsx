@@ -79,8 +79,19 @@ export default function AIChat({
   const [isLoading,   setIsLoading]   = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [kindGate,    setKindGate]    = useState(clipKind)
   const scrollRef = useRef<HTMLDivElement>(null)
   const startedFor = useRef<string | null>(null)
+  // Switching Pitching/Hitting remounts the chat onto the other agent.
+  // Adjust during render (not in an effect) so React Compiler stays quiet.
+  if (kindGate !== clipKind) {
+    setKindGate(clipKind)
+    setAgent(clipKind === 'hitting' ? 'barry' : 'randy')
+    setMessages([])
+    setStreaming('')
+    setInput('')
+    setAnalysisError(null)
+  }
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -125,16 +136,6 @@ export default function AIChat({
       setIsAnalyzing(false)
     }
   }, [clipId])
-
-  useEffect(() => {
-    const next = clipKind === 'hitting' ? 'barry' : 'randy'
-    setAgent(next)
-    setMessages([])
-    setStreaming('')
-    setInput('')
-    setAnalysisError(null)
-    startedFor.current = null
-  }, [clipKind])
 
   useEffect(() => {
     if (!agent || startedFor.current === `${clipId}:${agent}:${clipKind}`) return

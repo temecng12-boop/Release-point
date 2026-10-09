@@ -43,7 +43,11 @@ export default function MobileNav({ items, userName, userRole }: Props) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    // Portal target is document.body; wait for the client so SSR matches.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
 
   const initials = (userName ?? 'U')
     .split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -68,6 +72,7 @@ export default function MobileNav({ items, userName, userRole }: Props) {
           {/* Drawer */}
           <motion.aside
             key="drawer"
+            data-testid="mobile-nav-drawer"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

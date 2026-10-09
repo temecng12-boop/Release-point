@@ -3,9 +3,9 @@
  * in). Coach A gets 403 for coach B's clip; unsigned-in gets 401.
  * Run with: npx tsx --tsconfig src/lib/__tests__/routes/tsconfig.json --test src/lib/__tests__/routes/analyze-clip.test.ts
  */
-import { test, beforeEach } from 'node:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resetFake, state } from '../actions/fakes/db'
+import { resetFake } from '../actions/fakes/db'
 import { POST } from '../../../app/api/analyze-clip/route'
 
 process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'https://test.supabase.co'

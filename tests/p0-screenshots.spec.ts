@@ -19,12 +19,24 @@ function slug(project: string) {
 async function hideDevOverlay(page: Page) {
   await page.addInitScript(() => {
     const hide = () => {
-      document.querySelectorAll('nextjs-portal').forEach((el) => el.remove())
+      document.querySelectorAll('nextjs-portal, [data-next-badge-root]').forEach((el) => el.remove())
     }
     hide()
     const obs = new MutationObserver(hide)
     obs.observe(document.documentElement, { childList: true, subtree: true })
   })
+  await page.addStyleTag({
+    content: 'nextjs-portal, [data-next-badge-root] { display: none !important; visibility: hidden !important; }',
+  }).catch(() => { /* page may not be open yet */ })
+}
+
+async function dismissDevOverlay(page: Page) {
+  await page.addStyleTag({
+    content: 'nextjs-portal, [data-next-badge-root] { display: none !important; visibility: hidden !important; }',
+  }).catch(() => { /* empty */ })
+  await page.evaluate(() => {
+    document.querySelectorAll('nextjs-portal, [data-next-badge-root]').forEach((el) => el.remove())
+  }).catch(() => { /* empty */ })
 }
 
 async function stubVoiceRecording(page: Page) {
@@ -84,14 +96,17 @@ test('clip page: mute, Voice tab, Pitching/Hitting toggle, analysis panel', asyn
   await expect(page.getByRole('button', { name: 'Hitting' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Voice', exact: true })).toBeVisible()
 
+  await dismissDevOverlay(page)
   await page.screenshot({ path: `${SHOT}/clip-page-${tag}.png`, fullPage: true })
 
   await page.getByRole('button', { name: 'Voice', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeVisible()
+  await dismissDevOverlay(page)
   await page.screenshot({ path: `${SHOT}/clip-page-voice-${tag}.png`, fullPage: true })
 
   await page.getByRole('button', { name: iphone ? 'AI' : 'AI Coach', exact: true }).click()
   await expect(page.getByText('Randy', { exact: true }).first()).toBeVisible()
+  await dismissDevOverlay(page)
   await page.screenshot({ path: `${SHOT}/clip-page-analysis-${tag}.png`, fullPage: true })
 })
 
@@ -109,18 +124,23 @@ test('mobile nav drawer open', async ({ page }, info) => {
 
   await page.setViewportSize({ width: 375, height: 667 })
   await page.getByRole('button', { name: 'Open menu' }).click()
+  const drawer = page.getByTestId('mobile-nav-drawer')
+  await expect(drawer).toBeVisible()
   await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'About Release Point' })).toBeVisible()
-  // Framer-motion springs the drawer from the right; wait until it has settled
-  // in-frame so WebKit does not capture the still-closed hamburger.
+  // Framer-motion springs from x=100%. Wait until the panel is in-frame, then
+  // pin transform so WebKit does not snapshot the initial off-screen keyframe.
   await expect.poll(async () => {
-    const box = await page.getByRole('button', { name: 'Close menu' }).boundingBox()
-    return !!box && box.x > 180 && box.width > 20
+    const box = await drawer.boundingBox()
+    return !!box && box.x < 120 && box.width > 200
   }).toBe(true)
-  await page.screenshot({
-    path: `${SHOT}/mobile-nav-${tag}.png`,
-    animations: 'disabled',
+  await drawer.evaluate((el) => {
+    const node = el as HTMLElement
+    node.style.transform = 'none'
+    node.style.transition = 'none'
   })
+  await dismissDevOverlay(page)
+  await page.screenshot({ path: `${SHOT}/mobile-nav-${tag}.png` })
 })
 
 test('/about shows the exact AI sentence', async ({ page }, info) => {
@@ -138,6 +158,7 @@ test('/about shows the exact AI sentence', async ({ page }, info) => {
   await expect(el).toBeVisible()
   await el.scrollIntoViewIfNeeded()
   await expect(el).toBeInViewport()
+  await dismissDevOverlay(page)
   // Viewport, not full-page: the sentence has to be readable in the artifact.
   await page.screenshot({ path: `${SHOT}/about-ai-${tag}.png`, fullPage: false })
 })
