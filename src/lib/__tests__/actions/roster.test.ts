@@ -175,5 +175,6 @@ test('add-player form: email optional, consent only for 13–17, no generateLink
   assert.match(src, /data-testid="minor-consent"/)
   assert.match(src, /showConsent/)
   assert.doesNotMatch(src, /generateLink|Send Player Invite/)
-  assert.match(src, /I'm this player's parent\/guardian/)
+  assert.match(src, /MINOR_CONSENT_LABELS/)
+  assert.match(src, /name="minor_consent"/)
 })

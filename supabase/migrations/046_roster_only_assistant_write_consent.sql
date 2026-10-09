@@ -295,7 +295,7 @@ CREATE POLICY "clips_bucket_delete" ON storage.objects
       OR public.rls_is_players_team_coach(public.clip_object_player_id(name))
       OR (
         public.rls_is_player_self(public.clip_object_player_id(name))
-        AND public.clip_object_is_own_clip_video(name)
+        AND public.rls_is_own_clip_video(name)
       )
     )
   );

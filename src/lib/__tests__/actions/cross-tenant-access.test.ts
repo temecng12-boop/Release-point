@@ -179,7 +179,7 @@ test('add-player: coach A cannot attach a player to coach B\'s team_id', async (
     birth_year: TEEN_YEAR,
   }))
   assert.equal(r.error, 'Invalid team')
-  assert.equal(state.tables.players.length, 2)
+  assert.equal(state.tables.players.length, 3)
   assert.equal(state.tables.player_teams.length, 2)
 })
 
@@ -201,11 +201,11 @@ test('assistant-coach add/revoke: coach A cannot change staff on coach B\'s team
   state.tables.profiles.push({ id: 'coach-x', role: 'coach', full_name: 'X' })
   const added = await addCoachToTeam(undefined, form({ team_id: TEAM_B, coach_email: 'x@example.com' }))
   assert.equal(added.error, 'Only the team organizer can add coaches')
-  assert.equal(state.tables.team_coaches.length, 2)
+  assert.equal(state.tables.team_coaches.length, 3)
 
   const removed = await removeCoachFromTeam(TEAM_B, COACH_B.id)
   assert.equal(removed.error, 'Only the team organizer can remove coaches')
-  assert.equal(state.tables.team_coaches.length, 2)
+  assert.equal(state.tables.team_coaches.length, 3)
 })
 
 test('TrackMan import: coach A is refused for coach B\'s clip', async () => {

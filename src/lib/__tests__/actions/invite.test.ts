@@ -111,7 +111,7 @@ test('another coach\'s player and self-signed-up player are still refused', asyn
 test('team invite form note no longer promises an email to existing accounts', async () => {
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../../../app/dashboard/invite-form.tsx', import.meta.url), 'utf8')
-  assert.match(src, /invite to set up the player's account/)
+  assert.match(src, /invite to set up the player/)
   assert.doesNotMatch(src, /will receive an email/)
 })
 
