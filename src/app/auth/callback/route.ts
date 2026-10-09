@@ -88,6 +88,21 @@ export async function GET(request: NextRequest) {
     // A frozen under-13 account signing in again: Supabase copies the
     // provider's name and photo back into the auth metadata; remove them.
     if (code) await rescrubFrozenAccount(supabaseAdmin, user.id)
+
+    // Brand-new coaches go to the dedicated onboarding page instead of the
+    // dashboard. isBrandNewUser uses a 5-min window — covers email confirm
+    // but not repeat logins or password resets.
+    if (isBrandNewUser(user) && linkedPlayers.length === 0) {
+      const { data: newProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (newProfile?.role === 'coach' && next !== '/onboarding/coach') {
+        return NextResponse.redirect(`${origin}/onboarding/coach`)
+      }
+    }
+
     return NextResponse.redirect(`${origin}${postAcceptRedirect(next, linkedPlayers.length)}`)
   }
 

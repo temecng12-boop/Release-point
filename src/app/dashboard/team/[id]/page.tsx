@@ -260,9 +260,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
 
-        <div className="flex justify-end">
-          <DeleteTeamButton teamId={id} teamName={team.name} />
-        </div>
+        {isOrganizer && (
+          <div className="flex justify-end">
+            <DeleteTeamButton teamId={id} teamName={team.name} />
+          </div>
+        )}
       </main>
       <SiteFooter variant="app" />
     </div>

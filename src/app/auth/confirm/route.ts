@@ -108,5 +108,17 @@ export async function GET(request: NextRequest) {
     if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
   }
 
+  // Brand-new coaches go to the dedicated onboarding page.
+  if (isBrandNewUser(user) && linkedPlayers.length === 0 && !joinTeam) {
+    const { data: newProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (newProfile?.role === 'coach') {
+      return NextResponse.redirect(`${origin}/onboarding/coach`)
+    }
+  }
+
   return NextResponse.redirect(`${origin}${postAcceptRedirect(next, linkedPlayers.length)}`)
 }

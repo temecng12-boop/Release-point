@@ -81,8 +81,16 @@ export async function invitePlayer(
     },
   })
 
-  if (linkErr && !linkErr.message.toLowerCase().includes('already')) {
-    return { error: `Player added but invite link failed: ${linkErr.message}` }
+  if (linkErr) {
+    if (!linkErr.message.toLowerCase().includes('already')) {
+      return { error: `Player added but invite link failed: ${linkErr.message}` }
+    }
+    // Player already has a Release Point AI account — they were added to the
+    // roster but don't need a new invite. No email sent; return an honest message.
+    revalidatePath('/', 'layout')
+    return {
+      success: `${playerName ? `${playerName} has` : 'Player has'} been added to your roster. They already have a Release Point AI account and can sign in at releasepointai.com to view their clips.`,
+    }
   }
 
   if (linkData?.properties?.action_link) {

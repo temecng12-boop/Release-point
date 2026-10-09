@@ -21,13 +21,15 @@ export async function createTeam(
   if (!name) return { error: 'Team name is required' }
   if (ageGroup && !AGE_GROUPS.includes(ageGroup)) return { error: 'Invalid age group' }
 
-  const { error } = await supabaseAdmin
+  const { data: team, error } = await supabaseAdmin
     .from('teams')
     .insert({ coach_id: user.id, name, age_group: ageGroup || null })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard')
-  return { success: true }
+  return { success: true, teamId: team?.id as string | undefined }
 }
 
 const NOT_AVAILABLE = 'Deleting teams isn\'t available yet (database update pending). The team was not deleted.'

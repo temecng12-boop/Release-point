@@ -147,6 +147,52 @@ export async function sendAssistantCoachInviteEmail({
   return error ? { error: error.message } : {}
 }
 
+export async function sendAssistantCoachAddedEmail({
+  toEmail,
+  coachName,
+  inviterName,
+  teamName,
+  teamId,
+}: {
+  toEmail: string
+  coachName?: string
+  inviterName: string
+  teamName: string
+  teamId: string
+}): Promise<{ error?: string }> {
+  if (!resend) return { error: 'Email sending is not set up' }
+  const greeting = coachName ? `Hey ${coachName},` : 'Hey,'
+  const teamUrl = `${SITE}/dashboard/team/${teamId}`
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `${inviterName} added you as assistant coach for ${teamName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+        <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
+          <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">You're on the Staff</h1>
+        </div>
+        <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
+        <p style="color:#456080;font-size:14px;line-height:1.6;">
+          <strong style="color:#0F1F33">${inviterName}</strong> added you as an assistant coach for <strong style="color:#0F1F33">${teamName}</strong> on Release Point AI.
+        </p>
+        <p style="color:#456080;font-size:14px;line-height:1.6;">
+          You can now view all player clips, add annotations, and track metrics for everyone on the team.
+        </p>
+        <a href="${teamUrl}"
+           style="display:inline-block;background:#C8102E;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:13px;text-transform:uppercase;letter-spacing:0.1em;margin:16px 0;">
+          View Team →
+        </a>
+        <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
+          Release Point AI · Built for coaches and players.
+        </p>
+      </div>
+    `,
+  })
+  return error ? { error: error.message } : {}
+}
+
 export async function sendClipUploadedEmail({
   coachEmail,
   coachName,

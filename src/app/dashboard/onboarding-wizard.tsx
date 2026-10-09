@@ -102,10 +102,17 @@ export default function CoachOnboardingWizard({ hasTeams, hasPlayers, hasClips =
                       </a>
                     )}
                     {i === 1 && !firstTeamId && <CreateTeamButton />}
-                    {i === 2 && (
-                      <span className="text-xs text-[#5B6B7F] bg-[#EEF2F7] px-3 py-1.5 rounded-md whitespace-nowrap" style={oswald}>
-                        Use Upload on any player
-                      </span>
+                    {i === 2 && firstTeamId && (
+                      <a
+                        href={`/dashboard/team/${firstTeamId}`}
+                        className="text-xs bg-[#1C3A5C] hover:bg-[#15304F] text-white px-3 py-1.5 rounded-md transition-colors whitespace-nowrap inline-block"
+                        style={oswald}
+                      >
+                        Go to Team →
+                      </a>
+                    )}
+                    {i === 2 && !firstTeamId && (
+                      <CreateTeamButton />
                     )}
                   </div>
                 )}

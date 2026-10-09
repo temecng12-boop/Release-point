@@ -30,7 +30,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, role, team_name')
+    .select('full_name, role, team_name, is_platform_admin')
     .eq('id', user.id)
     .single()
 
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
           {profile?.role ?? user.user_metadata?.role ?? 'coach'}
         </span>
       </div>
-      {user.email === 'temecng12@gmail.com' && (
+      {profile?.is_platform_admin && (
         <Link href="/admin/waitlist" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors font-semibold" style={os}>
           Admin
         </Link>
@@ -234,7 +234,7 @@ export default async function DashboardPage() {
         </svg>
       ),
     },
-    ...(user.email === 'temecng12@gmail.com' ? [{
+    ...(profile?.is_platform_admin ? [{
       href: '/admin/waitlist',
       label: 'Admin',
       icon: (
@@ -330,12 +330,7 @@ export default async function DashboardPage() {
                 <span className="text-[11px] text-slate-400" style={os}>{teams.length} {teams.length === 1 ? 'team' : 'teams'}</span>
               </div>
 
-              {teams.length === 0 ? (
-                <div className="rounded-xl px-5 py-12 text-center" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                  <p className="text-sm text-slate-500 mb-4">No teams yet.</p>
-                  <CreateTeamButton />
-                </div>
-              ) : (
+              {teams.length === 0 ? null : (
                 <div className="grid sm:grid-cols-2 gap-3">
                   {teamStats.map(team => (
                     <Link

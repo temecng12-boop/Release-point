@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { findAuthUserByEmail } from '@/lib/team-coaches'
+import { sendAssistantCoachAddedEmail } from '@/lib/email'
 
 // The caller's role on a team, read with the service client for the
 // authenticated user's id. 'unavailable' if team_coaches can't be read
@@ -68,6 +69,22 @@ export async function addCoachToTeam(
     console.error('[addCoachToTeam] insert failed', { code: insertErr.code, message: insertErr.message })
     return { error: 'Could not add that coach. Please try again.' }
   }
+
+  // Notify the added coach by email (best-effort, never blocks the action)
+  try {
+    const { data: team } = await supabaseAdmin.from('teams').select('name').eq('id', teamId).single()
+    const { data: organizerProfile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', user.id).single()
+    const { data: { user: targetAuthUser } } = await supabaseAdmin.auth.admin.getUserById(target.id)
+    if (team && targetAuthUser?.email) {
+      await sendAssistantCoachAddedEmail({
+        toEmail: targetAuthUser.email,
+        coachName: targetProfile.full_name ?? undefined,
+        inviterName: organizerProfile?.full_name ?? user.email ?? 'Your team organizer',
+        teamName: team.name,
+        teamId,
+      })
+    }
+  } catch { /* email is non-critical */ }
 
   revalidatePath(`/dashboard/team/${teamId}`)
   return { success: `${targetProfile.full_name ?? email} added as assistant coach` }
