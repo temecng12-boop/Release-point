@@ -260,7 +260,7 @@ test('player_video_consents is append-only for end users; service role can write
   const id = svc.rows[0].id as string
   assert.match((await as(db, COACH, `UPDATE player_video_consents SET kind='coach_has_written_permission' WHERE id=$1`, [id])).err, /written by the app only|42501|permission/i)
   assert.match((await as(db, COACH, `DELETE FROM player_video_consents WHERE id=$1`, [id])).err, /written by the app only|42501|permission/i)
-  assert.equal((await db.query(`SELECT count(*)::int n FROM player_video_consents`)).rows[0].n, 1)
+  assert.equal((await db.query<{ n: number }>(`SELECT count(*)::int n FROM player_video_consents`)).rows[0].n, 1)
 })
 
 test('042 hook allows an email attached later to a roster-only row', async () => {
@@ -294,7 +294,7 @@ test('under-13 self-answer after accept blocks video on the same player id', asy
   assert.equal(row[0].id, P_ROSTER)
   assert.equal(row[0].age_band, 'under_13')
   assert.equal(await videoOf(db, P_ROSTER), false)
-  assert.equal((await db.query(`SELECT player_id FROM clips WHERE id=$1`, [CLIP])).rows[0].player_id, P_ROSTER)
+  assert.equal((await db.query<{ player_id: string }>(`SELECT player_id FROM clips WHERE id=$1`, [CLIP])).rows[0].player_id, P_ROSTER)
 })
 
 test('main invite and clip write shapes still work after 046', async () => {

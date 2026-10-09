@@ -36,6 +36,7 @@ test('ENABLE_DEV_PAGES=1 is set only in the Playwright webServer, not in app cod
   const pw = src('../playwright.config.ts')
   assert.match(pw, /ENABLE_DEV_PAGES:\s*'1'/)
   assert.match(pw, /webServer/)
-  const app = src('app/dev/positions-shot/page.tsx')
-  assert.doesNotMatch(app, /ENABLE_DEV_PAGES/)
+  for (const p of ['app/dev/positions-shot/page.tsx', 'app/dev/roster-shot/page.tsx']) {
+    assert.doesNotMatch(src(p), /ENABLE_DEV_PAGES/)
+  }
 })

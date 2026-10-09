@@ -217,6 +217,7 @@ test('under-13 self-answer after accept freezes the same player row', async () =
     birth_month: '1',
     birth_year: KID_YEAR,
   }))
+  assert.ok(age && 'stopped' in age)
   assert.equal(age.stopped, true)
   assert.equal(state.tables.players.filter(p => p.email === 'jr@example.com' || p.id === playerId).length, 1)
   assert.equal(state.tables.players[0].id, playerId)
