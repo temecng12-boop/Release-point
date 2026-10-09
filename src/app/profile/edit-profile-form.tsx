@@ -189,7 +189,7 @@ export default function EditProfileForm({
               onChange={e => setCoachingSince(e.target.value)}
               placeholder="2010"
               min="1960"
-              max="2030"
+              max={new Date().getFullYear()}
               className={inputClass}
             />
           </div>

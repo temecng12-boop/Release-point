@@ -85,6 +85,14 @@ export async function signUp(_prevState: { error?: string; message?: string; sto
     }
   }
 
+  // If Supabase requires email confirmation, data.session is null and the user
+  // must click the link in their inbox before they can sign in. Return a message
+  // instead of redirecting to the dashboard (where they'd immediately be bounced
+  // back to login with no explanation).
+  if (!data.session) {
+    return { message: 'check_email', email }
+  }
+
   redirect('/dashboard')
 }
 

@@ -47,6 +47,15 @@ function CompleteInner() {
     setStatus('error')
   }
 
+  // Safety net: if nothing has resolved after 12 seconds, send the user to
+  // login with an error rather than leaving them on a blank loading screen.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (status === 'loading') window.location.replace('/auth/login?error=confirmation_failed')
+    }, 12000)
+    return () => clearTimeout(timeout)
+  }, [status])
+
   useEffect(() => {
     async function handleComplete() {
       const supabase = createClient()

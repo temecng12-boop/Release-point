@@ -277,13 +277,19 @@ async function isCoachForPlayer(userId: string, playerId: string): Promise<boole
     .single()
   if (!player) return false
   if (player.coach_id === userId || player.user_id === userId) return true
-  if (!player.team_id) return false
+  const { data: links } = await supabaseAdmin
+    .from('player_teams')
+    .select('team_id')
+    .eq('player_id', playerId)
+  const teamIds = (links ?? []).map((l: { team_id: string }) => l.team_id)
+  if (teamIds.length === 0) return false
   const { data: membership } = await supabaseAdmin
     .from('team_coaches')
     .select('coach_id')
-    .eq('team_id', player.team_id)
     .eq('coach_id', userId)
-    .single()
+    .in('team_id', teamIds)
+    .limit(1)
+    .maybeSingle()
   return !!membership
 }
 
@@ -296,13 +302,19 @@ async function isTeamCoachForPlayer(userId: string, playerId: string): Promise<b
     .single()
   if (!player) return false
   if (player.coach_id === userId) return true
-  if (!player.team_id) return false
+  const { data: links } = await supabaseAdmin
+    .from('player_teams')
+    .select('team_id')
+    .eq('player_id', playerId)
+  const teamIds = (links ?? []).map((l: { team_id: string }) => l.team_id)
+  if (teamIds.length === 0) return false
   const { data: membership } = await supabaseAdmin
     .from('team_coaches')
     .select('coach_id')
-    .eq('team_id', player.team_id)
     .eq('coach_id', userId)
-    .single()
+    .in('team_id', teamIds)
+    .limit(1)
+    .maybeSingle()
   return !!membership
 }
 

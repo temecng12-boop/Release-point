@@ -117,11 +117,16 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   // The edit form saves the player's full set of this coach's teams, so give
   // it all of the coach's teams and every one of them the player is on.
   // Otherwise saving here would drop the player from the coach's other teams.
-  const { data: coachTeams } = await supabaseAdmin
-    .from('teams')
-    .select('id, name')
+  const { data: coachTeamLinks } = await supabaseAdmin
+    .from('team_coaches')
+    .select('team_id, teams(id, name)')
     .eq('coach_id', user.id)
-    .order('created_at')
+  const coachTeams = (coachTeamLinks ?? [])
+    .map((r: { team_id: string; teams: { id: string; name: string } | { id: string; name: string }[] | null }) => {
+      const t = Array.isArray(r.teams) ? r.teams[0] : r.teams
+      return t ? { id: t.id, name: t.name } : null
+    })
+    .filter((t): t is { id: string; name: string } => t !== null)
   const coachTeamIds = (coachTeams ?? []).map((t) => t.id as string)
   const { data: ownPlayerLinks } = playerIds.length > 0 && coachTeamIds.length > 0
     ? await supabaseAdmin
@@ -233,7 +238,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 <PlayerRow
                   key={p.id}
                   player={{ ...p, teamIds: teamIdsByPlayer[p.id] ?? [id] }}
-                  isOwnPlayer={p.coach_id === user.id}
                   clips={clips?.filter((c) => c.player_id === p.id) ?? []}
                   teams={coachTeams && coachTeams.length > 0 ? coachTeams : [team]}
                   sessions={(sessions ?? []).filter(s => s.player_id === p.id) as import('@/app/dashboard/bullpen-modal').BullpenSession[]}

@@ -25,8 +25,27 @@ function CoachForm({ onBack }: { onBack: () => void }) {
   const [passwordTouched, setPasswordTouched] = useState(false)
   const pwProblem = passwordProblem(password)
   const showPwProblem = passwordTouched && pwProblem !== null
-  // The server refuses while the 24-hour stop cookie is set (same as players).
   if (state?.stopped) return <AgeStopNotice />
+  if (state?.message === 'check_email') {
+    return (
+      <div className="space-y-5 text-center">
+        <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+          <svg className="w-7 h-7 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="text-base text-slate-900 mb-1 tracking-tight" style={os}>Check Your Email</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            We sent a confirmation link to{' '}
+            <strong className="text-slate-700">{state.email}</strong>.
+            Click it to activate your account.
+          </p>
+        </div>
+        <p className="text-xs text-slate-400">Link expires in 24 hours. Check your spam folder if you don't see it.</p>
+      </div>
+    )
+  }
   return (
     <form
       action={action}

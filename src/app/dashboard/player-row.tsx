@@ -8,6 +8,7 @@ import EditPlayerModal from './edit-player-modal'
 import BullpenModal from './bullpen-modal'
 import type { BullpenSession } from './bullpen-modal'
 import { deleteClip } from '@/app/actions/clips'
+import { resendPlayerInvite } from '@/app/actions/invite'
 
 interface Clip {
   id: string
@@ -47,6 +48,17 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
   const [deletingClip, setDeletingClip] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
+  const [resending, setResending]       = useState(false)
+  const [resendMsg, setResendMsg]       = useState<string | null>(null)
+
+  async function handleResendInvite() {
+    setResending(true)
+    setResendMsg(null)
+    const result = await resendPlayerInvite(player.id)
+    setResending(false)
+    setResendMsg(result.success ?? result.error ?? null)
+    if (result.success) setTimeout(() => setResendMsg(null), 4000)
+  }
 
   async function handleDeleteClip(clipId: string) {
     setDeletingClip(clipId)
@@ -98,6 +110,22 @@ export default function PlayerRow({ player, clips, teams, sessions }: Props) {
             >
               {player.accepted_at ? 'Joined' : 'Invited'}
             </span>
+            {!player.accepted_at && (
+              <button
+                onClick={handleResendInvite}
+                disabled={resending}
+                title="Resend invite email"
+                className="hidden sm:inline-block text-[10px] text-[#456080] hover:text-[#C8102E] border border-[#DDE4ED] hover:border-[#C8102E] px-2 py-0.5 rounded-md transition-colors disabled:opacity-50"
+                style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
+              >
+                {resending ? '…' : 'Resend'}
+              </button>
+            )}
+            {resendMsg && (
+              <span className="hidden sm:inline-block text-[10px] text-green-600" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}>
+                {resendMsg}
+              </span>
+            )}
             <button
               onClick={() => setEditOpen(true)}
               className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED]"

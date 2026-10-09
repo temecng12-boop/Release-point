@@ -312,16 +312,13 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* ── Onboarding wizard ── */}
-            {teams.length === 0 && allPlayerIds.length === 0 && (
-              <CoachOnboardingWizard hasTeams={false} hasPlayers={false} />
-            )}
-            {teams.length > 0 && allPlayerIds.length === 0 && (
-              <CoachOnboardingWizard hasTeams={true} hasPlayers={false} firstTeamId={teams[0].id} />
-            )}
-            {teams.length > 0 && allPlayerIds.length > 0 && (allClips ?? []).length === 0 && (
-              <CoachOnboardingWizard hasTeams={true} hasPlayers={true} hasClips={false} firstTeamId={teams[0].id} />
-            )}
+            {/* ── Onboarding wizard (shows until all 3 steps done + dismissed) ── */}
+            <CoachOnboardingWizard
+              hasTeams={teams.length > 0}
+              hasPlayers={allPlayerIds.length > 0}
+              hasClips={(allClips ?? []).length > 0}
+              firstTeamId={teams[0]?.id}
+            />
 
             {/* ── Teams grid ── */}
             <div>

@@ -9,6 +9,7 @@ import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
 import ErrorBoundary from '@/components/error-boundary'
+import { canViewPlayerContent } from '@/lib/clip-access'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -58,6 +59,9 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     .select('full_name, age_group, position, coach_id, user_id')
     .eq('id', clip.player_id)
     .single()
+
+  const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id)
+  if (!access.allowed) notFound()
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')
