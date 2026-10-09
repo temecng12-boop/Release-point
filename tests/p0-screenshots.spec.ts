@@ -78,8 +78,8 @@ test('clip page: mute, Voice tab, Pitching/Hitting toggle, analysis panel', asyn
   await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeVisible()
   await page.screenshot({ path: `${SHOT}/clip-page-voice-${tag}.png`, fullPage: true })
 
-  await page.getByRole('button', { name: iphone ? 'AI' : 'AI Coach' }).click()
-  await expect(page.getByText(/Randy|Reviewing your video|I've got this clip|Could not capture frames|Analysis/)).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: iphone ? 'AI' : 'AI Coach', exact: true }).click()
+  await expect(page.getByText('Randy', { exact: true }).first()).toBeVisible()
   await page.screenshot({ path: `${SHOT}/clip-page-analysis-${tag}.png`, fullPage: true })
 })
 
@@ -98,7 +98,7 @@ test('mobile nav drawer open', async ({ page }, info) => {
     await page.setViewportSize({ width: 375, height: 667 })
   }
   await page.getByRole('button', { name: 'Open menu' }).click()
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'About Release Point' })).toBeVisible()
   await page.screenshot({ path: `${SHOT}/mobile-nav-${tag}.png` })
 })
 
