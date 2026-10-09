@@ -36,7 +36,7 @@ function backLinkBlock(): string {
 test('AppHeader takes optional backHref/backLabel props', () => {
   assert.match(header, /backHref\?: string/)
   assert.match(header, /backLabel\?: string/)
-  assert.match(header, /\{ breadcrumbs, right, showSignOut, backHref, backLabel \}/)
+  assert.match(header, /\{ breadcrumbs, right, showSignOut, backHref, backLabel, mobileNav \}/)
 })
 
 test('the control is a real link to the backHref prop with nav-back transition', () => {
@@ -64,16 +64,16 @@ test('chevron-left icon plus responsive labels (full on desktop, Dashboard under
   assert.match(block, />Dashboard</)
 })
 
-test('44px tap target with px-3 and no max-sm gating', () => {
+test('44px tap target with px-4 and no max-sm gating', () => {
   const block = backLinkBlock()
   assert.match(block, /min-h-11/)
-  assert.match(block, /px-3/)
+  assert.match(block, /px-4/)
   assert.doesNotMatch(block, /max-sm:/)
 })
 
 test('outline-button styling on existing navy tokens (never red)', () => {
   const block = backLinkBlock()
-  assert.match(block, /rounded-md/)
+  assert.match(block, /rounded-lg/)
   assert.match(block, /bg-white/)
   assert.match(block, /border-\[#DDE4ED\]/)
   assert.match(block, /var\(--rp-navy/)

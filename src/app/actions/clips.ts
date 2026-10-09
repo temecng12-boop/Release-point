@@ -388,7 +388,13 @@ export async function deleteAllPitchMetrics(clipId: string) {
 // first; players have no update policy on clips. The update runs with the
 // user's own client and must report the one clip row it changed.
 const HITTING_DELETE_DENIED = 'Hitting data not deleted. Only the player\'s own coach can delete it. Refresh the page and try again.'
-const HITTING_KEYS = ['ev_avg', 'ev_max', 'launch_angle_avg', 'barrel_rate', 'hard_hit_rate', 'sweet_spot_rate', 'attack_angle', 'bat_speed'] as const
+const HITTING_KEYS = [
+  'ev_avg', 'ev_max', 'ev_90th', 'distance_avg', 'distance_max',
+  'launch_angle_avg', 'barrel_rate', 'hard_hit_rate', 'sweet_spot_rate',
+  'attack_angle', 'bat_speed',
+  'gb_rate', 'ld_rate', 'fb_rate', 'pull_rate', 'oppo_rate',
+  'contact_rate', 'whiff_rate',
+] as const
 type HittingKey = (typeof HITTING_KEYS)[number]
 
 async function hittingDeleteContext(clipId: unknown) {

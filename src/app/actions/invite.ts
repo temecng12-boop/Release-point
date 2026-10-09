@@ -48,7 +48,7 @@ export async function resendPlayerInvite(
 
   const inviteUrl = linkData?.properties?.hashed_token
     ? buildInviteAcceptUrl(siteUrl, linkData.properties.hashed_token, '/onboarding')
-    : linkData?.properties?.action_link
+    : undefined
   if (!inviteUrl) return { error: 'Could not create the invite link. Please try again.' }
 
   const { data: { user: coachUser } } = await supabaseAdmin.auth.admin.getUserById(user.id)

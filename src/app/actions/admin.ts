@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendCoachApprovalEmail } from '@/lib/email'
 import { requirePlatformAdmin } from '@/lib/platform-admin-server'
 import { isValidInviteEmail, normalizeInviteEmail } from '@/lib/platform-admin'
+import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 
 export async function approveWaitlistAsCoach(
   waitlistId: string,
@@ -38,7 +39,9 @@ export async function approveWaitlistAsCoach(
   })
   if (linkErr) return { error: linkErr.message }
 
-  const inviteUrl = linkData?.properties?.action_link
+  const inviteUrl = linkData?.properties?.hashed_token
+    ? buildInviteAcceptUrl(siteUrl, linkData.properties.hashed_token, '/dashboard')
+    : undefined
   if (!inviteUrl) return { error: 'Could not generate invite link' }
 
   const sent = await sendCoachApprovalEmail({ toEmail: normalized, name: name ?? undefined, inviteUrl })
