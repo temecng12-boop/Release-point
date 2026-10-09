@@ -213,7 +213,8 @@ test('removed: coach banners, one-tap band buttons, age screen form, debug-clip 
 })
 
 test('invite forms: birth month/year required (no band, no guardian); Edit Player: the band picker is optional', () => {
-  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) {
+  assert.match(src('app/dashboard/team/[id]/team-invite-form.tsx'), /AddPlayerModal/)
+  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/add-player-modal.tsx']) {
     const s = src(f)
     assert.doesNotMatch(s, /age_band|AgeBand/, `${f}: no band picker`)
     assert.match(s, /name="birth_month"[^>]*required/, `${f}: birth month is required`)

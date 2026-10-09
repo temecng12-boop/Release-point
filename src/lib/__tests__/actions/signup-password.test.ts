@@ -5,8 +5,9 @@
  */
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { resetFake, fail, state } from './fakes/db'
-import { signUpCalls } from './fakes/supabase-server'
+import { signUpCalls, signUpFake } from './fakes/supabase-server'
 import { signUp } from '../../../app/actions/auth'
 
 const form = (password: string) => {
@@ -19,6 +20,7 @@ beforeEach(() => {
   // Coach signup is invite-only: the happy path needs a pending invite row.
   resetFake({ tables: { profiles: [], coach_invites: [{ id: 'i1', email: 'coach@example.com', accepted_at: null }] } })
   signUpCalls.length = 0
+  signUpFake.reset()
 })
 
 test('server rejects a 7-character password without calling Supabase', async () => {
@@ -42,7 +44,8 @@ test('server rejects a missing password field', async () => {
 })
 
 test('an 8-character uncommon password reaches Supabase signUp', async () => {
-  await assert.rejects(signUp(undefined, form('Tq9#vLm2')), (e: Error) => e.message === 'NEXT_REDIRECT')
+  const r = await signUp(undefined, form('Tq9#vLm2'))
+  assert.deepEqual(r, { message: 'check_email', email: 'coach@example.com' })
   assert.deepEqual(signUpCalls, [{ email: 'coach@example.com', password: 'Tq9#vLm2' }])
 })
 
@@ -58,9 +61,25 @@ test('a failed coach profile upsert is reported, not redirected to the dashboard
   assert.deepEqual(state.tables.profiles, [])
 })
 
-test('a saved coach profile still redirects to the dashboard with role coach', async () => {
+test('a saved coach profile with no session returns check_email (no fake dashboard success)', async () => {
+  const r = await signUp(undefined, form('Tq9#vLm2'))
+  assert.deepEqual(r, { message: 'check_email', email: 'coach@example.com' })
+  assert.deepEqual(state.tables.profiles.map(p => p.role), ['coach'])
+})
+
+test('when a session is present, invited coach signUp still redirects to the dashboard', async () => {
+  signUpFake.session = { access_token: 'tok' }
   await assert.rejects(signUp(undefined, form('Tq9#vLm2')), (e: Error) => e.message === 'NEXT_REDIRECT')
   assert.deepEqual(state.tables.profiles.map(p => p.role), ['coach'])
+})
+
+test('coach signup form shows check-email honestly, never a fake success', () => {
+  const page = readFileSync(new URL('../../../app/auth/signup/signup-form.tsx', import.meta.url), 'utf8')
+  assert.match(page, /if \(state\?\.message === 'check_email'\)/)
+  assert.match(page, /Check Your Email/)
+  assert.match(page, /We sent a confirmation link to/)
+  assert.match(page, /Click it to activate your account/)
+  assert.doesNotMatch(page, /Account created|Welcome to the dashboard|You're in/i)
 })
 
 test('an invited player email through coach signUp stays player and gets an error (no fake success)', async () => {

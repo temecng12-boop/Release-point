@@ -2,6 +2,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
+import { isFrozenUnder13, type PlayerConsentFields } from '@/lib/consent'
+import AgeStopNotice from '@/components/age-stop-notice'
+import AccountLoadError from '@/components/account-load-error'
+import { dashboardRoute } from '@/lib/age-gate-routing'
 import UploadButton from './upload-button'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
@@ -29,15 +34,23 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabaseAdmin
+  const profileRead = await supabaseAdmin
     .from('profiles')
     .select('full_name, role, team_name, is_platform_admin')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+  const profile = profileRead.data
 
+  // A failed or missing profile read: say so (Try again / Sign out). Never
+  // guess a role and render an empty dashboard that looks fine.
+  if (dashboardRoute(profileRead, null) === 'error') {
+    console.error('[dashboard] profile read failed', { userId: user.id, missing: !profileRead.error })
+    return <AccountLoadError retryHref="/dashboard" />
+  }
   if (profile?.role === 'guardian') redirect('/guardian')
 
-  const isCoach = (profile?.role ?? user.user_metadata?.role) === 'coach'
+  // Role comes from profiles only; user_metadata is set by the client at signup.
+  const isCoach = profile?.role === 'coach'
 
   // ── Coach data ──────────────────────────────────────────────────────────────
   // Fetch all teams where this user is a coach (organizer OR assistant)
@@ -116,15 +129,21 @@ export default async function DashboardPage() {
   const allPlayerNameMap = Object.fromEntries((allPlayers ?? []).map(p => [p.id, p.full_name]))
 
   // ── Player data ─────────────────────────────────────────────────────────────
-  const { data: playerRow } = !isCoach
-    ? await supabaseAdmin
-        .from('players')
-        .select('id, full_name, position, adult_confirmed_at, consent_given_at, age_band, age_confirmed_at, age_band_coach, age_band_self, age_screen_at')
-        .eq('user_id', user.id)
-        .single()
-    : { data: null }
+  const { data: playerRow, error: playerReadError } = !isCoach
+    ? await selectPlayersWithConsent<{ id: string; full_name: string | null; position: string | null } & PlayerConsentFields>(
+        'id, full_name, position',
+        (cols) => supabaseAdmin.from('players').select(cols).eq('user_id', user.id).maybeSingle(),
+      )
+    : { data: null, error: null }
 
-  if (!isCoach && playerRow && !playerRow.position) redirect('/onboarding')
+  // A player whose age isn't confirmed yet (coach-invited, Google/Apple, no
+  // players row yet) answers the one screen first, once.
+  // Only on a confirmed state (both rows read fine); see src/lib/age-gate-routing.ts.
+  if (dashboardRoute(profileRead, isCoach ? null : { data: playerRow, error: playerReadError }) === 'age') redirect('/onboarding/age')
+  // Under 13 is a hard stop for now: the account shows only the stop message.
+  const frozen = !isCoach && isFrozenUnder13(playerRow)
+  // Position chips are optional: an empty selection is valid, so the dashboard
+  // does not send the player back to the picker.
 
   const { data: myClips } = !isCoach && playerRow
     ? await supabaseAdmin
@@ -171,7 +190,7 @@ export default async function DashboardPage() {
           className="text-xs px-2 py-0.5 rounded"
           style={{ ...os, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
         >
-          {profile?.role ?? user.user_metadata?.role ?? 'coach'}
+          {profile?.role ?? 'player'}
         </span>
       </div>
       {profile?.is_platform_admin && (
@@ -249,7 +268,7 @@ export default async function DashboardPage() {
           <MobileNav
             items={mobileNavItems}
             userName={profile?.full_name ?? user.email?.split('@')[0]}
-            userRole={profile?.role ?? user.user_metadata?.role ?? 'coach'}
+            userRole={profile?.role ?? 'player'}
           />
         }
         showSignOut
@@ -397,6 +416,8 @@ export default async function DashboardPage() {
         ) : (
           /* ── Player view ── */
           <div className="space-y-6">
+            {frozen && <AgeStopNotice />}
+            {!frozen && (<>
             {/* Welcome hero */}
             <div className="relative rounded-2xl overflow-hidden" style={{
               background: '#ffffff',
@@ -424,9 +445,16 @@ export default async function DashboardPage() {
                       ? 'Ready to start your development journey?'
                       : `${myClips!.length} clip${myClips!.length === 1 ? '' : 's'} uploaded · Keep grinding.`}
                   </p>
+                  <Link
+                    href="/player-settings"
+                    className="inline-flex items-center justify-center min-h-11 mt-3 px-4 rounded-lg border border-[#e2e8f0] text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                    style={os}
+                  >
+                    My Profile
+                  </Link>
                 </div>
                 {playerRow && (
-                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} />
+                  <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} viewer="player" />
                 )}
               </div>
 
@@ -463,7 +491,7 @@ export default async function DashboardPage() {
                   <div className="rounded-xl px-6 py-10 text-center" style={{ background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
                     <h3 className="text-base text-slate-950 mb-2 tracking-tight" style={os}>Upload Your First Clip</h3>
                     <p className="text-sm text-slate-500 mb-5 max-w-xs mx-auto">Film with your phone, upload here, and your coach starts analyzing.</p>
-                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} />
+                    <UploadButton playerId={playerRow.id} playerName={playerRow.full_name ?? 'Player'} consent={playerRow} viewer="player" />
                   </div>
                 )}
               </div>
@@ -559,6 +587,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
             )}
+            </>)}
           </div>
         )}
       </main>
