@@ -16,6 +16,17 @@ function slug(project: string) {
   return project.toLowerCase().replace(/\s+/g, '-')
 }
 
+async function hideDevOverlay(page: Page) {
+  await page.addInitScript(() => {
+    const hide = () => {
+      document.querySelectorAll('nextjs-portal').forEach((el) => el.remove())
+    }
+    hide()
+    const obs = new MutationObserver(hide)
+    obs.observe(document.documentElement, { childList: true, subtree: true })
+  })
+}
+
 async function stubVoiceRecording(page: Page) {
   await page.addInitScript(() => {
     const track = { stop() {}, kind: 'audio', enabled: true }
@@ -61,6 +72,7 @@ test('clip page: mute, Voice tab, Pitching/Hitting toggle, analysis panel', asyn
   const width = iphone ? 375 : 1280
   const tag = `${slug(info.project.name)}-${width}`
   await page.setViewportSize({ width, height: iphone ? 667 : 900 })
+  await hideDevOverlay(page)
   await stubVoiceRecording(page)
 
   const res = await page.goto(`/clips/${E2E_CLIP_A}`, { waitUntil: 'domcontentloaded' })
@@ -89,17 +101,26 @@ test('mobile nav drawer open', async ({ page }, info) => {
   const width = iphone ? 375 : 1280
   const tag = `${slug(info.project.name)}-${width}`
   await page.setViewportSize({ width, height: iphone ? 667 : 900 })
+  await hideDevOverlay(page)
 
   const res = await page.goto(`/clips/${E2E_CLIP_A}`, { waitUntil: 'domcontentloaded' })
   expect(res?.ok()).toBeTruthy()
   await expect(page.getByTestId('e2e-clip-page')).toBeVisible()
 
-  if (width > 640) {
-    await page.setViewportSize({ width: 375, height: 667 })
-  }
+  await page.setViewportSize({ width: 375, height: 667 })
   await page.getByRole('button', { name: 'Open menu' }).click()
+  await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'About Release Point' })).toBeVisible()
-  await page.screenshot({ path: `${SHOT}/mobile-nav-${tag}.png` })
+  // Framer-motion springs the drawer from the right; wait until it has settled
+  // in-frame so WebKit does not capture the still-closed hamburger.
+  await expect.poll(async () => {
+    const box = await page.getByRole('button', { name: 'Close menu' }).boundingBox()
+    return !!box && box.x > 180 && box.width > 20
+  }).toBe(true)
+  await page.screenshot({
+    path: `${SHOT}/mobile-nav-${tag}.png`,
+    animations: 'disabled',
+  })
 })
 
 test('/about shows the exact AI sentence', async ({ page }, info) => {
@@ -108,11 +129,15 @@ test('/about shows the exact AI sentence', async ({ page }, info) => {
   const width = iphone ? 375 : 1280
   const tag = `${slug(info.project.name)}-${width}`
   await page.setViewportSize({ width, height: iphone ? 667 : 900 })
+  await hideDevOverlay(page)
 
   const res = await page.goto('/about', { waitUntil: 'domcontentloaded' })
   expect(res?.ok()).toBeTruthy()
   const sentence = 'Both run on frontier-grade, enterprise-trusted AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip.'
-  await expect(page.getByText(sentence)).toBeVisible()
-  await page.getByText(sentence).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: `${SHOT}/about-ai-${tag}.png`, fullPage: true })
+  const el = page.getByText(sentence)
+  await expect(el).toBeVisible()
+  await el.scrollIntoViewIfNeeded()
+  await expect(el).toBeInViewport()
+  // Viewport, not full-page: the sentence has to be readable in the artifact.
+  await page.screenshot({ path: `${SHOT}/about-ai-${tag}.png`, fullPage: false })
 })
