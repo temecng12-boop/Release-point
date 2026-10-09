@@ -55,8 +55,6 @@ async function stubVoiceRecording(page: Page) {
   })
 }
 
-test.describe.configure({ mode: 'serial' })
-
 test('clip page: mute, Voice tab, Pitching/Hitting toggle, analysis panel', async ({ page }, info) => {
   mkdirSync(SHOT, { recursive: true })
   const iphone = isIphone(info.project.name)
@@ -72,11 +70,11 @@ test('clip page: mute, Voice tab, Pitching/Hitting toggle, analysis panel', asyn
   await expect(page.getByTestId('clip-mute')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Pitching' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Hitting' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Voice' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Voice', exact: true })).toBeVisible()
 
   await page.screenshot({ path: `${SHOT}/clip-page-${tag}.png`, fullPage: true })
 
-  await page.getByRole('button', { name: 'Voice' }).click()
+  await page.getByRole('button', { name: 'Voice', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeVisible()
   await page.screenshot({ path: `${SHOT}/clip-page-voice-${tag}.png`, fullPage: true })
 
