@@ -1,47 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireAiCoachClipAccess } from '@/lib/ai-coach/access'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { formatChecklist, formatHittingMetrics, formatMetrics } from '@/lib/ai-coach/prompt'
 
-const client = new Anthropic()
-
-type Metric = {
-  pitch_type: string | null
-  velocity: number | null
-  spin_rate: number | null
-  spin_axis: number | null
-  horizontal_break: number | null
-  vertical_break: number | null
-}
-
-type PhaseRow = {
-  name: string
-  rating: 'good' | 'needs_work' | 'critical' | null
-  note: string
-}
-
-function formatMetrics(metrics: Metric[]): string {
-  if (!metrics.length) return 'No pitch metrics for this session.'
-  return metrics.map(m => {
-    const parts: string[] = []
-    if (m.pitch_type) parts.push(`Pitch: ${m.pitch_type}`)
-    if (m.velocity != null) parts.push(`Velo: ${m.velocity} mph`)
-    if (m.spin_rate != null) parts.push(`Spin: ${m.spin_rate} rpm`)
-    if (m.spin_axis != null) parts.push(`Axis: ${m.spin_axis}°`)
-    if (m.horizontal_break != null) parts.push(`HB: ${m.horizontal_break}"`)
-    if (m.vertical_break != null) parts.push(`VB: ${m.vertical_break}"`)
-    return parts.join(' | ')
-  }).join('\n')
-}
-
-function formatChecklist(checklist: PhaseRow[] | null): string {
-  if (!checklist || checklist.length === 0) return 'No mechanics checklist for this clip.'
-  const ratingLabel = { good: '✓ Good', needs_work: '△ Needs Work', critical: '✗ Critical' }
-  return checklist.map(row => {
-    const rating = row.rating ? ratingLabel[row.rating] : '— Not rated'
-    const note = row.note?.trim() ? ` — "${row.note}"` : ''
-    return `${row.name}: ${rating}${note}`
-  }).join('\n')
+function anthropic() {
+  return new Anthropic()
 }
 
 const RANDY_SYSTEM = `You are Randy — pitching coach. You've just reviewed video frames of a pitcher's delivery. Analyze only what you can see. Do not mention what you cannot see.
@@ -84,12 +49,23 @@ Rules:
 - Under 200 words total
 - No generic advice — be specific to this hitter`
 
+function framesFromBody(raw: unknown): string[] | { error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { error: 'No frames provided' }
+  const frames: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string' || item.length < 32 || item.length > 2_000_000) {
+      return { error: 'One or more frames were invalid.' }
+    }
+    frames.push(item)
+  }
+  return frames
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
 
-  // 5 vision analyses per user per minute
   const limit = await checkRateLimit(user.id, 'analyze-clip', 5, 60)
   if (!limit.allowed) {
     return new Response('Rate limit exceeded. Wait a moment and try again.', {
@@ -98,35 +74,36 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const {
-    frames,
-    agent = 'randy',
-    playerName,
-    playerAgeGroup,
-    playerPosition,
-    metrics = [],
-    checklist = null,
-    coachNotes = null,
-  } = await req.json()
+  const body = await req.json().catch(() => null) as { clipId?: unknown; frames?: unknown; agent?: unknown } | null
+  if (!body) return new Response('Bad request', { status: 400 })
 
-  if (!frames || frames.length === 0) {
-    return new Response('No frames provided', { status: 400 })
+  const access = await requireAiCoachClipAccess(user.id, body.clipId, { requireVideoConsent: true })
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status })
   }
 
-  const metricsText   = formatMetrics(metrics as Metric[])
-  const checklistText = formatChecklist(checklist as PhaseRow[] | null)
+  const frames = framesFromBody(body.frames)
+  if ('error' in frames) return new Response(frames.error, { status: 400 })
 
+  const ctx = access.context
+  const agent = body.agent === 'barry' || body.agent === 'randy'
+    ? body.agent
+    : ctx.clipKind === 'hitting' ? 'barry' : 'randy'
+
+  const metricsText = formatMetrics(ctx.metrics)
+  const hittingText = formatHittingMetrics(ctx.hittingMetrics)
+  const checklistText = formatChecklist(ctx.checklist)
   const contextText = [
-    `Player: ${playerName || 'Unknown'} | Level: ${playerAgeGroup || 'Not specified'} | Position: ${playerPosition || 'Not specified'}`,
-    `\nSession data:\n${metricsText}`,
+    `Player: ${ctx.playerName || 'Unknown'} | Level: ${ctx.ageGroup || 'Not specified'} | Position: ${ctx.position || 'Not specified'} | This clip: ${ctx.clipKind === 'hitting' ? 'Hitting' : 'Pitching'}`,
+    `\nSession data:\n${ctx.clipKind === 'hitting' ? hittingText : metricsText}`,
     `\nMechanics checklist:\n${checklistText}`,
-    coachNotes ? `\nCoach notes: "${coachNotes}"` : '',
+    ctx.coachNotes ? `\nCoach notes: "${ctx.coachNotes}"` : '',
     `\nThe ${frames.length} frames below are extracted at roughly equal intervals across the full clip (early delivery through follow-through). Analyze what you see.`,
   ].filter(Boolean).join('\n')
 
   const content: Anthropic.MessageParam['content'] = [
     { type: 'text', text: contextText },
-    ...frames.map((frame: string) => ({
+    ...frames.map((frame) => ({
       type: 'image' as const,
       source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: frame },
     })),
@@ -134,7 +111,7 @@ export async function POST(req: NextRequest) {
   ]
 
   try {
-    const stream = await client.messages.stream({
+    const stream = await anthropic().messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 600,
       system: agent === 'barry' ? BARRY_SYSTEM : RANDY_SYSTEM,
@@ -143,12 +120,17 @@ export async function POST(req: NextRequest) {
 
     const readable = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-            controller.enqueue(new TextEncoder().encode(chunk.delta.text))
+        try {
+          for await (const chunk of stream) {
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+              controller.enqueue(new TextEncoder().encode(chunk.delta.text))
+            }
           }
+          controller.close()
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Analysis unavailable'
+          controller.error(new Error(msg))
         }
-        controller.close()
       },
     })
 

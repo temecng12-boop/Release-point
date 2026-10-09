@@ -128,7 +128,7 @@ export default function AboutPage() {
             Randy and Barry.<br />Two agents, built for baseball.
           </h2>
           <p className="text-[#456080] leading-relaxed mb-10 max-w-2xl">
-            Release Point AI has two AI coaching agents, one for pitching and one for hitting. Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
+            Release Point AI has two AI coaching agents, one for pitching and one for hitting. Both run on frontier-grade, enterprise-trusted AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip. They are not generic sports chatbots. They know what a four-seam fastball at, for example, 2400 RPM with a 1:00 spin axis means at the high school level versus the professional level.
           </p>
           <div className="grid sm:grid-cols-2 gap-5">
             <div className="bg-white rounded-xl overflow-hidden border border-[#DDE4ED]">
@@ -191,15 +191,15 @@ export default function AboutPage() {
             {[
               {
                 label: 'Secure Video Storage',
-                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, and the other coaches on teams the player is on.',
+                desc: 'Clips are kept in cloud storage and played through signed links that expire after an hour. A player\'s video can be seen by the player, the player\'s direct coach, the other coaches on teams the player is on (including assistant coaches), and the player\'s linked guardian.',
               },
               {
                 label: 'Shared Feedback',
                 desc: 'Coach annotations, metrics, and notes are saved with the clip. The player sees them the next time they open or refresh the clip, on any device.',
               },
               {
-                label: 'Built on Claude',
-                desc: 'Both AI agents run on Anthropic\'s Claude, streaming responses in real time. Context from the clip, including metrics, checklist, and coach notes, is sent with every conversation.',
+                label: 'AI Coach',
+                desc: 'Both AI agents stream responses in real time. Context from the clip, including metrics, checklist, and coach notes, is sent with every conversation. Clip analysis also sends still frames from the video.',
               },
               {
                 label: 'Access Checks',

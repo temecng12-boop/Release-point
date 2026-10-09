@@ -31,9 +31,10 @@ test('chips render all six tags as toggle buttons with aria-pressed and 44px tar
 })
 
 test('invite, team invite, edit player, settings, and onboarding use the chips (no pitcher/hitter-only select)', () => {
+  assert.match(src('app/dashboard/team/[id]/team-invite-form.tsx'), /AddPlayerModal/)
   for (const f of [
     'app/dashboard/invite-form.tsx',
-    'app/dashboard/team/[id]/team-invite-form.tsx',
+    'app/dashboard/add-player-modal.tsx',
     'app/dashboard/edit-player-modal.tsx',
     'app/player-settings/player-settings-form.tsx',
     'app/onboarding/position-picker.tsx',
@@ -46,7 +47,7 @@ test('invite, team invite, edit player, settings, and onboarding use the chips (
 })
 
 test('invite chips are optional: no required attribute and zero selected is valid', () => {
-  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/team/[id]/team-invite-form.tsx']) {
+  for (const f of ['app/dashboard/invite-form.tsx', 'app/dashboard/add-player-modal.tsx']) {
     const s = src(f)
     assert.match(s, /name="positions"/)
     assert.doesNotMatch(s, /name="positions"[^>]*required/)

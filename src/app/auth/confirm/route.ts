@@ -94,21 +94,46 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Assistant-coach invite: authorize join_team while the coach_invites row
+  // is still pending. finishInviteAcceptance marks that row accepted, so a
+  // lookup afterwards would miss it. Never trust the query team_id alone.
+  const joinTeam = searchParams.get('join_team')
+  let joinAsAssistant: string | null = null
+  if (joinTeam && user.email && (await findInviteForEmail(supabaseAdmin, user.email)) === 'coach') {
+    const { data: inviteRow } = await supabaseAdmin
+      .from('coach_invites')
+      .select('invited_by')
+      .ilike('email', user.email)
+      .is('accepted_at', null)
+      .maybeSingle()
+    const invitedBy = (inviteRow as { invited_by?: string } | null)?.invited_by
+    const { data: membership } = invitedBy
+      ? await supabaseAdmin
+          .from('team_coaches')
+          .select('role')
+          .eq('team_id', joinTeam)
+          .eq('coach_id', invitedBy)
+          .maybeSingle()
+      : { data: null }
+    if (membership?.role === 'organizer') {
+      joinAsAssistant = joinTeam
+    } else {
+      console.warn('[auth/confirm] join_team refused: inviter is not organizer of that team', { joinTeam })
+    }
+  }
+
   const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
 
-  // Assistant coach invite: join_team param encodes the team to join
-  const joinTeam = searchParams.get('join_team')
-  if (joinTeam) {
+  if (joinAsAssistant) {
     const { error: joinErr } = await supabaseAdmin
       .from('team_coaches')
       .upsert(
-        { team_id: joinTeam, coach_id: user.id, role: 'assistant' },
+        { team_id: joinAsAssistant, coach_id: user.id, role: 'assistant' },
         { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
       )
     if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
   }
 
-  // Brand-new coaches go to the dedicated onboarding page.
   if (isBrandNewUser(user) && linkedPlayers.length === 0 && !joinTeam) {
     const { data: newProfile } = await supabaseAdmin
       .from('profiles')

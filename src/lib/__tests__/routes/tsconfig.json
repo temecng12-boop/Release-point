@@ -6,6 +6,7 @@
   "compilerOptions": {
     "paths": {
       "@/lib/supabase/admin": ["../actions/fakes/supabase-admin.ts"],
+      "@/lib/supabase/server": ["../actions/fakes/supabase-server.ts"],
       "@/lib/email": ["../actions/fakes/email.ts"],
       "@supabase/ssr": ["./fakes/ssr.ts"],
       "next/headers": ["../actions/fakes/next-headers.ts"],

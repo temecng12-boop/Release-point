@@ -4,6 +4,7 @@ const { withSentryConfig } = require('@sentry/nextjs/config')
 
 const nextConfig: NextConfig = {
   experimental: {
+    authInterrupts: true,
     serverActions: {
       // Pitch imports (importPitchMetrics) send the whole file's rows in one
       // action call. Default is 1mb; Vercel's function body limit is 4.5 MB.

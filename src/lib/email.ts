@@ -288,9 +288,9 @@ export async function sendCoachApprovalEmail({
   name?: string
   inviteUrl: string
 }) {
-  if (!resend) return
+  if (!resend) return { error: 'Email sending is not set up' }
   const greeting = name ? `Hey ${name},` : 'Hey,'
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: toEmail,
     subject: "You're in — Release Point",
@@ -315,6 +315,7 @@ export async function sendCoachApprovalEmail({
       </div>
     `,
   })
+  return error ? { error: error.message } : {}
 }
 
 export async function sendPlayerJoinedEmail({

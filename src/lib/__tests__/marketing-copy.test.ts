@@ -62,6 +62,17 @@ test('the checker catches the claims it looks for', () => {
   }
 })
 
+const ABOUT_AI_SENTENCE =
+  'Both run on frontier-grade, enterprise-trusted AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip.'
+
+test('about page: exact AI sentence and zero vendor names', () => {
+  const about = read('app/about/page.tsx')
+  assert.ok(about.includes(ABOUT_AI_SENTENCE), 'exact About AI sentence')
+  assert.equal((about.match(/Both run on frontier-grade, enterprise-trusted AI models/g) ?? []).length, 1)
+  assert.doesNotMatch(about, /Claude|Anthropic|GPT|OpenAI|Gemini/)
+  assert.match(read('app/privacy/page.tsx'), /Anthropic/)
+})
+
 test('about page: no realtime claim, and coach access described with team coaches', () => {
   const about = read('app/about/page.tsx')
   assert.doesNotMatch(about, /instantly|real-time data|the moment a coach saves/i)
@@ -84,7 +95,7 @@ test('about page: security and access claims match the code', () => {
   assert.doesNotMatch(about, /protect(s)? every table/i)
   // Who can see a clip: canViewPlayerContent (src/lib/clip-access.ts).
   assert.doesNotMatch(about, /only accessible to that player and their assigned coach/i)
-  assert.match(about, /the player, the player\\'s direct coach, and the other coaches on teams the player is on/)
+  assert.match(about, /the player, the player\\'s direct coach, the other coaches on teams the player is on \(including assistant coaches\), and the player\\'s linked guardian/)
   const access = read('lib/clip-access.ts')
   for (const via of ["'player'", "'coach'", "'guardian'", "'team_coach'"]) assert.ok(access.includes(via), via)
   // Signed clip links expire after an hour (3600 s) on the clip page.

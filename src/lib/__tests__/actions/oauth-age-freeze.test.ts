@@ -19,7 +19,7 @@ import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resetFake, fail, state } from './fakes/db'
-import { clientCalls, signUpCalls } from './fakes/supabase-server'
+import { clientCalls, signUpCalls, signUpFake } from './fakes/supabase-server'
 import { authAdmin } from './fakes/supabase-admin'
 import { RedirectSignal } from './fakes/next-navigation'
 import { signUp, startOAuthSignup } from '../../../app/actions/auth'
@@ -65,7 +65,7 @@ const googleAccount = (extra: Record<string, unknown[]> = {}) => resetFake({
   storage: { clips: [`avatars/${UID}.jpg`, 'avatars/22222222-2222-4222-8222-222222222222.jpg', `${UID}/clip.mp4`], profiles: [`avatars/${UID}.png`] },
 })
 
-beforeEach(() => { resetFake(); clientCalls.n = 0; signUpCalls.length = 0; authAdmin.reset() })
+beforeEach(() => { resetFake(); clientCalls.n = 0; signUpCalls.length = 0; signUpFake.reset(); authAdmin.reset() })
 
 // ── 1a. Signup page: birth month/year before the Google and Apple buttons ───
 test('startOAuthSignup: under 13 -> stopped, 24-hour cookie, no Supabase call, no OAuth cookie, nothing logged', async () => {
@@ -307,7 +307,8 @@ test('coach signUp: refused while the 24-hour stop cookie is set, before any Sup
 
 test('coach signUp: without the cookie it still works', async () => {
   state.tables.coach_invites = [{ id: 'i1', email: 'c@example.com', accepted_at: null }]
-  await assert.rejects(signUp(undefined, fd({ email: 'c@example.com', password: 'a-long-unusual-pass', full_name: 'coach c', tos: 'on' })), (e) => e instanceof RedirectSignal && e.url === '/dashboard')
+  const r = await signUp(undefined, fd({ email: 'c@example.com', password: 'a-long-unusual-pass', full_name: 'coach c', tos: 'on' }))
+  assert.deepEqual(r, { message: 'check_email', email: 'c@example.com' }, 'email confirmation on: honest check-email, no dashboard bounce')
   assert.equal(signUpCalls.length, 1)
 })
 

@@ -1,7 +1,18 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendWaitlistNotification } from '@/lib/email'
+import {
+  WAITLIST_INVALID_EMAIL,
+  WAITLIST_RATE_LIMITED,
+  clientIpFromHeaders,
+  isValidWaitlistEmail,
+  normalizeWaitlistEmail,
+  normalizeWaitlistName,
+  waitlistJoinOutcome,
+  waitlistRateLimited,
+} from '@/lib/waitlist'
 
 export async function joinWaitlist(data: {
   email: string
@@ -12,49 +23,53 @@ export async function joinWaitlist(data: {
   tech?: string
   referral?: string
 }) {
-  const email = data.email.trim().toLowerCase()
-  const name  = data.name.trim()
+  const email = normalizeWaitlistEmail(data.email ?? '')
+  const name = normalizeWaitlistName(data.name ?? '')
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: 'Please enter a valid email address.' }
+  if (!email || !isValidWaitlistEmail(email)) {
+    return { error: WAITLIST_INVALID_EMAIL }
   }
 
-  const payload: Record<string, string | null> = {
-    email,
-    name:          name || null,
-    role:          data.role          || null,
-    program_name:  data.programName   || null,
-    athlete_count: data.athleteCount  || null,
-    tech_stack:    data.tech          || null,
-    referral:      data.referral      || null,
+  const h = await headers()
+  const ip = clientIpFromHeaders(h)
+  if (waitlistRateLimited(`ip:${ip}`) || waitlistRateLimited(`email:${email}`)) {
+    return { error: WAITLIST_RATE_LIMITED }
   }
 
-  // Best-effort DB insert — qualifying columns may not exist yet if migration hasn't run
-  const { error: dbError } = await supabaseAdmin.from('waitlist').insert(payload)
+  const extras: Record<string, string> = {}
+  if (data.role) extras.role = data.role
+  if (data.programName) extras.program_name = data.programName
+  if (data.athleteCount) extras.athlete_count = data.athleteCount
+  if (data.tech) extras.tech_stack = data.tech
+  if (data.referral) extras.referral = data.referral
 
-  if (dbError?.code === '23505') {
-    return { error: "You're already on the list — we'll be in touch!" }
-  }
+  const { error: dbError } = await supabaseAdmin
+    .from('waitlist')
+    .insert({ email, name, ...extras })
 
-  // If columns are missing, fall back to base insert so no one is lost
-  if (dbError) {
-    await supabaseAdmin.from('waitlist').insert({ email, name: name || null })
-  }
-
-  // Always send email notification so no signups are lost regardless of DB outcome
+  let emailOk = false
   try {
     await sendWaitlistNotification({
       email,
-      name:         name || null,
-      role:         data.role         || null,
-      programName:  data.programName  || null,
-      athleteCount: data.athleteCount || null,
-      tech:         data.tech         || null,
-      referral:     data.referral     || null,
+      name,
+      role: data.role ?? null,
+      programName: data.programName ?? null,
+      athleteCount: data.athleteCount ?? null,
+      tech: data.tech ?? null,
+      referral: data.referral ?? null,
     })
-  } catch {
-    // email is non-critical
+    emailOk = true
+  } catch (err) {
+    console.error('[joinWaitlist] founder notification failed', err)
   }
 
-  return { success: true }
+  const outcome = waitlistJoinOutcome({ dbError, emailOk })
+  if ('error' in outcome) {
+    console.error('[joinWaitlist] insert failed', {
+      code: dbError?.code ?? null,
+      message: dbError?.message ?? null,
+      emailOk,
+    })
+  }
+  return outcome
 }

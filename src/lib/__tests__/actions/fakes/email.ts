@@ -29,3 +29,14 @@ export async function sendWaitlistNotification(args: { email: string; name?: str
   emailFake.waitlist.push({ email: args.email, name: args.name ?? null })
 }
 export async function sendPlayerJoinedEmail() {}
+export async function sendCoachApprovalEmail(args: { toEmail: string; name?: string; inviteUrl: string }) {
+  if (emailFake.coachInviteResult === 'throw') throw new Error('network down')
+  if (!emailFake.coachInviteResult.error) emailFake.coachInvites.push({ toEmail: args.toEmail, inviteUrl: args.inviteUrl })
+  return emailFake.coachInviteResult
+}
+export async function sendAssistantCoachInviteEmail(args: { toEmail: string; coachName?: string; inviterName: string; teamName: string; inviteUrl: string }) {
+  if (emailFake.coachInviteResult === 'throw') throw new Error('network down')
+  if (!emailFake.coachInviteResult.error) emailFake.coachInvites.push({ toEmail: args.toEmail, coachName: args.coachName, inviteUrl: args.inviteUrl })
+  return emailFake.coachInviteResult
+}
+export async function sendAssistantCoachAddedEmail() {}

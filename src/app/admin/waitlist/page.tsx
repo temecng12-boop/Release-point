@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { forbidden } from '@/lib/http-forbidden'
+import { loadAdminWaitlistPage } from '@/lib/admin-waitlist'
 import AppHeader from '@/components/app-header'
 import ApproveButton from './approve-button'
 
-const ADMIN_EMAIL = 'temecng12@gmail.com'
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
 function fmtDate(iso: string) {
@@ -12,17 +11,12 @@ function fmtDate(iso: string) {
 }
 
 export default async function AdminWaitlistPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) redirect('/dashboard')
+  const result = await loadAdminWaitlistPage()
+  if (!result.ok && result.status === 401) redirect('/auth/login')
+  if (!result.ok) forbidden()
 
-  const { data: entries } = await supabaseAdmin
-    .from('waitlist')
-    .select('id, email, name, role, program_name, athlete_count, referral, created_at, approved_at, invite_sent_at')
-    .order('created_at', { ascending: false })
-
-  const pending  = (entries ?? []).filter(e => !e.approved_at)
-  const approved = (entries ?? []).filter(e =>  e.approved_at)
+  const pending  = result.entries.filter(e => !e.approved_at)
+  const approved = result.entries.filter(e =>  e.approved_at)
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">

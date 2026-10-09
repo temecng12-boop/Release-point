@@ -2,6 +2,11 @@ import { fakeClient, sessionFrom, state } from './db'
 
 /** Calls to auth.signUp, so tests can check whether signup reached Supabase. */
 export const signUpCalls: { email: string; password: string }[] = []
+/** Session returned from signUp. Null = email confirmation on (production). */
+export const signUpFake = {
+  session: null as null | { access_token: string },
+  reset() { this.session = null },
+}
 /** Calls to auth.signInWithOtp (player signup links). */
 export const otpCalls: { email: string; options?: { emailRedirectTo?: string } }[] = []
 
@@ -31,7 +36,7 @@ export async function createClient() {
       signOut: async () => { state.signOuts++; return { error: null } },
       signUp: async ({ email, password }: { email: string; password: string }) => {
         signUpCalls.push({ email, password })
-        return { data: { user: { id: `u-${signUpCalls.length}`, email } }, error: null }
+        return { data: { user: { id: `u-${signUpCalls.length}`, email }, session: signUpFake.session }, error: null }
       },
       signInWithOtp: async (args: { email: string; options?: { emailRedirectTo?: string } }) => {
         otpCalls.push(args)

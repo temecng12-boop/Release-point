@@ -131,6 +131,7 @@ test.describe('real clip page mute', () => {
     await page.getByRole('button', { name: '1x', exact: true }).click()
     await expect.poll(async () => videoMuted(page)).toBe(false)
 
+    await page.getByRole('button', { name: 'Voice', exact: true }).click()
     await page.getByRole('button', { name: 'Record', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Stop Recording' })).toBeVisible()
     await expect.poll(async () => videoMuted(page)).toBe(true)

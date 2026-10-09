@@ -65,7 +65,7 @@ test('server validation accepts exactly the rows the CSV preview accepted', () =
 // ── Large imports (server action body limit) ────────────────────────────────
 test('next.config raises serverActions.bodySizeLimit to 4mb under experimental, matching pitch-import.ts', () => {
   const cfg = read('../next.config.ts')
-  assert.match(cfg, /experimental: \{\s*serverActions: \{[^}]*bodySizeLimit: '4mb'/)
+  assert.match(cfg, /experimental: \{[\s\S]*serverActions: \{[^}]*bodySizeLimit: '4mb'/)
   assert.equal(SERVER_ACTION_BODY_LIMIT_BYTES, 4 * 1024 * 1024)
   assert.ok(IMPORT_BODY_LIMIT_BYTES < SERVER_ACTION_BODY_LIMIT_BYTES && IMPORT_BODY_LIMIT_BYTES > 3.5 * 1024 * 1024)
 })

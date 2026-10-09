@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendAssistantCoachInviteEmail } from '@/lib/email'
+import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 
 export async function inviteAssistantCoach(
   _prev: { error?: string; success?: string; inviteUrl?: string } | undefined,
@@ -63,19 +64,26 @@ export async function inviteAssistantCoach(
     return { error: `Invite record created but link generation failed: ${linkErr.message}` }
   }
 
-  if (linkData?.properties?.action_link) {
-    await sendAssistantCoachInviteEmail({
-      toEmail: email,
-      coachName: coachName || undefined,
-      inviterName,
-      teamName,
-      inviteUrl: linkData.properties.action_link,
-    })
-  }
+  const inviteUrl = linkData?.properties?.hashed_token
+    ? (() => {
+        const url = new URL(buildInviteAcceptUrl(siteUrl, linkData.properties.hashed_token, '/dashboard'))
+        url.searchParams.set('join_team', teamId)
+        return url.toString()
+      })()
+    : undefined
+  if (!inviteUrl) return { error: 'Could not create the invite link. Please try again.' }
+
+  await sendAssistantCoachInviteEmail({
+    toEmail: email,
+    coachName: coachName || undefined,
+    inviterName,
+    teamName,
+    inviteUrl,
+  })
 
   revalidatePath(`/dashboard/team/${teamId}`)
   return {
     success: `Invite sent to ${email}! ${coachName ? `${coachName} will` : 'They will'} receive an email to join ${teamName}.`,
-    inviteUrl: linkData?.properties?.action_link ?? undefined,
+    inviteUrl,
   }
 }

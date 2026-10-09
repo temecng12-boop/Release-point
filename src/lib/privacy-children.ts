@@ -37,7 +37,7 @@ ${UNDER_13_POLICY_BODY}
 - **Teen accounts are private.** Release Point AI has no public profiles or public clip pages. A teen's clips and data can be seen by the teen and the coaches on the teen's teams (see "Video and Performance Data").
 - **Accounts created before the birth month and year screen:** some players were added by a coach before that screen existed. For those players, we use the age group the coach entered.
 - **We don't sell teens' personal information, share it for advertising, or show ads.**
-- **AI Coach:** teens can currently use AI Coach. It sends text, never video or audio, to our AI provider, Anthropic (see "Service providers").
+- **AI Coach:** teens can currently use AI Coach. Chat sends text, never video or audio, to our AI provider, Anthropic (see "Service providers"). Clip analysis also sends still frames from a clip.
 - **Removing content:** teens can delete clips they uploaded themselves. They can also email **privacy@releasepointai.com** to ask us to remove anything they posted, or to delete their account and data.
 
 **Coaches**
