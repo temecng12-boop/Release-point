@@ -170,6 +170,8 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <AppHeader
+        backHref="/dashboard"
+        backLabel="Back to Dashboard"
         breadcrumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: clip.title }]}
         showSignOut
       />

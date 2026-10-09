@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { addCoachToTeam, removeCoachFromTeam } from '@/app/actions/team-coaches'
+import InviteCoachForm from './invite-coach-form'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 const inputClass = 'flex-1 bg-white border border-[#DDE4ED] rounded-md px-3 py-2 text-sm text-[#0F1F33] placeholder:text-[#3D5166] focus:outline-none focus:border-[#456080] max-sm:min-h-11'
@@ -51,35 +52,41 @@ export default function AddCoachForm({
 
         {/* Add coach form — organizer only */}
         {isOrganizer && (
-          <form ref={formRef} action={action}>
-            <input type="hidden" name="team_id" value={teamId} />
-            <div className="flex gap-2">
-              <input
-                type="email"
-                name="coach_email"
-                placeholder="Assistant coach email"
-                required
-                className={inputClass}
-              />
-              <button
-                type="submit"
-                disabled={pending}
-                className="bg-[#1C3A5C] hover:bg-[#223F63] text-white rounded-md px-4 py-2 text-xs transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 max-sm:min-h-11"
-                style={oswald}
-              >
-                {pending ? 'Adding…' : 'Add Coach'}
-              </button>
-            </div>
-            {state?.error && (
-              <p className="text-xs text-[#C8102E] mt-2">{state.error}</p>
-            )}
-            {state?.success && (
-              <p className="text-xs text-green-700 mt-2">{state.success}</p>
-            )}
-            <p className="text-[10px] text-[#3D5166] mt-3">
-              Assistant coaches can view and manage all players and clips on this team.
-            </p>
-          </form>
+          <>
+            {/* Add existing coach by email */}
+            <form ref={formRef} action={action}>
+              <input type="hidden" name="team_id" value={teamId} />
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  name="coach_email"
+                  placeholder="Existing coach email"
+                  required
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="bg-[#1C3A5C] hover:bg-[#223F63] text-white rounded-md px-4 py-2 text-xs transition-colors disabled:opacity-50 whitespace-nowrap shrink-0 max-sm:min-h-11"
+                  style={oswald}
+                >
+                  {pending ? 'Adding…' : 'Add Coach'}
+                </button>
+              </div>
+              {state?.error && (
+                <p className="text-xs text-[#C8102E] mt-2">{state.error}</p>
+              )}
+              {state?.success && (
+                <p className="text-xs text-green-700 mt-2">{state.success}</p>
+              )}
+              <p className="text-[10px] text-[#3D5166] mt-3">
+                Has an account already? Enter their email above.
+              </p>
+            </form>
+
+            {/* Invite a new coach who doesn't have an account yet */}
+            <InviteCoachForm teamId={teamId} />
+          </>
         )}
       </div>
     </div>

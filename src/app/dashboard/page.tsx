@@ -5,7 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import UploadButton from './upload-button'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
+import ActivityFeed from './activity-feed'
 import AppHeader from '@/components/app-header'
+import MobileNav from '@/components/mobile-nav'
 import SiteFooter from '@/components/SiteFooter'
 
 const os = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
@@ -108,18 +110,14 @@ export default async function DashboardPage() {
     }
   })
 
-  // Recent clips for the activity feed (last 6)
-  const recentClips = (allClips ?? []).slice(0, 6)
-
-  // Player name lookup for recent clips
-  const recentPlayerIds = [...new Set(recentClips.map(c => c.player_id))]
-  const { data: recentPlayers } = recentPlayerIds.length > 0
+  // Player name lookup for all clips in the activity feed
+  const { data: allPlayers } = allPlayerIds.length > 0
     ? await supabaseAdmin
         .from('players')
         .select('id, full_name')
-        .in('id', recentPlayerIds)
+        .in('id', allPlayerIds)
     : { data: [] }
-  const playerNameMap = Object.fromEntries((recentPlayers ?? []).map(p => [p.id, p.full_name]))
+  const allPlayerNameMap = Object.fromEntries((allPlayers ?? []).map(p => [p.id, p.full_name]))
 
   // ── Player data ─────────────────────────────────────────────────────────────
   const { data: playerRow } = !isCoach
@@ -166,8 +164,9 @@ export default async function DashboardPage() {
     : null
   const myClipTitleMap = Object.fromEntries((myClips ?? []).map(c => [c.id, c.title]))
 
+  // Desktop-only inline nav (hidden on mobile — mobile uses the drawer)
   const dashNav = (
-    <div className="flex items-center gap-4">
+    <div className="hidden sm:flex items-center gap-4">
       <div className="flex items-center gap-2">
         <span className="text-xs text-slate-500 hidden md:block truncate max-w-[140px]">
           {profile?.full_name ?? user.email}
@@ -180,16 +179,16 @@ export default async function DashboardPage() {
         </span>
       </div>
       {user.email === 'temecng12@gmail.com' && (
-        <Link href="/admin/waitlist" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors hidden sm:block font-semibold" style={os}>
+        <Link href="/admin/waitlist" className="text-xs text-[#C8102E] hover:text-[#9E0E24] transition-colors font-semibold" style={os}>
           Admin
         </Link>
       )}
-      <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block" style={os}>
+      <Link href="/about" className="text-xs text-slate-400 hover:text-slate-700 transition-colors" style={os}>
         About RP
       </Link>
       <Link
         href={isCoach ? '/profile' : '/player-settings'}
-        className="text-xs text-slate-400 hover:text-slate-700 transition-colors hidden sm:block"
+        className="text-xs text-slate-400 hover:text-slate-700 transition-colors"
         style={os}
       >
         {isCoach ? 'Profile' : 'My Profile'}
@@ -197,9 +196,68 @@ export default async function DashboardPage() {
     </div>
   )
 
+  const mobileNavItems = [
+    {
+      href: '/dashboard',
+      label: 'Dashboard',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+        </svg>
+      ),
+    },
+    {
+      href: '/clips/compare',
+      label: 'Compare Clips',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+        </svg>
+      ),
+    },
+    {
+      href: isCoach ? '/profile' : '/player-settings',
+      label: isCoach ? 'Profile' : 'My Profile',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+        </svg>
+      ),
+    },
+    {
+      href: '/about',
+      label: 'About Release Point',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+        </svg>
+      ),
+    },
+    ...(user.email === 'temecng12@gmail.com' ? [{
+      href: '/admin/waitlist',
+      label: 'Admin',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      ),
+    }] : []),
+  ]
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <AppHeader right={dashNav} showSignOut />
+      <AppHeader
+        right={dashNav}
+        mobileNav={
+          <MobileNav
+            items={mobileNavItems}
+            userName={profile?.full_name ?? user.email?.split('@')[0]}
+            userRole={profile?.role ?? user.user_metadata?.role ?? 'coach'}
+          />
+        }
+        showSignOut
+      />
 
       <main className="max-w-4xl mx-auto px-5 py-8 space-y-6">
         {isCoach ? (
@@ -340,46 +398,12 @@ export default async function DashboardPage() {
             </div>
 
             {/* ── Recent activity feed ── */}
-            {recentClips.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[11px] tracking-[0.25em] text-[#E8102A]" style={os}>Recent Activity</p>
-                  <span className="text-[11px] text-slate-400" style={os}>{(allClips ?? []).length} total clips</span>
-                </div>
-                <div className="rounded-xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                  {recentClips.map((clip, i) => {
-                    const label = clip.session_date
-                      ? new Date(clip.session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                      : new Date(clip.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    return (
-                      <Link
-                        key={clip.id}
-                        href={`/clips/${clip.id}`}
-                        className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-slate-50"
-                        style={{ borderBottom: i < recentClips.length - 1 ? '1px solid #f1f5f9' : undefined }}
-                      >
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100">
-                          <svg className="w-3.5 h-3.5 text-[#E8102A]" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] text-slate-700 truncate group-hover:text-slate-950 transition-colors">{clip.title}</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {playerNameMap[clip.player_id] ?? 'Unknown'} · {label}
-                          </p>
-                        </div>
-                        {i === 0 && (
-                          <span className="text-[10px] bg-[#E8102A] text-white px-2 py-0.5 rounded shrink-0" style={os}>New</span>
-                        )}
-                        <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
+            {(allClips ?? []).length > 0 && (
+              <ActivityFeed
+                clips={allClips ?? []}
+                playerNameMap={allPlayerNameMap}
+                totalClips={(allClips ?? []).length}
+              />
             )}
           </>
         ) : (

@@ -18,9 +18,11 @@ interface Props {
   backHref?: string
   /** Full label for the back control; also its accessible name. */
   backLabel?: string
+  /** Mobile-only drawer trigger + panel (rendered as the last item in the right group). */
+  mobileNav?: React.ReactNode
 }
 
-export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, backLabel }: Props) {
+export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, backLabel, mobileNav }: Props) {
   return (
     <header
       className="sticky top-0 z-50 flex items-center justify-between gap-2 px-5 md:px-8 min-h-14"
@@ -40,7 +42,7 @@ export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, b
             href={backHref}
             transitionTypes={['nav-back']}
             aria-label={backLabel ?? 'Back to dashboard'}
-            className="inline-flex shrink-0 items-center gap-1 min-h-11 px-3 rounded-md bg-white border border-[#DDE4ED] text-xs whitespace-nowrap transition-colors hover:border-[color:var(--rp-navy,#023167)] hover:bg-[var(--rp-navy-50)] focus-visible:border-[color:var(--rp-navy,#023167)] focus-visible:bg-[var(--rp-navy-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rp-navy)] focus-visible:ring-offset-2"
+            className="inline-flex shrink-0 items-center gap-1.5 min-h-11 px-4 rounded-lg bg-white border-2 border-[#DDE4ED] text-xs whitespace-nowrap transition-colors hover:border-[color:var(--rp-navy,#023167)] hover:bg-[var(--rp-navy-50)] focus-visible:border-[color:var(--rp-navy,#023167)] focus-visible:bg-[var(--rp-navy-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rp-navy)] focus-visible:ring-offset-2"
             style={{ ...oswald, color: 'var(--rp-navy, #023167)', letterSpacing: '0.08em' }}
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -80,8 +82,8 @@ export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, b
         {right}
         {/* Signed-in pages pass showSignOut; the header is sticky, so this is
             always reachable and never over the video controls. */}
-        {showSignOut && <ReportProblemButton />}
-        {showSignOut && (
+        {showSignOut && !mobileNav && <ReportProblemButton />}
+        {showSignOut && !mobileNav && (
           <SignOutForm>
             <button
               type="submit"
@@ -91,6 +93,26 @@ export default function AppHeader({ breadcrumbs, right, showSignOut, backHref, b
               Sign Out
             </button>
           </SignOutForm>
+        )}
+        {/* On desktop the sign-out / report buttons render above; the mobile
+            nav drawer contains its own copies and shows only on sm:. */}
+        {mobileNav}
+        {/* Desktop-only sign-out when a mobileNav drawer is present */}
+        {mobileNav && showSignOut && (
+          <>
+            <div className="hidden sm:flex items-center gap-3">
+              <ReportProblemButton />
+              <SignOutForm>
+                <button
+                  type="submit"
+                  className="text-xs text-slate-400 hover:text-slate-700 transition-colors px-2 py-1"
+                  style={oswald}
+                >
+                  Sign Out
+                </button>
+              </SignOutForm>
+            </div>
+          </>
         )}
       </div>
     </header>

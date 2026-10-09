@@ -6,9 +6,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendPlayerInviteEmail } from '@/lib/email'
 
 export async function invitePlayer(
-  _prevState: { error?: string; success?: string } | undefined,
+  _prevState: { error?: string; success?: string; inviteUrl?: string } | undefined,
   formData: FormData
-) {
+): Promise<{ error?: string; success?: string; inviteUrl?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -99,5 +99,6 @@ export async function invitePlayer(
   revalidatePath('/', 'layout')
   return {
     success: `Invite sent to ${playerEmail}! ${playerName ? `${playerName} will` : 'They will'} receive an email to set up their account.`,
+    inviteUrl: linkData?.properties?.action_link ?? undefined,
   }
 }

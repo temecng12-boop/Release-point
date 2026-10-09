@@ -920,9 +920,10 @@ export default function VideoPlayer({
 
       {/* Coach-only draw toolbar */}
       {isCoach && (
-        <div className="mt-2 pt-2 flex flex-wrap gap-2 items-center justify-between" style={divider}>
-          <div className="flex gap-2 flex-wrap items-center">
-            <div className={tgroup} style={oswald}>
+        <div className="mt-2 pt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between" style={divider}>
+          {/* Tools row — scrolls horizontally on narrow screens */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 sm:pb-0 sm:overflow-visible">
+            <div className={`${tgroup} shrink-0`} style={oswald}>
               {TOOLS.map(t => (
                 <button key={t.id} onClick={() => selectTool(t.id)} className={`${btnBase} ${tool === t.id ? btnOn : btnIdle}`}>
                   {t.label}
@@ -930,7 +931,7 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <div className="flex items-center gap-2 px-1">
+            <div className="flex items-center gap-2 px-1 shrink-0">
               {COLORS.map(c => (
                 <button key={c.hex} onClick={() => selectColor(c.hex)} title={c.label}
                   style={{
@@ -944,12 +945,13 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <button onClick={toggleTracking} className={`${btnBase} border border-[#DDE4ED] ${trackingEnabled ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`} style={oswald}>
+            <button onClick={toggleTracking} className={`${btnBase} border border-[#DDE4ED] shrink-0 ${trackingEnabled ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`} style={oswald}>
               Tracking: {trackingEnabled ? 'On' : 'Off'}
             </button>
           </div>
 
-          <div className="flex gap-1">
+          {/* Secondary actions row */}
+          <div className="flex gap-1 flex-wrap">
             <button
               onClick={() => { setReframeMode(m => !m); setReframeSaveErr(null) }}
               className={`${btnBase} border border-[#DDE4ED] ${reframeMode ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`}

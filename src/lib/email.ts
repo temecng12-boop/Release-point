@@ -100,6 +100,53 @@ export async function sendCoachInviteEmail({
   return error ? { error: error.message } : {}
 }
 
+export async function sendAssistantCoachInviteEmail({
+  toEmail,
+  coachName,
+  inviterName,
+  teamName,
+  inviteUrl,
+}: {
+  toEmail: string
+  coachName?: string
+  inviterName: string
+  teamName: string
+  inviteUrl: string
+}): Promise<{ error?: string }> {
+  if (!resend) return { error: 'Email sending is not set up' }
+  const greeting = coachName ? `Hey ${coachName},` : 'Hey,'
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `${inviterName} invited you to coach ${teamName} on Release Point AI`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+        <div style="background:#0F1F33;border-radius:12px;padding:24px;margin-bottom:24px;">
+          <p style="color:#C8102E;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 6px">Release Point AI</p>
+          <h1 style="color:white;font-size:22px;margin:0;text-transform:uppercase;">Assistant Coach Invite</h1>
+        </div>
+        <p style="color:#0F1F33;font-size:15px;">${greeting}</p>
+        <p style="color:#456080;font-size:14px;line-height:1.6;">
+          <strong style="color:#0F1F33">${inviterName}</strong> has invited you to join <strong style="color:#0F1F33">${teamName}</strong> as an assistant coach on Release Point AI — a professional-grade film room built for baseball.
+        </p>
+        <p style="color:#456080;font-size:14px;line-height:1.6;">
+          As an assistant coach you can view all player clips, add annotations, leave voice notes, and track player metrics for everyone on the team.
+        </p>
+        <a href="${inviteUrl}"
+           style="display:inline-block;background:#C8102E;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:13px;text-transform:uppercase;letter-spacing:0.1em;margin:16px 0;">
+          Accept Invite →
+        </a>
+        <p style="color:#8096AE;font-size:12px;margin-top:8px;">This link expires in 24 hours. After you accept, you can set a password anytime from Sign in → Forgot password, or keep signing in with an email link.</p>
+        <p style="color:#3D5166;font-size:12px;margin-top:32px;border-top:1px solid #DDE4ED;padding-top:16px;">
+          By accepting this invite you agree to the <a href="${SITE}/terms" style="color:#1C3A5C;">Terms of Service</a> and <a href="${SITE}/privacy" style="color:#1C3A5C;">Privacy Policy</a>.<br />
+          Release Point AI · Built for coaches and players.
+        </p>
+      </div>
+    `,
+  })
+  return error ? { error: error.message } : {}
+}
+
 export async function sendClipUploadedEmail({
   coachEmail,
   coachName,

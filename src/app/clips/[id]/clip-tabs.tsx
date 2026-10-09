@@ -111,9 +111,6 @@ export default function ClipTabs({
             Hitter
           </button>
         </div>
-        <span className="text-[10px] text-[#94a3b8]" style={os}>
-          {isPitcher ? 'Randy Johnson × Nolan Ryan' : 'Barry Bonds × Tony Gwynn'}
-        </span>
       </div>
 
       {/* Tab bar */}

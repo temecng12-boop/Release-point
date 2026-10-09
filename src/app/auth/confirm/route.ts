@@ -95,5 +95,18 @@ export async function GET(request: NextRequest) {
   }
 
   const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
+
+  // Assistant coach invite: join_team param encodes the team to join
+  const joinTeam = searchParams.get('join_team')
+  if (joinTeam) {
+    const { error: joinErr } = await supabaseAdmin
+      .from('team_coaches')
+      .upsert(
+        { team_id: joinTeam, coach_id: user.id, role: 'assistant' },
+        { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
+      )
+    if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
+  }
+
   return NextResponse.redirect(`${origin}${postAcceptRedirect(next, linkedPlayers.length)}`)
 }

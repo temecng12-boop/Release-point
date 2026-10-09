@@ -1,5 +1,4 @@
 import VideoPlayer from '@/components/video-player'
-import VoiceNote from '@/app/clips/[id]/voice-note'
 import ComparePlayer from '@/app/clips/compare/compare-player'
 import AppHeader from '@/components/app-header'
 import SiteFooter from '@/components/SiteFooter'
@@ -20,18 +19,7 @@ export function E2eClipCoachPage({ clipId }: { clipId: string }) {
           clipId={clipId}
           playerId={E2E_PLAYER_ID}
           role="coach"
-          canAddMedia
-          canRecordLesson={false}
         />
-        <div className="mt-4">
-          <VoiceNote
-            clipId={clipId}
-            playerId={E2E_PLAYER_ID}
-            role="coach"
-            initialVoiceUrl={null}
-            canAddMedia
-          />
-        </div>
       </main>
       <SiteFooter variant="app" />
     </div>
