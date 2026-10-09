@@ -204,7 +204,8 @@ test('legal and marketing copy says Release Point AI, not Release Point alone', 
 test('who can see video reads identically on about, privacy, and terms', () => {
   const sentence =
     "A player's video can be seen by the player, the player's direct coach, " +
-    "and the other coaches on teams the player is on."
+    "the other coaches on teams the player is on (including assistant coaches), " +
+    "and the player's linked guardian."
   // Privacy keeps the Children and Teens copy in its own module (easy swap).
   const privacy = read('app/privacy/page.tsx') + '\n' + read('lib/privacy-children.ts')
   assert.ok(read('app/about/page.tsx').includes(sentence), 'about viewer sentence')
@@ -253,10 +254,11 @@ test('sport: baseball only on legal pages, baseball-led marketing and meta', () 
 })
 
 test('AI wording is honest; Barry stays; no pro-career claims', () => {
-  assert.match(read('app/about/page.tsx'), /Both run on Anthropic's Claude, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip/)
+  assert.match(read('app/about/page.tsx'), /Both run on leading enterprise-grade AI models, set up with baseball biomechanics and pitching and hitting metric frameworks, and given the full context of each clip/)
+  assert.doesNotMatch(read('app/about/page.tsx'), /Anthropic|Claude/)
   assert.match(read('app/terms/page.tsx'), /AI Coach is powered by Anthropic's Claude/)
   assert.match(read('app/privacy/page.tsx'), /AI Coach runs on Anthropic's Claude/)
-  assert.match(read('app/privacy/page.tsx'), /Video and audio files are never sent/)
+  assert.match(read('app/privacy/page.tsx'), /still frames from a clip/)
   assert.match(read('app/privacy/page.tsx'), /does not train models on customer content.*anthropic\.com\/legal\/commercial-terms/)
   assert.doesNotMatch(read('app/about/page.tsx'), new RegExp('trained with deep ' + 'baseball biomechanics', 'i'))
   assert.match(read('app/about/page.tsx'), /Boise Hawks in the Pioneer League/)

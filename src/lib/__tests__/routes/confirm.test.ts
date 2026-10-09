@@ -130,6 +130,42 @@ test('confirm and callback forward sanitized error_code and error_description wi
   assert.equal(cbLoc.searchParams.get('error_description'), desc)
 })
 
+test('join_team is refused when the inviter is not organizer of that team (no client-trusted team_id)', async () => {
+  const TEAM_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const TEAM_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  state.tables.coach_invites = [
+    { id: 'inv-1', email: 'asst@example.com', invited_by: 'org-a', accepted_at: null },
+  ]
+  state.tables.team_coaches = [
+    { team_id: TEAM_A, coach_id: 'org-a', role: 'organizer' },
+    { team_id: TEAM_B, coach_id: 'org-b', role: 'organizer' },
+  ]
+  state.tables.profiles.push({ id: 'u-asst', role: 'coach', full_name: 'Asst' })
+  ssrAuth.verifyUser = { id: 'u-asst', email: 'asst@example.com', created_at: NOW }
+  const before = state.tables.team_coaches.length
+  const r = (await confirm(req(`/auth/confirm?token_hash=H&type=invite&join_team=${TEAM_B}`))) as unknown as { location: string }
+  assert.ok(r.location.startsWith(ORIGIN))
+  assert.equal(state.tables.team_coaches.length, before, 'must not join a team the inviter does not organize')
+  assert.ok(!state.tables.team_coaches.some((row) => row.team_id === TEAM_B && row.coach_id === 'u-asst'))
+})
+
+test('join_team succeeds only when a pending coach_invites row exists and the inviter organizes that team', async () => {
+  const TEAM_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  state.tables.coach_invites = [
+    { id: 'inv-1', email: 'asst@example.com', invited_by: 'org-a', accepted_at: null },
+  ]
+  state.tables.team_coaches = [
+    { team_id: TEAM_A, coach_id: 'org-a', role: 'organizer' },
+  ]
+  state.tables.profiles.push({ id: 'u-asst', role: 'coach', full_name: 'Asst' })
+  ssrAuth.verifyUser = { id: 'u-asst', email: 'asst@example.com', created_at: NOW }
+  await confirm(req(`/auth/confirm?token_hash=H&type=invite&join_team=${TEAM_A}`))
+  assert.ok(
+    state.tables.team_coaches.some((row) => row.team_id === TEAM_A && row.coach_id === 'u-asst' && row.role === 'assistant'),
+    'assistant is added only for the invited team',
+  )
+})
+
 test('forwarded error_code and error_description are charset-limited and length-capped', async () => {
   const long = 'x'.repeat(500)
   const r = (await confirm(req(`/auth/confirm?error=x&error_code=${encodeURIComponent('otp_expired<script>')}&error_description=${encodeURIComponent(`\n${long}`)}`))) as unknown as { status: number; location: string }

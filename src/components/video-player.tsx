@@ -1,7 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, saveReframe } from '@/app/actions/clips'
+import { newLessonPath } from '@/lib/lesson-path'
+import { browserRecordingEnv, micErrorMessage, recordedDurationMs, recordingSupportError } from '@/lib/lesson-recording'
+import { pickAudioMime, TimelineRecorder, type PxPoint } from '@/lib/lesson-timeline/recorder'
+import type { Crop as TimelineCrop, Timeline } from '@/lib/lesson-timeline/schema'
+import { useRouter } from 'next/navigation'
+import { formatSeconds, watchMediaDuration } from '@/lib/media-duration'
+import { runAction } from '@/lib/action-result'
+import { marksAfterClear } from '@/lib/mark-clear'
+import { saveAnnotation, deleteAnnotation, clearAnnotations, saveTimestampNote, getSignedUploadUrl, saveLessonPath, saveReframe } from '@/app/actions/clips'
+import UploadBlockedNotice from '@/components/upload-blocked-notice'
+import { applyPlaybackAction, nextPlaybackAction, type PlaybackIntent } from '@/lib/video-playback'
+import { applyClipAudio, effectiveMuted, initialClipMuted, playClip, readClipMuted, writeClipMuted, VOICE_RECORDING_EVENT } from '@/lib/clip-mute'
+import ClipMuteButton from '@/components/clip-mute-button'
 
 // ── playback ───────────────────────────────────────────────────────────────
 const FRAME = 1 / 30
@@ -212,7 +224,8 @@ function nccSearch(
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
-function fmtTime(t: number) { return (isFinite(t) ? t : 0).toFixed(2) + 's' }
+// Unknown values show "--", never 0.00s (QA-007).
+function fmtTime(t: number | null) { return formatSeconds(t) }
 
 function dbToShape(a: DbAnnotation): Shape {
   const shape: Shape = {
@@ -239,6 +252,32 @@ function dbToShape(a: DbAnnotation): Shape {
   return shape
 }
 
+// ── lesson timeline helpers ────────────────────────────────────────────────
+// Stable ids for marks inside one lesson timeline (DB ids arrive later or never).
+class ShapeIds {
+  private ids = new WeakMap<object, string>()
+  private n = 0
+  of(s: object): string {
+    let id = this.ids.get(s)
+    if (!id) { id = `s${++this.n}`; this.ids.set(s, id) }
+    return id
+  }
+}
+function trackOffsets(shapes: Shape[], ids: ShapeIds): Record<string, PxPoint> {
+  const out: Record<string, PxPoint> = {}
+  for (const s of shapes) if (s.anchor && s.currentAnchor) out[ids.of(s)] = { x: s.currentAnchor.x - s.anchor.x, y: s.currentAnchor.y - s.anchor.y }
+  return out
+}
+/** Records clip position and tracked-mark movement (both throttled by the recorder). */
+function sampleTimeline(rec: TimelineRecorder | null, video: HTMLVideoElement | null, shapes: Shape[], ids: ShapeIds) {
+  if (!rec) return
+  if (video && !video.paused) rec.pos(video.currentTime)
+  rec.track(trackOffsets(shapes, ids))
+}
+function viewCrop(reframeMode: boolean, c: { left: number; top: number; right: number; bottom: number }): TimelineCrop {
+  return reframeMode ? { l: 0, t: 0, r: 1, b: 1 } : { l: c.left / 100, t: c.top / 100, r: c.right / 100, b: c.bottom / 100 }
+}
+
 // ── style helpers ──────────────────────────────────────────────────────────
 const TOOLS = [
   { id: 'pointer',  label: 'Pointer' },
@@ -256,9 +295,9 @@ const COLORS = [
 
 const oswald  = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }
 const divider = { borderTop: '1px solid #DDE4ED' }
-const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors'
+const btnBase = 'px-2 py-1.5 sm:px-3 sm:py-2 rounded-md text-[0.65rem] sm:text-[0.76rem] uppercase tracking-wider cursor-pointer transition-colors max-sm:min-h-11 max-sm:min-w-11'
 const btnIdle = 'text-[#456080] hover:bg-[#EEF2F7] hover:text-[#0F1F33]'
-const btnOn   = 'bg-[#C8102E] text-white'
+const btnOn   = 'rp-cta'
 const tgroup  = 'flex gap-1 bg-[#F0F4F8] rounded-lg p-[3px] items-center border border-[#DDE4ED]'
 
 // ── component ──────────────────────────────────────────────────────────────
@@ -269,6 +308,8 @@ export default function VideoPlayer({
   role,
   initialAnnotations = [],
   initialReframe = null,
+  canAddMedia,
+  canRecordLesson,
 }: {
   src: string
   clipId: string
@@ -276,8 +317,13 @@ export default function VideoPlayer({
   role: 'coach' | 'player'
   initialAnnotations?: DbAnnotation[]
   initialReframe?: { left: number; top: number; right: number; bottom: number } | null
+  /** False when the player has no 18+ confirmation or guardian consent (src/lib/consent.ts). */
+  canAddMedia: boolean
+  /** Lesson recording is for the player's direct coach only (defaults to role === 'coach'). */
+  canRecordLesson?: boolean
 }) {
   const isCoach = role === 'coach'
+  const canRecord = canRecordLesson ?? isCoach
 
   const videoRef       = useRef<HTMLVideoElement>(null)
   const overlayRef     = useRef<HTMLCanvasElement>(null)
@@ -295,9 +341,19 @@ export default function VideoPlayer({
 
   // UI state
   const [playing,         setPlaying]         = useState(false)
+  // Intent for play/pause: video.paused can lag behind play() (promise still
+  // settling), so a second click would call play() again. Track what the user
+  // asked for and pause whenever we already wanted to play or the element is
+  // actually playing (src/lib/video-playback.ts).
+  const wantPlayingRef = useRef<PlaybackIntent>({ wantPlaying: false })
   const [currentTime,     setCurrentTime]     = useState(0)
-  const [duration,        setDuration]        = useState(0)
+  const [duration,        setDuration]        = useState<number | null>(null)   // null until the browser has a finite length
   const [speed,           setSpeedState]      = useState(1)
+  const [audioMuted,      setAudioMuted]      = useState(initialClipMuted)
+  const savedMutedRef    = useRef(false)
+  const speedRef         = useRef(1)
+  const voiceRecRef      = useRef(false)
+  const lessonRecMuteRef = useRef(false)
   const [tool,            setTool]            = useState('pointer')
   const [inkColor,        setInkColor]        = useState('#E9412F')
   const [markerCount,     setMarkerCount]     = useState(0)
@@ -315,6 +371,8 @@ export default function VideoPlayer({
   const [stampMode,      setStampMode]        = useState(false)
   const [stampText,      setStampText]        = useState('')
   const [stampSaving,    setStampSaving]      = useState(false)
+  const [stampError,     setStampError]       = useState<string | null>(null)
+  const [markError,      setMarkError]        = useState<string | null>(null)
 
   // reframe
   type Crop = { left: number; top: number; right: number; bottom: number }
@@ -330,6 +388,25 @@ export default function VideoPlayer({
   const reframeModeRef  = useRef(false)
   const cropDragRef     = useRef<{ handle: HandleId; startX: number; startY: number; startCrop: Crop } | null>(null)
 
+  // lesson recording
+  // Saved lessons are listed below the player (LessonList); this only records.
+  const router = useRouter()
+  const [lessonNotice,   setLessonNotice]     = useState<string | null>(null)
+  const lessonStartRef   = useRef<number>(0)
+  const [lessonPhase,    setLessonPhase]      = useState<'idle' | 'recording' | 'saving'>('idle')
+  const [lessonSecs,     setLessonSecs]       = useState(0)
+  const [lessonError,    setLessonError]      = useState<string | null>(null)
+  const lessonCanvasRef  = useRef<HTMLCanvasElement | null>(null)
+  const lessonRecRef     = useRef<MediaRecorder | null>(null)
+  const lessonChunksRef  = useRef<Blob[]>([])
+  const lessonRafRef     = useRef<number | null>(null)
+  const lessonTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lessonTicksRef   = useRef(0)   // whole seconds recorded (duration fallback)
+  // timeline lessons: audio + every action, replayed over the original clip
+  const tlRecRef         = useRef<TimelineRecorder | null>(null)
+  const shapeIdsRef      = useRef(new ShapeIds())
+  const stepFlagRef      = useRef(false)
+  const penDownRef       = useRef(0)
 
   // load initial annotations from DB
   useEffect(() => {
@@ -501,6 +578,7 @@ export default function VideoPlayer({
       if (toolRef.current === 'pointer') return
       e.preventDefault()
       videoRef.current?.pause()
+      penDownRef.current = tlRecRef.current?.penDown() ?? 0
       const p = canvasPoint(e)
       draftRef.current = toolRef.current === 'freehand'
         ? { type: 'freehand', color: inkColorRef.current, points: [p] }
@@ -531,6 +609,7 @@ export default function VideoPlayer({
         const frame = grabFrame()
         if (frame) d.template = extractPatch(frame.imgData, anchor.x, anchor.y, frame.w, frame.h)
         annotationsRef.current = [...annotationsRef.current, d]
+        tlRecRef.current?.stroke(shapeIdsRef.current.of(d), d, penDownRef.current)
         setMarkerCount(c => c + 1)
         const item = { ref: d, type: d.type, color: d.color, time: d.originTime ?? 0 }
         setMarkList(prev => [...prev, item])
@@ -546,11 +625,13 @@ export default function VideoPlayer({
           origin_time: d.originTime ?? 0,
         }).then(result => {
           if (result?.error) {
+            setMarkError(`Mark not saved: ${result.error}`)
             annotationsRef.current = annotationsRef.current.filter(s => s !== d)
             setMarkList(prev => prev.filter(m => m.ref !== d))
             setMarkerCount(c => c - 1)
             drawFrame()
           } else if (result?.id) {
+            setMarkError(null)
             d.id = result.id
             setMarkList(prev => prev.map(m => m.ref === d ? { ...m } : m))
           }
@@ -583,8 +664,6 @@ export default function VideoPlayer({
     if (!video || !scrub) return
 
     function onLoadedMetadata() {
-      setDuration(video!.duration)
-      scrub!.max = String(Math.floor(video!.duration * 1000) || 1000)
       if (video!.videoWidth && video!.videoHeight) {
         setVideoAspect(video!.videoWidth / video!.videoHeight)
       }
@@ -593,29 +672,62 @@ export default function VideoPlayer({
     function onTimeUpdate() {
       if (!scrubbingRef.current) scrub!.value = String(Math.floor(video!.currentTime * 1000))
       setCurrentTime(video!.currentTime)
-      if (video!.paused) { updateTracking(); drawFrame() }
+      if (video!.paused) { updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
     }
-    function onPlay()  { setPlaying(true) }
-    function onPause() { setPlaying(false); updateTracking(); drawFrame() }
-    function onEnded() { setPlaying(false) }
+    function onPlay()  { wantPlayingRef.current.wantPlaying = true; setPlaying(true); tlRecRef.current?.play(video!.currentTime) }
+    function onPause() { wantPlayingRef.current.wantPlaying = false; setPlaying(false); tlRecRef.current?.pause(video!.currentTime); updateTracking(); sampleTimeline(tlRecRef.current, video, annotationsRef.current, shapeIdsRef.current); drawFrame() }
+    function onEnded() { wantPlayingRef.current.wantPlaying = false; setPlaying(false) }
+    // Scrubs, jumps and frame steps (stepFlagRef marks the frame buttons).
+    function onSeeking() { tlRecRef.current?.seek(video!.currentTime, stepFlagRef.current); stepFlagRef.current = false }
+    function onRateChange() { tlRecRef.current?.rate(video!.playbackRate) }
 
     video.addEventListener('loadedmetadata', onLoadedMetadata)
+    video.addEventListener('durationchange', onLoadedMetadata)
+    // Metadata may have loaded before this effect ran (QA-007: "0.00s" total).
+    const lateMeta = video.readyState >= 1 ? setTimeout(onLoadedMetadata, 0) : null
     video.addEventListener('timeupdate',     onTimeUpdate)
     video.addEventListener('play',           onPlay)
     video.addEventListener('pause',          onPause)
     video.addEventListener('ended',          onEnded)
+    video.addEventListener('seeking',        onSeeking)
+    video.addEventListener('ratechange',     onRateChange)
     window.addEventListener('resize',        resizeCanvas)
+    // Duration (QA-007): webm clips can report Infinity until resolved, and it
+    // can change later (durationchange). Shared with the lesson player.
+    const stopDuration = watchMediaDuration(video, (d) => {
+      setDuration(d)
+      scrub!.max = String(d != null ? Math.floor(d * 1000) || 1000 : 1000)
+    })
 
     return () => {
+      stopDuration()
+      setDuration(null)
       prevFrameRef.current = null
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeEventListener('durationchange', onLoadedMetadata)
+      if (lateMeta) clearTimeout(lateMeta)
       video.removeEventListener('timeupdate',     onTimeUpdate)
       video.removeEventListener('play',           onPlay)
       video.removeEventListener('pause',          onPause)
       video.removeEventListener('ended',          onEnded)
+      video.removeEventListener('seeking',        onSeeking)
+      video.removeEventListener('ratechange',     onRateChange)
       window.removeEventListener('resize',        resizeCanvas)
     }
   }, [src, drawFrame, resizeCanvas])
+
+  // Saved mute choice + voice-note recording (sibling components dispatch this).
+  useEffect(() => {
+    savedMutedRef.current = readClipMuted()
+    void syncAudio()
+    function onVoice(e: Event) {
+      voiceRecRef.current = !!(e as CustomEvent<{ recording?: boolean }>).detail?.recording
+      void syncAudio()
+    }
+    window.addEventListener(VOICE_RECORDING_EVENT, onVoice)
+    return () => window.removeEventListener(VOICE_RECORDING_EVENT, onVoice)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src])
 
   // ── stamp overlay listener ───────────────────────────────────────────────
   useEffect(() => {
@@ -639,7 +751,12 @@ export default function VideoPlayer({
   useEffect(() => {
     if (!playing) return
     let raf: number
-    function loop() { updateTracking(); drawFrame(); raf = requestAnimationFrame(loop) }
+    function loop() {
+      updateTracking()
+      sampleTimeline(tlRecRef.current, videoRef.current, annotationsRef.current, shapeIdsRef.current)
+      drawFrame()
+      raf = requestAnimationFrame(loop)
+    }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [playing, drawFrame])
@@ -647,15 +764,34 @@ export default function VideoPlayer({
   // ── controls ─────────────────────────────────────────────────────────────
   function togglePlay() {
     const v = videoRef.current; if (!v) return
-    if (v.paused) { clearStampOverlay(); v.play() } else { v.pause() }
+    const action = nextPlaybackAction(wantPlayingRef.current, v.paused)
+    if (action === 'play') {
+      clearStampOverlay()
+      setPlaying(true) // optimistic: label flips to Pause before play settles
+      const want = effectiveMuted({
+        savedMuted: savedMutedRef.current,
+        playbackRate: speedRef.current,
+        recording: recordingNow(),
+      })
+      void playClip(v, want).then((audio) => {
+        setAudioMuted(audio === 'muted')
+        if (v.paused) {
+          wantPlayingRef.current.wantPlaying = false
+          setPlaying(false)
+        }
+      })
+    } else {
+      setPlaying(false)
+      applyPlaybackAction(v, wantPlayingRef.current, action, () => setPlaying(false))
+    }
   }
   function stepBack() {
     const v = videoRef.current; if (!v) return
-    v.pause(); v.currentTime = Math.max(0, v.currentTime - FRAME)
+    v.pause(); stepFlagRef.current = true; v.currentTime = Math.max(0, v.currentTime - FRAME)
   }
   function stepFwd() {
     const v = videoRef.current; if (!v) return
-    v.pause(); v.currentTime = Math.min(v.duration || 0, v.currentTime + FRAME)
+    v.pause(); stepFlagRef.current = true; v.currentTime = Math.min(v.duration || 0, v.currentTime + FRAME)
   }
   function clearStampOverlay() {
     if (stampTimerRef.current) clearTimeout(stampTimerRef.current)
@@ -670,22 +806,73 @@ export default function VideoPlayer({
   function onScrubChange() { scrubbingRef.current = false }
   function changeSpeed(s: number) {
     if (videoRef.current) videoRef.current.playbackRate = s
+    speedRef.current = s
     setSpeedState(s)
+    void syncAudio()
+  }
+  function recordingNow() {
+    return voiceRecRef.current || lessonRecMuteRef.current
+  }
+  async function syncAudio() {
+    const want = effectiveMuted({
+      savedMuted: savedMutedRef.current,
+      playbackRate: speedRef.current,
+      recording: recordingNow(),
+    })
+    const v = videoRef.current
+    if (!v) { setAudioMuted(want); return }
+    if (want) {
+      v.muted = true
+      setAudioMuted(true)
+      return
+    }
+    const result = await applyClipAudio(v, false)
+    setAudioMuted(result === 'muted')
+  }
+  function toggleMute() {
+    const next = !savedMutedRef.current
+    savedMutedRef.current = next
+    writeClipMuted(next)
+    void syncAudio()
   }
   function selectTool(t: string)  { toolRef.current = t;     setTool(t) }
   function selectColor(c: string) { inkColorRef.current = c; setInkColor(c) }
-  async function removeAnnotation(shape: Shape) {
-    if (shape.id) await deleteAnnotation(shape.id)
+  // Marks leave the screen only after the server removed them; on failure
+  // they stay and the error is shown. The lesson timeline records the removal
+  // only once it really happened.
+  async function removeAnnotation(shape: Shape, why: 'undo' | 'delete' = 'delete') {
+    // Still saving: removing it now would let the save land afterwards.
+    if (!shape.id) return
+    const id = shape.id
+    const result = await runAction(() => deleteAnnotation(id))
+    if (!result.ok) { setMarkError(`Mark not removed: ${result.error}`); return }
+    setMarkError(null)
+    tlRecRef.current?.remove(shapeIdsRef.current.of(shape), why)
     annotationsRef.current = annotationsRef.current.filter(s => s !== shape)
     setMarkList(prev => prev.filter(m => m.ref !== shape))
     setMarkerCount(c => c - 1)
     drawFrame()
   }
 
+  function undoLastMark() {
+    const last = annotationsRef.current[annotationsRef.current.length - 1]
+    if (last) void removeAnnotation(last, 'undo')
+  }
+
   async function clearMarks() {
-    await clearAnnotations(clipId)
-    annotationsRef.current = []; draftRef.current = null
-    setMarkList([]); setMarkerCount(0); drawFrame()
+    const result = await runAction(() => clearAnnotations(clipId))
+    if (!result.ok) { setMarkError(`Marks not cleared: ${result.error}`); return }
+    // Only the marks the server deleted (this coach's saved marks) leave the screen.
+    const removedIds = (result.value && 'removedIds' in result.value ? result.value.removedIds : undefined) ?? []
+    const { kept, removed } = marksAfterClear(annotationsRef.current, removedIds)
+    // Lesson timeline: a full clear when nothing is left, otherwise one removal per deleted mark.
+    if (kept.length === 0) tlRecRef.current?.clear()
+    else for (const shape of annotationsRef.current) if (!kept.includes(shape)) tlRecRef.current?.remove(shapeIdsRef.current.of(shape), 'delete')
+    annotationsRef.current = kept; draftRef.current = null
+    setMarkList(prev => prev.filter(m => kept.includes(m.ref)))
+    setMarkerCount(c => c - removed)
+    setMarkError(kept.length > 0 ? 'Some marks weren\'t cleared: marks added by someone else, or still saving, stay on the clip.' : null)
+    drawFrame()
   }
   async function saveStamp() {
     if (!stampText.trim()) return
@@ -698,23 +885,245 @@ export default function VideoPlayer({
       end:   s.end   ? { x: s.end.x   + ((s.currentAnchor?.x ?? 0) - (s.anchor?.x ?? 0)), y: s.end.y   + ((s.currentAnchor?.y ?? 0) - (s.anchor?.y ?? 0)) } : undefined,
     }))
     setStampSaving(true)
-    const result = await saveTimestampNote({
-      clip_id: clipId,
-      time_seconds: t,
-      body: stampText.trim(),
-      drawing_data: shapes.length ? shapes : null,
-    })
-    setStampSaving(false)
-    if (result?.note) {
-      window.dispatchEvent(new CustomEvent('rp:stamp-created', { detail: result.note }))
-      setStampText('')
-      setStampMode(false)
+    setStampError(null)
+    try {
+      const result = await saveTimestampNote({
+        clip_id: clipId,
+        time_seconds: t,
+        body: stampText.trim(),
+        drawing_data: shapes.length ? shapes : null,
+      })
+      if (result?.note) {
+        window.dispatchEvent(new CustomEvent('rp:stamp-created', { detail: result.note }))
+        setStampText('')
+        setStampMode(false)
+      } else {
+        setStampError(result?.error ?? 'Could not save this stamp. Please try again.')
+      }
+    } catch (err) {
+      console.error('[saveStamp] request failed', err)
+      setStampError('Could not save this stamp. Check your connection and try again.')
+    } finally {
+      setStampSaving(false)
     }
   }
 
+  // Timeline lessons (audio + actions) where MediaRecorder can record audio;
+  // otherwise the older screen-style video recorder below.
+  async function startLessonRecording() {
+    setLessonError(null)
+    setLessonNotice(null)
+    // QA-004: say why instead of failing silently (no MediaRecorder, no mic API, http).
+    const unsupported = recordingSupportError(browserRecordingEnv())
+    if (unsupported) { setLessonError(unsupported); return }
+    try {
+      const audioMime = pickAudioMime(m => MediaRecorder.isTypeSupported(m))
+      if (audioMime) await startTimelineRecording(audioMime)
+      else await startVideoLessonRecording()
+    } catch (err) {
+      console.error('[lesson] could not start recording', err)
+      setLessonError('Couldn\'t start recording in this browser. Try again, or use the latest Safari or Chrome.')
+      setLessonPhase('idle')
+    }
+  }
+
+  async function startTimelineRecording(mimeType: string) {
+    const video = videoRef.current
+    const overlay = overlayRef.current
+    if (!video || !overlay) return
+    let micStream: MediaStream
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err) {
+      setLessonError(micErrorMessage(err))
+      return
+    }
+    const ids = shapeIdsRef.current
+    const rec = new TimelineRecorder(
+      () => performance.now(),
+      overlay.width || video.videoWidth || 1280, overlay.height || video.videoHeight || 720,
+      Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : null,
+    )
+    rec.begin({
+      videoSec: video.currentTime, playing: !video.paused, rate: video.playbackRate,
+      crop: viewCrop(reframeModeRef.current, crop),
+      shapes: annotationsRef.current.map(s => ({ id: ids.of(s), shape: s })),
+      offsets: trackOffsets(annotationsRef.current, ids),
+    })
+    let recorder: MediaRecorder
+    try {
+      recorder = new MediaRecorder(micStream, { mimeType })
+    } catch (err) {
+      console.warn('[lesson] audio recorder unavailable, using video recorder', err)
+      micStream.getTracks().forEach(t => t.stop())
+      return startVideoLessonRecording()
+    }
+    lessonChunksRef.current = []
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) lessonChunksRef.current.push(e.data) }
+    // The audio clock starts here; timeline times are measured from it.
+    lessonStartRef.current = 0
+    lessonTicksRef.current = 0
+    recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp; rec.setOrigin(ev.timeStamp) }
+    recorder.onstop = (ev) => {
+      micStream.getTracks().forEach(t => t.stop())
+      tlRecRef.current = null
+      lessonRecRef.current = null
+      const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
+      const done = rec.finish(durationMs ?? 0)
+      if (!done.ok) console.warn('[lesson] timeline not saved', done.error)
+      uploadLesson(mimeType, durationMs, done.ok ? done.timeline : null, done.ok ? null : done.error)
+    }
+    recorder.onerror = (ev) => {
+      console.error('[lesson] recorder error', ev)
+      if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+      micStream.getTracks().forEach(t => t.stop())
+      tlRecRef.current = null
+      lessonRecRef.current = null
+      setLessonError('Recording stopped unexpectedly. Try again.')
+      setLessonPhase('idle')
+      lessonRecMuteRef.current = false
+      void syncAudio()
+    }
+    tlRecRef.current = rec
+    recorder.start(250)
+    lessonRecRef.current = recorder
+    setLessonSecs(0)
+    setLessonNotice(null)
+    setLessonPhase('recording')
+    lessonRecMuteRef.current = true
+    void syncAudio()
+    lessonTimerRef.current = setInterval(() => { lessonTicksRef.current += 1; setLessonSecs(s => s + 1) }, 1000)
+  }
+
+  // Fallback: composites video + drawings into a video file (format 1).
+  async function startVideoLessonRecording() {
+    const video = videoRef.current
+    const overlay = overlayRef.current
+    if (!video || !overlay) return
+
+    const lw = video.videoWidth || 1280
+    const lh = video.videoHeight || 720
+    const lCanvas = document.createElement('canvas')
+    lCanvas.width = lw; lCanvas.height = lh
+    lessonCanvasRef.current = lCanvas
+    const lCtx = lCanvas.getContext('2d')!
+
+    let micStream: MediaStream
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err) {
+      setLessonError(micErrorMessage(err))
+      return
+    }
+
+    function lessonLoop() {
+      lCtx.drawImage(video!, 0, 0, lw, lh)
+      lCtx.drawImage(overlay!, 0, 0, lw, lh)
+      lessonRafRef.current = requestAnimationFrame(lessonLoop)
+    }
+    lessonLoop()
+
+    const canvasStream = lCanvas.captureStream(30)
+    const mixedStream = new MediaStream([
+      canvasStream.getVideoTracks()[0],
+      micStream.getAudioTracks()[0],
+    ])
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4'
+
+    const recorder = new MediaRecorder(mixedStream, { mimeType })
+    lessonChunksRef.current = []
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) lessonChunksRef.current.push(e.data) }
+    // Release everything this recording opened, so the next one starts clean.
+    const releaseStreams = () => {
+      if (lessonRafRef.current) cancelAnimationFrame(lessonRafRef.current)
+      lessonRafRef.current = null
+      micStream.getTracks().forEach(t => t.stop())
+      canvasStream.getTracks().forEach(t => t.stop())
+    }
+    // Event timestamps share one clock, so stop - start is the recording length.
+    lessonStartRef.current = 0
+    recorder.onstart = (ev) => { lessonStartRef.current = ev.timeStamp }
+    recorder.onstop = (ev) => {
+      releaseStreams()
+      lessonRecRef.current = null
+      const durationMs = recordedDurationMs(lessonStartRef.current, ev.timeStamp, lessonTicksRef.current)
+      uploadLesson(mimeType, durationMs, null, null)
+    }
+    recorder.onerror = (ev) => {
+      console.error('[lesson] recorder error', ev)
+      if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+      releaseStreams()
+      lessonRecRef.current = null
+      setLessonError('Recording stopped unexpectedly. Try again.')
+      setLessonPhase('idle')
+      lessonRecMuteRef.current = false
+      void syncAudio()
+    }
+    recorder.start(250)
+    lessonRecRef.current = recorder
+    setLessonSecs(0)
+    setLessonNotice(null)
+    setLessonPhase('recording')
+    lessonRecMuteRef.current = true
+    void syncAudio()
+    lessonTicksRef.current = 0
+    lessonTimerRef.current = setInterval(() => { lessonTicksRef.current++; setLessonSecs(s => s + 1) }, 1000)
+  }
+
+  function stopLessonRecording() {
+    if (lessonTimerRef.current) clearInterval(lessonTimerRef.current)
+    lessonRecRef.current?.stop()
+    setLessonPhase('saving')
+    lessonRecMuteRef.current = false
+    void syncAudio()
+  }
+
+  async function uploadLesson(mimeType: string, durationMs: number | null, timeline: Timeline | null, timelineError: string | null) {
+    // A fresh object per recording: re-recording used to reuse lesson.<ext>,
+    // which already existed, so the non-upsert signed upload was rejected.
+    const path = newLessonPath(playerId, clipId, mimeType)
+    // Strip codec parameters — Supabase MIME check only matches the base type
+    const baseMime = mimeType.split(';')[0].trim()
+    const isAudio = baseMime.startsWith('audio/')
+    // The real type (audio/mp4, audio/webm, or video/* for the fallback recorder):
+    // the same value goes to the upload, the file and the lessons row (026 allows audio/*).
+    const uploadType = baseMime
+    const blob = new Blob(lessonChunksRef.current, { type: uploadType })
+    lessonChunksRef.current = []
+    if (blob.size === 0) { setLessonError('Nothing was recorded. Try again.'); setLessonPhase('idle'); return }
+
+    const urlResult = await getSignedUploadUrl(path, 'lessons')
+    if ('error' in urlResult) {
+      console.error('[lesson] signed upload URL failed', { path, error: urlResult.error })
+      setLessonError(urlResult.error ?? 'Upload failed'); setLessonPhase('idle'); return
+    }
+
+    const res = await fetch(urlResult.signedUrl, {
+      method: 'PUT', body: blob, headers: { 'Content-Type': uploadType },
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      console.error('[lesson] upload failed', { path, status: res.status, size: blob.size, detail })
+      setLessonError(`Upload failed (${res.status}). Try again.`); setLessonPhase('idle'); return
+    }
+
+    const saveResult = await saveLessonPath(clipId, path, { mime: baseMime, durationMs, ...(timeline ? { timeline } : {}) })
+    if ('error' in saveResult) {
+      console.error('[lesson] save failed', { path, error: saveResult.error })
+      setLessonError(`Uploaded, but the lesson wasn't saved: ${saveResult.error}`); setLessonPhase('idle'); return
+    }
+    setLessonNotice(saveResult.warning ?? (isAudio && !timeline ? `Voice saved without the drawing replay: ${timelineError ?? 'unknown error'}` : 'Lesson saved'))
+    setLessonPhase('idle')
+    router.refresh()   // reload the lesson list for this clip
+  }
 
   // ── reframe helpers ──────────────────────────────────────────────────────
   useEffect(() => { reframeModeRef.current = reframeMode }, [reframeMode])
+  // Zoom/reframe as the viewer sees it (full frame while the crop box is being edited).
+  useEffect(() => { tlRecRef.current?.crop(viewCrop(reframeMode, crop)) }, [reframeMode, crop])
 
   function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -864,6 +1273,7 @@ export default function VideoPlayer({
             ref={videoRef}
             src={src}
             playsInline
+            muted={audioMuted}
             crossOrigin="anonymous"
             className="w-full block"
             style={videoAspect && videoAspect < 1 ? { maxHeight: '70vh' } : {}}
@@ -890,16 +1300,28 @@ export default function VideoPlayer({
           ref={scrubRef}
           type="range" min="0" max="1000" defaultValue="0" step="1"
           onInput={onScrubInput} onChange={onScrubChange}
-          className="flex-1 accent-[#C8102E] cursor-pointer h-1"
+          className="flex-1 accent-[#C8031E] cursor-pointer h-1 max-sm:h-11"
         />
       </div>
 
       {/* Transport + speed */}
       <div className="mt-3 pt-3 flex flex-wrap gap-2 items-center" style={divider}>
         <div className={tgroup} style={oswald}>
-          <button onClick={togglePlay} className={`${btnBase} ${playing ? btnOn : btnIdle}`}>
+          <button
+            type="button"
+            data-testid="clip-play-pause"
+            aria-label={playing ? 'Pause' : 'Play'}
+            aria-pressed={playing}
+            onClick={togglePlay}
+            className={`${btnBase} ${playing ? btnOn : btnIdle}`}
+          >
             {playing ? 'Pause' : 'Play'}
           </button>
+          <ClipMuteButton
+            muted={audioMuted}
+            onToggle={toggleMute}
+            className={`${btnBase} ${audioMuted ? btnOn : btnIdle}`}
+          />
           <button onClick={stepBack} className={`${btnBase} ${btnIdle}`}>
             <svg className="inline w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16"><path d="M3 3h2v10H3V3zm9.854 1.146a.5.5 0 01.146.354v7a.5.5 0 01-.854.354L7.5 8.207V13a.5.5 0 01-1 0V3a.5.5 0 011 0v4.793l4.646-4.647a.5.5 0 01.708 0z"/></svg>
             Frame
@@ -931,9 +1353,10 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <div className="flex items-center gap-2 px-1 shrink-0">
+            <div className="flex items-center gap-2 px-1">
               {COLORS.map(c => (
                 <button key={c.hex} onClick={() => selectColor(c.hex)} title={c.label}
+                  className="max-sm:min-h-11 max-sm:min-w-11"
                   style={{
                     width: 20, height: 20, borderRadius: '50%', background: c.hex, padding: 0, cursor: 'pointer',
                     border: inkColor === c.hex ? '2px solid white' : '2px solid transparent',
@@ -945,13 +1368,12 @@ export default function VideoPlayer({
               ))}
             </div>
 
-            <button onClick={toggleTracking} className={`${btnBase} border border-[#DDE4ED] shrink-0 ${trackingEnabled ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`} style={oswald}>
+            <button onClick={toggleTracking} className={`${btnBase} border border-[#DDE4ED] ${trackingEnabled ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`} style={oswald}>
               Tracking: {trackingEnabled ? 'On' : 'Off'}
             </button>
           </div>
 
-          {/* Secondary actions row */}
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex gap-1">
             <button
               onClick={() => { setReframeMode(m => !m); setReframeSaveErr(null) }}
               className={`${btnBase} border border-[#DDE4ED] ${reframeMode ? btnOn : 'bg-[#F0F4F8] ' + btnIdle}`}
@@ -967,6 +1389,9 @@ export default function VideoPlayer({
               title="Stamp current drawings as a timestamp note"
             >
               ✦ Stamp
+            </button>
+            <button onClick={undoLastMark} disabled={markerCount === 0} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle} disabled:opacity-40`} style={oswald} title="Remove the last mark">
+              Undo
             </button>
             <button onClick={clearMarks} className={`${btnBase} bg-[#F0F4F8] border border-[#DDE4ED] ${btnIdle}`} style={oswald}>
               Clear marks
@@ -997,7 +1422,7 @@ export default function VideoPlayer({
             </button>
           </div>
           {reframeSaveErr && (
-            <p className="w-full text-[0.65rem] text-[#C8102E] font-mono break-all">{reframeSaveErr}</p>
+            <p className="w-full text-[0.65rem] text-[#C8031E] font-mono break-all">{reframeSaveErr}</p>
           )}
         </div>
       )}
@@ -1005,29 +1430,72 @@ export default function VideoPlayer({
       {/* Stamp input row */}
       {isCoach && stampMode && (
         <div className="mt-2 pt-2 flex items-center gap-2" style={divider}>
+          <span className="rp-callout-navy text-[0.65rem] tracking-wider px-2 py-1 rounded shrink-0 max-sm:min-h-11 inline-flex items-center" style={oswald}>Timestamped notes</span>
           <span className="text-[0.68rem] text-[#8096AE] tabular-nums shrink-0" style={oswald}>{fmtTime(currentTime)}</span>
           <input
             autoFocus
             value={stampText}
-            onChange={e => setStampText(e.target.value)}
+            onChange={e => { setStampText(e.target.value); setStampError(null) }}
             onKeyDown={e => { if (e.key === 'Enter') saveStamp(); if (e.key === 'Escape') { setStampMode(false); setStampText('') } }}
             placeholder="Describe this moment…"
-            className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080]"
+            className="flex-1 text-sm bg-white border border-[#DDE4ED] rounded-md px-3 py-1 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080] max-sm:min-h-11"
           />
           <button
             onClick={saveStamp}
             disabled={stampSaving || !stampText.trim()}
-            className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0"
+            className="rp-cta text-xs px-3 py-1 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap shrink-0 max-sm:min-h-11"
             style={oswald}
           >
             {stampSaving ? 'Saving…' : 'Save'}
           </button>
           <button
             onClick={() => { setStampMode(false); setStampText('') }}
-            className="text-xs text-[#8096AE] hover:text-[#C8102E] transition-colors"
+            className="text-xs text-[#8096AE] hover:text-[#C8031E] transition-colors max-sm:min-h-11 max-sm:min-w-11"
           >
             ✕
           </button>
+        </div>
+      )}
+      {isCoach && stampMode && stampError && (
+        <p role="alert" className="mt-1 text-xs text-[#C8031E]">Stamp not saved: {stampError}</p>
+      )}
+
+      {/* Lesson recording */}
+      {canRecord && lessonPhase !== 'idle' ? (
+        <div className="mt-2 pt-2 flex items-center gap-3" style={divider}>
+          <span className="rp-callout-navy inline-flex items-center gap-2 rounded-md px-3 py-1.5 max-sm:min-h-11">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+            <span className="text-xs text-white" style={oswald}>
+              Recording · {String(Math.floor(lessonSecs / 60)).padStart(2, '0')}:{String(lessonSecs % 60).padStart(2, '0')}
+            </span>
+          </span>
+          <button
+            onClick={stopLessonRecording}
+            disabled={lessonPhase === 'saving'}
+            className={`${btnBase} rp-cta ml-auto disabled:opacity-50`}
+            style={oswald}
+          >
+            {lessonPhase === 'saving' ? 'Saving…' : 'Stop & save'}
+          </button>
+        </div>
+      ) : canRecord && !canAddMedia ? (
+        <div className="mt-2 pt-2" style={divider}>
+          <UploadBlockedNotice viewer="coach" />
+        </div>
+      ) : canRecord && (
+        <div className="mt-2 pt-2 flex items-center gap-2 flex-wrap" style={divider}>
+          <button
+            onClick={startLessonRecording}
+            className={`${btnBase} border border-[#DDE4ED] bg-[#F0F4F8] ${btnIdle}`}
+            style={oswald}
+            title="Record a lesson: your voice + everything you draw and do on this clip"
+          >
+            ● Record Lesson
+          </button>
+          {lessonError && <span className="text-xs text-[#C8031E]">{lessonError}</span>}
+          {lessonNotice && !lessonError && (lessonNotice === 'Lesson saved'
+            ? <span className="text-xs text-slate-400" style={oswald}>{lessonNotice}</span>
+            : <span role="status" className="text-xs text-[#B45309]">{lessonNotice}</span>)}
         </div>
       )}
 
@@ -1043,8 +1511,9 @@ export default function VideoPlayer({
                 <span className="text-[#8096AE] tabular-nums">{m.time.toFixed(2)}s</span>
                 <button
                   onClick={() => removeAnnotation(m.ref)}
-                  className="ml-auto text-[#8096AE] hover:text-[#C8102E] transition-colors leading-none"
-                  title="Remove annotation"
+                  disabled={!m.ref.id}
+                  className="ml-auto text-[#8096AE] hover:text-[#C8031E] transition-colors leading-none disabled:opacity-40 max-sm:min-h-11 max-sm:min-w-11"
+                  title={m.ref.id ? 'Remove annotation' : 'Saving…'}
                 >
                   ✕
                 </button>
@@ -1058,6 +1527,7 @@ export default function VideoPlayer({
       <div className="mt-2 text-[0.78rem] text-[#3D5166]">
         {markerCount} {markerCount === 1 ? 'mark' : 'marks'} on this clip
         {!isCoach && markerCount > 0 && <span className="ml-2 text-[#DDE4ED]">· coach annotations</span>}
+        {isCoach && markError && <p role="alert" className="mt-1 text-xs text-[#C8031E]">{markError}</p>}
       </div>
     </div>
   )

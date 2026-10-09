@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, Fragment, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState, Fragment } from 'react'
+import { aiCoachAudienceBadge, aiCoachAudienceEyebrow } from '@/lib/ai-coach-badge'
 import { extractVideoFrames } from '@/lib/extract-frames'
+import type { ClipKind } from '@/lib/positions'
 
 type Agent   = 'randy' | 'barry'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -33,6 +35,7 @@ const AGENTS = {
     border: '#FBD0D6',
     description: 'Mechanics, velocity, spin, and pitch design.',
     placeholder: 'Ask Randy anything about pitching…',
+    intro: "I've got this clip's notes and numbers. I can't watch the video, so I work from the coach's notes and the metrics. What are we working on?",
   },
   barry: {
     name: 'Barry',
@@ -42,37 +45,42 @@ const AGENTS = {
     border: '#C0CFE0',
     description: 'Swing mechanics, exit velocity, and bat path.',
     placeholder: 'Ask Barry anything about hitting…',
+    intro: "I've got this clip's notes and numbers. I can't watch the video, so I work from the coach's notes and the metrics. What are we working on?",
   },
 }
 
+// The chat sends only the clip id; the server loads the player's details,
+// pitch data, checklist and notes itself after an access check. The other
+// props are kept for the existing callers but are no longer sent.
 export default function AIChat({
   clipId,
+  available = true,
   role,
-  playerName,
-  playerAgeGroup,
-  playerPosition,
-  metrics = [],
-  checklist = null,
-  coachNotes = null,
-  forcedAgent,
+  clipKind = 'pitching',
 }: {
   clipId: string
+  /** False for viewers the server won't serve (guardians): show a notice instead of the chat. */
+  available?: boolean
   role: 'coach' | 'player'
   playerName: string
   playerAgeGroup: string | null
   playerPosition: string | null
+  /** Default Randy/Barry from the clip toggle; Switch Agent still shows both. */
+  clipKind?: ClipKind
   metrics?: Metric[]
   checklist?: PhaseRow[] | null
   coachNotes?: string | null
-  forcedAgent?: 'randy' | 'barry'
 }) {
-  const [agent,       setAgent]       = useState<Agent | null>(() => forcedAgent ?? null)
+  const defaultAgent: Agent = clipKind === 'hitting' ? 'barry' : 'randy'
+  const [agent,       setAgent]       = useState<Agent | null>(defaultAgent)
   const [messages,    setMessages]    = useState<Message[]>([])
   const [input,       setInput]       = useState('')
   const [streaming,   setStreaming]   = useState('')
   const [isLoading,   setIsLoading]   = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const startedFor = useRef<string | null>(null)
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -80,69 +88,67 @@ export default function AIChat({
 
   const analyzeClip = useCallback(async (a: Agent) => {
     setIsAnalyzing(true)
+    setAnalysisError(null)
     setStreaming('')
-
     try {
       const frames = await extractVideoFrames(5)
-
       if (frames.length === 0) {
-        setIsAnalyzing(false)
+        setAnalysisError('Could not capture frames from this clip. You can still chat.')
         return
       }
-
       const res = await fetch('/api/analyze-clip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frames,
-          agent: a,
-          playerName,
-          playerAgeGroup,
-          playerPosition,
-          metrics,
-          checklist,
-          coachNotes,
-        }),
+        body: JSON.stringify({ clipId, frames, agent: a }),
       })
-
       if (!res.ok || !res.body) {
-        setIsAnalyzing(false)
-        return
+        const detail = res.ok ? '' : (await res.text().catch(() => '')).slice(0, 300)
+        throw new Error(detail || `Analysis failed (${res.status})`)
       }
-
-      const reader  = res.body.getReader()
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let accumulated = ''
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         accumulated += decoder.decode(value, { stream: true })
         setStreaming(accumulated)
       }
-
+      if (!accumulated.trim()) throw new Error('Analysis returned an empty response.')
       setMessages([{ role: 'assistant', content: accumulated }])
       setStreaming('')
-    } catch {
-      // Silently fall through — coach can still chat without the visual analysis
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Analysis unavailable'
+      setAnalysisError(errMsg)
+      setStreaming('')
     } finally {
       setIsAnalyzing(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerName, playerAgeGroup, playerPosition, metrics, checklist, coachNotes])
+  }, [clipId])
 
-  // Auto-start analysis when agent is forced (no picker needed)
   useEffect(() => {
-    if (forcedAgent) analyzeClip(forcedAgent)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const next = clipKind === 'hitting' ? 'barry' : 'randy'
+    setAgent(next)
+    setMessages([])
+    setStreaming('')
+    setInput('')
+    setAnalysisError(null)
+    startedFor.current = null
+  }, [clipKind])
 
-  async function chooseAgent(a: Agent) {
+  useEffect(() => {
+    if (!agent || startedFor.current === `${clipId}:${agent}:${clipKind}`) return
+    startedFor.current = `${clipId}:${agent}:${clipKind}`
+    void analyzeClip(agent)
+  }, [agent, clipId, clipKind, analyzeClip])
+
+  function chooseAgent(a: Agent) {
     setAgent(a)
     setMessages([])
     setInput('')
     setStreaming('')
-    analyzeClip(a)
+    setAnalysisError(null)
+    startedFor.current = null
   }
 
   async function sendMessage() {
@@ -164,21 +170,14 @@ export default function AIChat({
         body: JSON.stringify({
           messages: nextMessages,
           agent,
-          context: {
-            playerName,
-            ageGroup: playerAgeGroup,
-            position: playerPosition,
-            clipId,
-            viewerRole: role,
-            metrics,
-            checklist,
-            coachNotes,
-          },
+          context: { clipId },
         }),
       })
 
-      if (res.status === 429) throw new Error('Slow down — too many messages. Wait a moment and try again.')
-      if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`)
+      if (!res.ok || !res.body) {
+        const detail = res.ok ? '' : (await res.text().catch(() => '')).slice(0, 300)
+        throw new Error(detail || `Request failed: ${res.status}`)
+      }
 
       const reader  = res.body.getReader()
       const decoder = new TextDecoder()
@@ -202,12 +201,33 @@ export default function AIChat({
     }
   }
 
+  if (!available) {
+    return (
+      <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md">
+        <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED]">
+          <p
+            className="text-xs text-[#3D5166] tracking-widest"
+            style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' }}
+          >
+            AI Coach Chat
+          </p>
+        </div>
+        <p className="p-4 text-sm text-[#456080]">
+          The AI Coach isn&apos;t available for guardians. It&apos;s for the player and their coaches.
+        </p>
+      </div>
+    )
+  }
+
   // ── Agent picker ────────────────────────────────────────────────────────────
   if (!agent) {
     return (
       <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md p-5 space-y-4">
         <div>
-          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os}>AI Coach</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166] mb-1" style={os} data-ai-badge={role}>
+            {aiCoachAudienceBadge(role)}
+          </p>
+          <p className="text-[10px] text-[#8096AE] mb-1">{aiCoachAudienceEyebrow(role)}</p>
           <p className="text-sm text-[#0F1F33]">Pick who you want to talk to.</p>
         </div>
 
@@ -216,7 +236,7 @@ export default function AIChat({
             <button
               key={key}
               onClick={() => chooseAgent(key)}
-              className="text-left rounded-xl border-2 p-4 transition-all hover:shadow-md active:scale-[0.98] space-y-2"
+              className="text-left rounded-xl border-2 p-4 min-h-11 transition-all hover:shadow-md active:scale-[0.98] space-y-2"
               style={{ borderColor: ag.border, background: ag.bg }}
             >
               <div className="flex items-center gap-2">
@@ -250,27 +270,29 @@ export default function AIChat({
   return (
     <div className="bg-white border border-[#DDE4ED] shadow-sm rounded-md flex flex-col">
       {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold" style={{ color: ag.color, ...os }}>{ag.name}</span>
-          <span className="text-[9px] text-[#8096AE] tracking-wide" style={os}>{ag.role}</span>
+      <div className="px-4 pt-3 pb-2 border-b border-[#DDE4ED] flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] tracking-[0.3em] text-[#3D5166]" style={os} data-ai-badge={role}>
+            {aiCoachAudienceBadge(role)}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs font-bold" style={{ color: ag.color, ...os }}>{ag.name}</span>
+            <span className="text-[9px] text-[#8096AE] tracking-wide" style={os}>{ag.role}</span>
+          </div>
         </div>
-        {!forcedAgent && (
-          <button
-            onClick={() => { setAgent(null); setMessages([]) }}
-            className="text-[10px] text-[#8096AE] hover:text-[#456080] transition-colors"
-            style={os}
-          >
-            Switch Agent
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => { setAgent(null); setMessages([]) }}
+          className="shrink-0 min-h-11 px-3 text-[10px] text-[#8096AE] hover:text-[#456080] transition-colors"
+          style={os}
+        >
+          Switch Agent
+        </button>
       </div>
 
       {/* Messages */}
       <div ref={scrollRef} className="max-h-[400px] overflow-y-auto p-4 space-y-3">
-
-        {/* Analysis loading state */}
-        {isAnalyzing && messages.length === 0 && (
+        {isAnalyzing && messages.length === 0 && !streaming && (
           <div className="flex justify-start">
             <div className="max-w-[85%] rounded-md px-3 py-2 text-sm text-[#456080]" style={{ background: ag.bg, border: `1px solid ${ag.border}` }}>
               <span className="animate-pulse" style={{ color: ag.color, ...os, fontSize: '10px', letterSpacing: '0.1em' }}>
@@ -280,11 +302,18 @@ export default function AIChat({
           </div>
         )}
 
-        {/* Fallback intro when no video was available */}
-        {!isAnalyzing && messages.length === 0 && (
+        {analysisError && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-md px-3 py-2 text-sm text-[#C8102E]" style={{ background: '#FFF5F5', border: '1px solid #FBD0D6' }}>
+              {analysisError}
+            </div>
+          </div>
+        )}
+
+        {!isAnalyzing && !analysisError && messages.length === 0 && !streaming && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-md px-3 py-2 text-sm text-[#456080]" style={{ background: ag.bg, border: `1px solid ${ag.border}` }}>
-              I&apos;ve got your numbers. What are we working on?
+              {ag.intro}
             </div>
           </div>
         )}
@@ -323,7 +352,7 @@ export default function AIChat({
         <button
           onClick={sendMessage}
           disabled={isLoading || isAnalyzing || !input.trim()}
-          className="px-4 py-2 rounded-md text-sm text-white font-medium transition-colors disabled:opacity-40"
+          className="min-h-11 px-4 py-2 rounded-md text-sm text-white font-medium transition-colors disabled:opacity-40"
           style={{ background: ag.color }}
         >
           Send

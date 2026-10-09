@@ -83,7 +83,7 @@ We do not sell your data to third parties. We do not use your data for advertisi
 
 **Supabase** (supabase.com): Database, authentication, and file storage. Your data is stored on Supabase's infrastructure. See supabase.com/privacy.
 
-**Anthropic** (anthropic.com): AI Coach runs on Anthropic's Claude. Each conversation sends your message plus the player's name, age group, position, session pitch and hitting metrics, mechanics checklist, coach notes, and clip details such as titles and dates. Video and audio files are never sent — the AI works from text only. Anthropic does not train models on customer content sent through its API (see anthropic.com/legal/commercial-terms).
+**Anthropic** (anthropic.com): AI Coach runs on Anthropic's Claude. Each conversation sends your message plus the player's name, age group, position, session pitch and hitting metrics, mechanics checklist, coach notes, and clip details such as titles and dates. Clip analysis also sends still frames from a clip to Anthropic. Anthropic does not train models on customer content sent through its API (see anthropic.com/legal/commercial-terms).
 
 **Google and Apple** (sign-in only): If you choose to sign in with Google (or Apple, where offered), that provider confirms your sign-in and shares your name, email address, and an account ID with us.
 
@@ -103,7 +103,7 @@ We don't sell your data, and we don't share it with anyone except the service pr
           },
           {
             title: '6. Video and Performance Data',
-            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the player's direct coach, and the other coaches on teams the player is on.
+            body: `Videos, voice recordings, and pitching and hitting metrics uploaded to Release Point AI are stored in Supabase Storage. A player's video can be seen by the player, the player's direct coach, the other coaches on teams the player is on (including assistant coaches), and the player's linked guardian.
 
 Videos are served via time-limited signed URLs. Files are not publicly accessible by default.`,
           },

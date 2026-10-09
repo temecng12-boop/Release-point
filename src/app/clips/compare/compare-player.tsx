@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { setPinnedComparison } from '@/app/actions/clips'
+import { applyClipAudio, effectiveMuted, initialClipMuted, playClip, readClipMuted, writeClipMuted } from '@/lib/clip-mute'
+import ClipMuteButton from '@/components/clip-mute-button'
 
 const oswald = { fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }
 
@@ -18,10 +19,9 @@ export interface ClipData {
 
 interface Props {
   clips: ClipData[]
-  role?: 'coach' | 'player'
 }
 
-export default function ComparePlayer({ clips, role }: Props) {
+export default function ComparePlayer({ clips }: Props) {
   const router = useRouter()
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
   const hasYoutube = clips.some(c => !!c.youtubeId)
@@ -29,39 +29,22 @@ export default function ComparePlayer({ clips, role }: Props) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState<number[]>(clips.map(() => 0))
   const [speed, setSpeed] = useState(1)
+  const [audioMuted, setAudioMuted] = useState(initialClipMuted)
+  const savedMutedRef = useRef(false)
+  const speedRef = useRef(1)
   const syncingRef = useRef(false)
-  const [copied, setCopied] = useState(false)
-  const [pinOpen, setPinOpen] = useState(false)
-  const [pinNote, setPinNote] = useState('')
-  const [pinning, setPinning] = useState(false)
-  const [pinned, setPinned] = useState(false)
 
   const SPEEDS = [0.25, 0.5, 1, 1.5] as const
+
+  useEffect(() => {
+    savedMutedRef.current = readClipMuted()
+    void syncAudio()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Add clip inline state
   const [addYtUrl, setAddYtUrl] = useState('')
   const [addYtError, setAddYtError] = useState('')
-
-  // The player clip is always clips[0]; the YouTube clip can be any slot
-  const playerClip = clips.find(c => !c.youtubeId)
-  const ytClip = clips.find(c => !!c.youtubeId)
-  const canPin = role === 'coach' && !!playerClip && !!ytClip
-
-  function copyLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-
-  async function handlePin() {
-    if (!playerClip || !ytClip) return
-    setPinning(true)
-    await setPinnedComparison(playerClip.id, ytClip.youtubeId!, pinNote.trim() || null)
-    setPinning(false)
-    setPinned(true)
-    setPinOpen(false)
-  }
 
   function setProgressAt(index: number, val: number) {
     setProgress(prev => {
@@ -86,9 +69,25 @@ export default function ComparePlayer({ clips, role }: Props) {
   const handlePlay = useCallback(() => {
     setPlaying(true)
     if (!hasYoutube) {
-      clips.forEach((clip, i) => {
-        if (!clip.youtubeId) videoRefs.current[i]?.play()
+      const want = effectiveMuted({
+        savedMuted: savedMutedRef.current,
+        playbackRate: speedRef.current,
+        recording: false,
       })
+      void (async () => {
+        let fellBack = false
+        let anyPlaying = false
+        for (let i = 0; i < clips.length; i++) {
+          if (clips[i].youtubeId) continue
+          const v = videoRefs.current[i]
+          if (!v) continue
+          const audio = await playClip(v, want)
+          if (audio === 'muted' && !want) fellBack = true
+          if (!v.paused) anyPlaying = true
+        }
+        setAudioMuted(want || fellBack)
+        if (!anyPlaying) setPlaying(false)
+      })()
     }
   }, [hasYoutube, clips])
 
@@ -109,14 +108,47 @@ export default function ComparePlayer({ clips, role }: Props) {
     playing ? handlePause() : handlePlay()
   }
 
+  async function syncAudio() {
+    const want = effectiveMuted({
+      savedMuted: savedMutedRef.current,
+      playbackRate: speedRef.current,
+      recording: false,
+    })
+    const videos = videoRefs.current.filter((v): v is HTMLVideoElement => !!v)
+    if (want) {
+      for (const v of videos) v.muted = true
+      setAudioMuted(true)
+      return
+    }
+    let fellBack = false
+    for (const v of videos) {
+      if (await applyClipAudio(v, false) === 'muted') fellBack = true
+    }
+    if (fellBack) {
+      for (const v of videos) v.muted = true
+      setAudioMuted(true)
+    } else {
+      setAudioMuted(false)
+    }
+  }
+
+  function toggleMute() {
+    const next = !savedMutedRef.current
+    savedMutedRef.current = next
+    writeClipMuted(next)
+    void syncAudio()
+  }
+
   function changeSpeed(s: number) {
     setSpeed(s)
+    speedRef.current = s
     clips.forEach((clip, i) => {
       if (!clip.youtubeId) {
         const v = videoRefs.current[i]
         if (v) v.playbackRate = s
       }
     })
+    void syncAudio()
   }
 
   function stepFrame(direction: -1 | 1) {
@@ -205,6 +237,7 @@ export default function ComparePlayer({ clips, role }: Props) {
             src={clip.videoUrl}
             className="w-full h-full object-contain"
             playsInline
+            muted={audioMuted}
             preload="metadata"
             onTimeUpdate={() => {
               const v = videoRefs.current[index]
@@ -282,108 +315,22 @@ export default function ComparePlayer({ clips, role }: Props) {
   return (
     <div className="space-y-4">
       {/* Header row */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between">
         <p className="text-xs text-[#3D5166]" style={oswald}>Side-by-Side Comparison</p>
-        <div className="flex items-center gap-3">
-          {!hasYoutube && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs text-[#3D5166]" style={oswald}>Sync playback</span>
-              <div
-                onClick={() => setSynced(s => !s)}
-                className={`w-9 h-5 rounded-full transition-colors relative ${synced ? 'bg-[#C8102E]' : 'bg-[#DDE4ED]'}`}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${synced ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </div>
-            </label>
-          )}
-          {hasYoutube && (
-            <p className="text-[11px] text-[#AAB8C8]" style={oswald}>YouTube plays independently</p>
-          )}
-          {canPin && (
-            <div className="relative">
-              <button
-                onClick={() => { if (!pinned) setPinOpen(o => !o) }}
-                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
-                style={pinned
-                  ? { ...oswald, background: '#F0FDF4', borderColor: '#86EFAC', color: '#16A34A' }
-                  : { ...oswald, background: '#F8FAFC', borderColor: '#DDE4ED', color: '#456080' }}
-              >
-                {pinned ? (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Sent
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                    Send to Player
-                  </>
-                )}
-              </button>
-
-              {pinOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-[#DDE4ED] rounded-xl shadow-lg p-4 z-20 space-y-3">
-                  <p className="text-[10px] tracking-[0.2em] text-[#C8102E]" style={oswald}>Send to {playerClip?.playerName}</p>
-                  <p className="text-xs text-[#456080]">
-                    This comparison will appear on their clip as a Film Study from you.
-                  </p>
-                  <textarea
-                    value={pinNote}
-                    onChange={e => setPinNote(e.target.value)}
-                    placeholder="Add a note (optional) — e.g. &quot;Watch how he loads his hips&quot;"
-                    rows={3}
-                    className="w-full text-sm bg-[#F8FAFC] border border-[#DDE4ED] rounded-lg px-3 py-2 text-[#0F1F33] placeholder:text-[#AAB8C8] focus:outline-none focus:border-[#456080] resize-none"
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => setPinOpen(false)}
-                      className="text-xs text-[#456080] px-3 py-1.5 rounded-md border border-[#DDE4ED] transition-colors hover:bg-[#F0F4F8]"
-                      style={oswald}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handlePin}
-                      disabled={pinning}
-                      className="text-xs bg-[#C8102E] hover:bg-[#9E0E24] text-white px-4 py-1.5 rounded-md transition-colors disabled:opacity-50"
-                      style={oswald}
-                    >
-                      {pinning ? 'Sending…' : 'Send'}
-                    </button>
-                  </div>
-                </div>
-              )}
+        {!hasYoutube && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-[#3D5166]" style={oswald}>Sync playback</span>
+            <div
+              onClick={() => setSynced(s => !s)}
+              className={`w-9 h-5 rounded-full transition-colors relative ${synced ? 'bg-[#C8102E]' : 'bg-[#DDE4ED]'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${synced ? 'translate-x-4' : 'translate-x-0.5'}`} />
             </div>
-          )}
-
-          <button
-            onClick={copyLink}
-            className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
-            style={copied
-              ? { ...oswald, background: '#F0FDF4', borderColor: '#86EFAC', color: '#16A34A' }
-              : { ...oswald, background: '#F8FAFC', borderColor: '#DDE4ED', color: '#456080' }}
-          >
-            {copied ? (
-              <>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-                Copied
-              </>
-            ) : (
-              <>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Share
-              </>
-            )}
-          </button>
-        </div>
+          </label>
+        )}
+        {hasYoutube && (
+          <p className="text-[11px] text-[#AAB8C8]" style={oswald}>YouTube plays independently</p>
+        )}
       </div>
 
       {/* Video panels */}
@@ -417,6 +364,12 @@ export default function ComparePlayer({ clips, role }: Props) {
             >
               ‹
             </button>
+
+            <ClipMuteButton
+              muted={audioMuted}
+              onToggle={toggleMute}
+              className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${audioMuted ? 'bg-[#C8102E] text-white' : 'bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080]'}`}
+            />
 
             {/* Play/Pause */}
             <button

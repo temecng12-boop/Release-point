@@ -1,18 +1,36 @@
+import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
+import type { Viewport } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { selectPlayersWithConsent } from '@/lib/consent-server'
+import { canViewPlayerContent, canDeleteSavedMetrics, canAddPitchData } from '@/lib/clip-access'
+import { canUploadVideo, type PlayerConsentFields } from '@/lib/consent'
 import VideoPlayer from '@/components/video-player'
 import ClipTabs, { type Metric } from './clip-tabs'
 import ClipTitle from './clip-title'
 import SaveBanner from './save-banner'
 import AppHeader from '@/components/app-header'
+
+// Pinch-zoom stays off on the clip viewer: frame-by-frame annotation needs
+// a fixed canvas. Marketing and legal pages allow zoom (root viewport).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
 import SiteFooter from '@/components/SiteFooter'
-import ErrorBoundary from '@/components/error-boundary'
-import { canViewPlayerContent } from '@/lib/clip-access'
+import ClipSkeleton from './clip-skeleton'
+import LessonList from '@/components/lessons/lesson-list'
+import { canManageLessons, loadLessons, type LessonItem } from '@/lib/lessons'
+import { isE2eClipFixture } from '@/lib/e2e-clip-fixture'
+import { E2eClipCoachPage } from '../e2e-clip-fixture'
+import { resolveClipKind, resolvePlayerPositions } from '@/lib/positions'
 
 export default async function ClipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  if (isE2eClipFixture(id)) return <E2eClipCoachPage clipId={id} />
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,13 +38,50 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
 
   const { data: clip, error: clipError } = await supabaseAdmin
     .from('clips')
-    .select('id, title, storage_path, created_at, session_date, player_id, notes')
+    .select('id, title, storage_path, created_at, session_date, player_id, notes, voice_path')
     .eq('id', id)
     .single()
 
   if (clipError) console.error('[ClipPage] DB error fetching clip', id, JSON.stringify(clipError))
   if (!clip) notFound()
 
+  // Only the player, their direct coach, a coach on one of their teams, or a
+  // linked guardian may see this clip. Everyone else gets a 404.
+  const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id)
+  if (!access.allowed) notFound()
+
+  // Everything above runs before any HTML is sent, so notFound() and redirect()
+  // produce real 404 / 307 responses. The rest of the page streams in behind
+  // the skeleton.
+  return (
+    <Suspense fallback={<ClipSkeleton />}>
+      <ClipContent id={id} clip={clip} userId={user.id} aiCoachAvailable={access.via !== 'guardian'} canDeleteMetrics={canDeleteSavedMetrics(access)} canAddMetrics={canAddPitchData(access)} canEditClipKind={access.via !== 'guardian'} />
+    </Suspense>
+  )
+}
+
+type ClipRow = {
+  id: string
+  title: string
+  storage_path: string
+  created_at: string
+  session_date: string | null
+  player_id: string
+  notes: string | null
+  voice_path: string | null
+}
+
+async function ClipContent({ id, clip, userId, aiCoachAvailable, canDeleteMetrics, canAddMetrics, canEditClipKind }: {
+  id: string
+  clip: ClipRow
+  userId: string
+  /** False for guardians: they see a notice instead of the AI Coach. */
+  aiCoachAvailable: boolean
+  /** Only the player's direct coach may delete saved pitch rows / hitting data (same rule as RLS). */
+  canDeleteMetrics: boolean
+  canAddMetrics: boolean
+  canEditClipKind: boolean
+}) {
   // Fetch phase_checklist separately — returns null if column not yet migrated (error code 42703)
   let phaseChecklist: { name: string; rating: 'good' | 'needs_work' | 'critical' | null; note: string }[] | null = null
   const { data: checklistData, error: checklistError } = await supabaseAdmin
@@ -49,19 +104,30 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
-  const role = (profile?.role ?? user.user_metadata?.role ?? 'player') as 'coach' | 'player'
+  // Role comes from profiles only; user_metadata is set by the client at signup.
+  const role = (profile?.role ?? 'player') as 'coach' | 'player'
 
-  const { data: playerRow } = await supabaseAdmin
-    .from('players')
-    .select('full_name, age_group, position, coach_id, user_id')
-    .eq('id', clip.player_id)
-    .single()
+  const { data: playerRow } = await selectPlayersWithConsent<
+    { full_name: string | null; age_group: string | null; position: string | null; positions?: string[] | null } & PlayerConsentFields
+  >(
+    'full_name, age_group, position, positions',
+    (cols) => supabaseAdmin.from('players').select(cols).eq('id', clip.player_id).single(),
+  )
 
-  const access = await canViewPlayerContent(supabaseAdmin, user.id, clip.player_id)
-  if (!access.allowed) notFound()
+  // clip_kind is added in 044; a missing column is treated as null (default from positions).
+  let storedClipKind: string | null = null
+  {
+    const { data: kindData, error: kindError } = await supabaseAdmin
+      .from('clips')
+      .select('clip_kind')
+      .eq('id', id)
+      .single()
+    if (!kindError) storedClipKind = (kindData as { clip_kind: string | null } | null)?.clip_kind ?? null
+  }
+  const clipKind = resolveClipKind(storedClipKind, resolvePlayerPositions(playerRow))
 
   const { data: rawAnnotations } = await supabaseAdmin
     .from('annotations')
@@ -134,6 +200,24 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     return new Date(iso + (row.session_date ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
+  let voiceUrl: string | null = null
+  if (clip.voice_path) {
+    const { data: signedVoice } = await supabaseAdmin.storage
+      .from('clips')
+      .createSignedUrl(clip.voice_path, 3600)
+    voiceUrl = signedVoice?.signedUrl ?? null
+  }
+
+  // Every lesson for this clip, newest first (falls back to clips.lesson_path before 025).
+  const lessonAccess = await canViewPlayerContent(supabaseAdmin, userId, clip.player_id)
+  const canManage = lessonAccess.allowed && canManageLessons(lessonAccess.via)
+  let clipLessons: LessonItem[] = []
+  try {
+    clipLessons = (await loadLessons(supabaseAdmin, { clipId: id })).lessons
+  } catch (e) {
+    console.error('[clip page] lessons load failed', e)
+  }
+
   let initialReframe: { left: number; top: number; right: number; bottom: number } | null = null
   {
     const { data: rfData } = await supabaseAdmin
@@ -148,7 +232,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null; ev_90th?: number | null; distance_avg?: number | null; distance_max?: number | null; pull_rate?: number | null; oppo_rate?: number | null; gb_rate?: number | null; ld_rate?: number | null; fb_rate?: number | null; contact_rate?: number | null; whiff_rate?: number | null }
+  type HittingMetrics = { ev_avg: number | null; ev_max: number | null; launch_angle_avg: number | null; barrel_rate: number | null; hard_hit_rate: number | null; sweet_spot_rate: number | null; attack_angle: number | null; bat_speed: number | null }
   let hittingMetrics: HittingMetrics | null = null
   {
     const { data: hmData } = await supabaseAdmin
@@ -159,24 +243,12 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
     hittingMetrics = (hmData as { hitting_metrics?: HittingMetrics | null } | null)?.hitting_metrics ?? null
   }
 
-  let featuredYoutubeId: string | null = null
-  let featuredComparisonNote: string | null = null
-  {
-    const { data: featData } = await supabaseAdmin
-      .from('clips')
-      .select('featured_youtube_id, featured_comparison_note')
-      .eq('id', id)
-      .single()
-    featuredYoutubeId = (featData as { featured_youtube_id?: string | null } | null)?.featured_youtube_id ?? null
-    featuredComparisonNote = (featData as { featured_comparison_note?: string | null } | null)?.featured_comparison_note ?? null
-  }
-
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <AppHeader
         backHref="/dashboard"
-        backLabel="Back to Dashboard"
-        breadcrumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: clip.title }]}
+        backLabel="Back to dashboard"
+        breadcrumbs={[{ label: clip.title }]}
         showSignOut
       />
 
@@ -206,7 +278,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href={`/clips/compare?a=${id}`}
-              className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-sm:min-h-11"
               style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -218,7 +290,7 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
             {nextClipRow && (
               <Link
                 href={`/clips/${nextClipRow.id}`}
-                className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38vw]"
+                className="group flex items-center gap-2 text-xs text-[#3D5166] hover:text-[#1C3A5C] border border-[#DDE4ED] hover:border-[#456080] px-3 py-1.5 rounded-md transition-colors max-w-[38vw] max-sm:min-h-11"
                 style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
               >
                 <span className="truncate leading-tight">
@@ -242,55 +314,40 @@ export default async function ClipPage({ params }: { params: Promise<{ id: strin
           role={role}
           initialAnnotations={rawAnnotations ?? []}
           initialReframe={initialReframe}
+          canAddMedia={canUploadVideo(playerRow)}
+          canRecordLesson={canManage}
         />
 
-        {featuredYoutubeId && (
-          <div className="mt-4 rounded-xl overflow-hidden border border-[#DDE4ED] bg-white">
-            <div className="h-px bg-[#C8102E]" />
-            <div className="px-4 py-3 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#FFF5F5] border border-[#FBD0D6] flex items-center justify-center shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-[#C8102E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] tracking-[0.2em] text-[#C8102E] mb-0.5" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
-                  Coach&apos;s Film Study
-                </p>
-                {featuredComparisonNote && (
-                  <p className="text-sm text-[#0F1F33] mb-2 leading-snug">&ldquo;{featuredComparisonNote}&rdquo;</p>
-                )}
-                <Link
-                  href={`/clips/compare?a=${id}&b=yt:${featuredYoutubeId}`}
-                  className="inline-flex items-center gap-1.5 text-xs text-white bg-[#C8102E] hover:bg-[#9E0E24] px-3 py-1.5 rounded-md transition-colors"
-                  style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
-                  </svg>
-                  View Side-by-Side
-                </Link>
-              </div>
-            </div>
-          </div>
+        {clipLessons.length > 0 && (
+          <section className="mt-4 bg-white rounded-xl border border-[#DDE4ED] shadow-sm p-4">
+            <p className="text-[0.68rem] text-[#8096AE] tracking-widest mb-1" style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)', textTransform: 'uppercase' as const }}>
+              {role === 'coach' ? 'Lesson Recordings' : 'Lessons from your coach'} · {clipLessons.length}
+            </p>
+            <LessonList lessons={clipLessons} canManage={canManage} />
+          </section>
         )}
 
         <div className="mt-4">
-          <ErrorBoundary>
           <ClipTabs
             clipId={id}
             playerId={clip.player_id}
             role={role}
             initialNotes={clip.notes ?? null}
+            initialVoiceUrl={voiceUrl}
             initialTsNotes={tsNotes ?? []}
             initialMetrics={(rawMetrics ?? []) as Metric[]}
+            canDeleteMetrics={canDeleteMetrics}
+            canAddMetrics={canAddMetrics}
             initialChecklist={phaseChecklist}
             initialHittingMetrics={hittingMetrics}
             playerName={playerRow?.full_name ?? 'Player'}
             playerAgeGroup={playerRow?.age_group ?? null}
             playerPosition={playerRow?.position ?? null}
+            initialClipKind={clipKind}
+            canEditClipKind={canEditClipKind}
+            aiCoachAvailable={aiCoachAvailable}
+            canAddMedia={canUploadVideo(playerRow)}
           />
-          </ErrorBoundary>
         </div>
       </main>
 

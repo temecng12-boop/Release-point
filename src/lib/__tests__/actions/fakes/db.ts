@@ -5,7 +5,7 @@
 export type Row = Record<string, unknown>
 export type DbError = { code?: string; message: string }
 type Action = 'select' | 'insert' | 'update' | 'upsert' | 'delete' | 'rpc'
-type Filter = { kind: 'eq' | 'is' | 'in' | 'ilike'; column: string; value: unknown }
+type Filter = { kind: 'eq' | 'is' | 'in' | 'ilike' | 'gte' | 'neq'; column: string; value: unknown }
 export type Op = { table: string; action: Action; values?: unknown; filters: Filter[]; via: Via }
 type Via = 'admin' | 'session'
 /** Row-level security stand-in for the session client: which rows the signed-in user may touch. Unset tables are open. */
@@ -60,6 +60,8 @@ function matches(row: Row, filters: Filter[]) {
     if (f.kind === 'eq') return row[f.column] === f.value
     if (f.kind === 'is') return (row[f.column] ?? null) === f.value
     if (f.kind === 'ilike') return likeMatch(String(row[f.column] ?? ''), String(f.value))
+    if (f.kind === 'gte') return String(row[f.column] ?? '') >= String(f.value)
+    if (f.kind === 'neq') return row[f.column] !== f.value
     return (f.value as unknown[]).includes(row[f.column])
   })
 }
@@ -94,10 +96,19 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   private returning = false
   private mode: 'many' | 'single' | 'maybeSingle' = 'many'
   private max: number | undefined
+  private countExact = false
+  private headOnly = false
   private upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {}
   constructor(private table: string, private via: Via = 'admin') {}
 
-  select(columns = '*') { if (this.action === 'select') this.columns = columns; else { this.returning = true; this.columns = columns } return this }
+  select(columns = '*', opts?: { count?: string; head?: boolean }) {
+    if (this.action === 'select') {
+      this.columns = columns
+      this.countExact = opts?.count === 'exact'
+      this.headOnly = !!opts?.head
+    } else { this.returning = true; this.columns = columns }
+    return this
+  }
   insert(values: Row | Row[]) { this.action = 'insert'; this.values = values; return this }
   update(values: Row) { this.action = 'update'; this.values = values; return this }
   upsert(values: Row | Row[], opts: { onConflict?: string; ignoreDuplicates?: boolean } = {}) { this.action = 'upsert'; this.values = values; this.upsertOpts = opts; return this }
@@ -106,6 +117,8 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
   is(column: string, value: unknown) { this.filters.push({ kind: 'is', column, value }); return this }
   in(column: string, value: unknown[]) { this.filters.push({ kind: 'in', column, value }); return this }
   ilike(column: string, value: string) { this.filters.push({ kind: 'ilike', column, value }); return this }
+  gte(column: string, value: unknown) { this.filters.push({ kind: 'gte', column, value }); return this }
+  neq(column: string, value: unknown) { this.filters.push({ kind: 'neq', column, value }); return this }
   order() { return this }
   limit(n: number) { this.max = n; return this }
   single() { this.mode = 'single'; return this }
@@ -141,9 +154,11 @@ class Query implements PromiseLike<{ data: unknown; error: DbError | null }> {
       state.tables[this.table] = rows.filter(r => !out.includes(r))
     }
     if (this.max !== undefined) out = out.slice(0, this.max)
+    const count = this.countExact ? out.length : undefined
+    if (this.headOnly) return { data: null, error: null, count }
     if (this.action !== 'select' && !this.returning) return { data: null, error: null }
     const data = out.map(r => project(r, this.columns))
-    if (this.mode === 'many') return { data, error: null }
+    if (this.mode === 'many') return { data, error: null, count }
     if (data.length === 1) return { data: data[0], error: null }
     if (data.length === 0 && this.mode === 'maybeSingle') return { data: null, error: null }
     return { data: null, error: { code: 'PGRST116', message: `JSON object requested, ${data.length} rows returned` } }

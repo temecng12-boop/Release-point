@@ -6,6 +6,7 @@ import UploadButton from './upload-button'
 import CreateTeamButton from './create-team-button'
 import CoachOnboardingWizard from './onboarding-wizard'
 import ActivityFeed from './activity-feed'
+import { loadActivityClips } from '@/lib/activity-feed'
 import AppHeader from '@/components/app-header'
 import MobileNav from '@/components/mobile-nav'
 import SiteFooter from '@/components/SiteFooter'
@@ -75,14 +76,8 @@ export default async function DashboardPage() {
   const directPlayerIds = (directPlayers ?? []).map(p => p.id)
   const allPlayerIds = [...new Set([...allTeamPlayerIds, ...directPlayerIds])]
 
-  // All clips across all players
-  const { data: allClips } = isCoach && allPlayerIds.length > 0
-    ? await supabaseAdmin
-        .from('clips')
-        .select('id, title, created_at, session_date, player_id')
-        .in('player_id', allPlayerIds)
-        .order('created_at', { ascending: false })
-    : { data: [] }
+  // All clips the caller may see (roster + teams). Never another coach's.
+  const allClips = isCoach ? await loadActivityClips(user.id) : []
 
   // Per-team stats computed in JS
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

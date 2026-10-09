@@ -96,19 +96,39 @@ export async function GET(request: NextRequest) {
 
   const { linkedPlayers } = await finishInviteAcceptance(supabaseAdmin, user)
 
-  // Assistant coach invite: join_team param encodes the team to join
+  // Assistant-coach invite: join_team is the team the organizer invited them
+  // to. Never trust the query alone — a pending coach_invites row must exist
+  // for this email, and that inviter must be the organizer of that team.
   const joinTeam = searchParams.get('join_team')
-  if (joinTeam) {
-    const { error: joinErr } = await supabaseAdmin
-      .from('team_coaches')
-      .upsert(
-        { team_id: joinTeam, coach_id: user.id, role: 'assistant' },
-        { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
-      )
-    if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
+  if (joinTeam && user.email && (await findInviteForEmail(supabaseAdmin, user.email)) === 'coach') {
+    const { data: inviteRow } = await supabaseAdmin
+      .from('coach_invites')
+      .select('invited_by')
+      .ilike('email', user.email)
+      .is('accepted_at', null)
+      .maybeSingle()
+    const invitedBy = (inviteRow as { invited_by?: string } | null)?.invited_by
+    const { data: membership } = invitedBy
+      ? await supabaseAdmin
+          .from('team_coaches')
+          .select('role')
+          .eq('team_id', joinTeam)
+          .eq('coach_id', invitedBy)
+          .maybeSingle()
+      : { data: null }
+    if (membership?.role === 'organizer') {
+      const { error: joinErr } = await supabaseAdmin
+        .from('team_coaches')
+        .upsert(
+          { team_id: joinTeam, coach_id: user.id, role: 'assistant' },
+          { onConflict: 'team_id,coach_id', ignoreDuplicates: true },
+        )
+      if (joinErr) console.error('[auth/confirm] join_team insert failed', { code: joinErr.code })
+    } else {
+      console.warn('[auth/confirm] join_team refused: inviter is not organizer of that team', { joinTeam })
+    }
   }
 
-  // Brand-new coaches go to the dedicated onboarding page.
   if (isBrandNewUser(user) && linkedPlayers.length === 0 && !joinTeam) {
     const { data: newProfile } = await supabaseAdmin
       .from('profiles')

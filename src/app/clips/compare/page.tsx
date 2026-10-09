@@ -90,20 +90,20 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
 
   // Picker mode — only clipA loaded (b missing)
   if (!b) {
-    // Get the player that clip A belongs to, then only show that player's
-    // other clips in the library (YouTube search/URL paste are unrestricted).
-    const { data: clipARecord } = await supabaseAdmin
-      .from('clips').select('player_id').eq('id', a).single()
-    const sourcePlayerId = clipARecord?.player_id
-
+    // Load all accessible clips except the source
     let allClips: { id: string; title: string; created_at: string; session_date: string | null; player_id: string }[] = []
 
     if (role === 'coach') {
-      if (sourcePlayerId) {
+      const { data: players } = await supabaseAdmin
+        .from('players')
+        .select('id')
+        .eq('coach_id', user.id)
+      const playerIds = (players ?? []).map(p => p.id)
+      if (playerIds.length > 0) {
         const { data } = await supabaseAdmin
           .from('clips')
           .select('id, title, created_at, session_date, player_id')
-          .eq('player_id', sourcePlayerId)
+          .in('player_id', playerIds)
           .neq('id', a)
           .order('created_at', { ascending: false })
           .limit(50)
@@ -191,7 +191,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         showSignOut
       />
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6">
-        <ComparePlayer clips={clips} role={role} />
+        <ComparePlayer clips={clips} />
       </main>
       <SiteFooter variant="app" />
     </div>
