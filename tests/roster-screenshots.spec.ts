@@ -45,8 +45,8 @@ test.describe('roster screenshots', () => {
     await expect(page.getByTestId('minor-consent')).toHaveCount(0)
     await form.screenshot({ path: join(OUT, `add-player-${tag}.png`) })
 
-    await page.getByLabel('Birth Month *').selectOption('1')
-    await page.getByLabel('Birth Year *').fill('2011')
+    await form.locator('select[name="birth_month"]').selectOption('1')
+    await form.locator('input[name="birth_year"]').fill('2011')
     const consent = page.getByTestId('minor-consent')
     await expect(consent).toBeVisible()
     await expect(consent.getByText("I'm this player's parent/guardian.")).toBeVisible()
@@ -75,8 +75,8 @@ test.describe('roster screenshots', () => {
     const tag = isIphone(info.project.name) ? '375' : '1280'
     await page.goto('/privacy')
     await expect(page.getByText('including assistant coaches').first()).toBeVisible()
-    await expect(page.getByText('Roster-only players')).toBeVisible()
-    await page.getByText('Roster-only players').scrollIntoViewIfNeeded()
+    await expect(page.getByText('Roster-only players', { exact: true })).toBeVisible()
+    await page.getByText('Roster-only players', { exact: true }).scrollIntoViewIfNeeded()
     await page.screenshot({ path: join(OUT, `privacy-roster-${tag}.png`), fullPage: false })
 
     await page.goto('/about')
