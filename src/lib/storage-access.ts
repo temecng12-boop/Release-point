@@ -8,13 +8,14 @@
 // so the first folder maps the path to its player. Access then follows
 // canViewPlayerContent (src/lib/clip-access.ts):
 //   read:  the player, direct coach, linked guardian, or team coach
-//   write: the player's own (direct) coach; the player themself for their
-//          own folder in the clips bucket (self-upload). Team coaches and
-//          guardians get read links only (no team upload screen yet). Lessons
-//          are direct-coach only.
+//   write: the player's own (direct) coach, a coach on a team that includes
+//          the player (including assistants), or the player themself for
+//          their own folder in the clips bucket (self-upload). Guardians
+//          get read links only unless they are also a team coach. Lessons
+//          follow the same coach write rule.
 // Team access is skipped (not an error) if team_coaches / player_teams can't
 // be read, e.g. migration 018 not applied.
-import { canViewPlayerContent } from './clip-access'
+import { canViewPlayerContent, teamCoachAccess, type AccessDb } from './clip-access'
 
 export type StorageBucket = 'clips' | 'lessons'
 export type StorageMode = 'read' | 'write'
@@ -75,20 +76,22 @@ export async function decideStorageAccess(
   if (!access.allowed) return { allowed: false, reason: 'no access to player', teamCheck: access.teamCheck }
   if (mode === 'read') return { allowed: true, playerId: parsed.playerId, via: access.via, teamCheck: access.teamCheck }
 
-  // write: direct coach, or the player in their own clips folder. Team
-  // coaches and guardians are read-only. Lesson files: the direct coach only,
-  // so nobody else can get an upload link (and leave an orphan file).
-  if (bucket === 'lessons') {
-    return access.via === 'coach'
-      ? { allowed: true, playerId: parsed.playerId, via: 'coach', teamCheck: access.teamCheck }
-      : { allowed: false, reason: 'lessons: direct coach only', teamCheck: access.teamCheck }
-  }
-  if (access.via === 'coach') {
-    return { allowed: true, playerId: parsed.playerId, via: 'coach', teamCheck: access.teamCheck }
+  // write: direct coach or a team coach (including assistants). The player
+  // may write in their own clips folder. Guardians are read-only unless they
+  // are also a team coach (re-checked below — canViewPlayerContent returns
+  // 'guardian' first).
+  if (access.via === 'coach' || access.via === 'team_coach') {
+    return { allowed: true, playerId: parsed.playerId, via: access.via, teamCheck: access.teamCheck }
   }
   if (access.via === 'player') {
     if (bucket === 'clips') return { allowed: true, playerId: parsed.playerId, via: 'player', teamCheck: access.teamCheck }
     return { allowed: false, reason: 'lessons are coach-only', teamCheck: access.teamCheck }
+  }
+  if (access.via === 'guardian') {
+    const team = await teamCoachAccess(client as AccessDb, userId, parsed.playerId, null)
+    if (team === 'yes') {
+      return { allowed: true, playerId: parsed.playerId, via: 'team_coach', teamCheck: 'ok' }
+    }
   }
   return { allowed: false, reason: 'read-only access', teamCheck: access.teamCheck }
 }

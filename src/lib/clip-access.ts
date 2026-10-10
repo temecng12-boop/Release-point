@@ -36,22 +36,21 @@ export type ClipAccess =
   | { allowed: false; teamCheck: 'ok' | 'unavailable' | 'skipped' }
 
 /**
- * Delete buttons for saved pitch rows and hitting data: only the player's
- * direct coach (players.coach_id), the same rule pitch_metrics RLS enforces.
- * Team coaches, the player and guardians can view but not delete.
+ * Delete buttons for saved pitch rows and hitting data: the player's direct
+ * coach or a coach on a team that includes the player. The player and
+ * guardians can view but not delete.
  */
 export function canDeleteSavedMetrics(access: ClipAccess): boolean {
-  return access.allowed && access.via === 'coach'
+  return access.allowed && (access.via === 'coach' || access.via === 'team_coach')
 }
 
 /**
  * Adding pitch data (manual entry, CSV and TrackMan PDF import): the player's
- * direct coach or the player themself, the rule importPitchMetrics and
- * addPitchMetric check on the server. Team coaches are read-only (031) and
- * guardians only view.
+ * direct coach, a team coach (including assistants), or the player themself.
+ * Guardians only view.
  */
 export function canAddPitchData(access: ClipAccess): boolean {
-  return access.allowed && (access.via === 'coach' || access.via === 'player')
+  return access.allowed && (access.via === 'coach' || access.via === 'team_coach' || access.via === 'player')
 }
 
 /** Pure decision for the direct relationships (no team lookup). */

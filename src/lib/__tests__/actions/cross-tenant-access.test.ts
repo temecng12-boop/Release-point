@@ -15,12 +15,15 @@ import { loadActivityClips } from '../../activity-feed'
 import { approveWaitlistAsCoach } from '../../../app/actions/admin'
 import { loadAdminWaitlistPage } from '../../admin-waitlist'
 import { invitePlayer, resendPlayerInvite } from '../../../app/actions/invite'
+import { addPitchMetric } from '../../../app/actions/clips'
+import { deletePlayer } from '../../../app/actions/player'
 import { inviteAssistantCoach } from '../../../app/actions/invite-coach'
 import { addCoachToTeam, removeCoachFromTeam } from '../../../app/actions/team-coaches'
 import { parseTrackmanPDF } from '../../../app/actions/import-pdf'
 import { forbidden } from '../../http-forbidden'
 
 const PA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const PA2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab'
 const PB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const CA = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const CB = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
@@ -28,6 +31,7 @@ const TEAM_A = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 const TEAM_B = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
 const COACH_A = { id: 'coach-a', email: 'a@example.com' }
 const COACH_B = { id: 'coach-b', email: 'b@example.com' }
+const ASST = { id: 'coach-asst', email: 'asst@example.com' }
 const PATH_A = `${PA}/1700000000000.mp4`
 const PATH_B = `${PB}/1700000000000.mp4`
 const T = '2026-01-01T00:00:00Z'
@@ -46,12 +50,19 @@ function seed(user: { id: string; email: string } | null) {
       profiles: [
         { id: COACH_A.id, role: 'coach', full_name: 'Coach A', is_platform_admin: false },
         { id: COACH_B.id, role: 'coach', full_name: 'Coach B', is_platform_admin: false },
+        { id: ASST.id, role: 'coach', full_name: 'Asst A', is_platform_admin: false },
       ],
       players: [
         {
           id: PA, coach_id: COACH_A.id, user_id: 'player-a', guardian_id: null, team_id: TEAM_A,
           email: 'pa@example.com', full_name: 'Player A', accepted_at: null,
           adult_confirmed_at: T, consent_given_at: null, age_band: '18_plus',
+          age_confirmed_at: T, age_screen_at: T,
+        },
+        {
+          id: PA2, coach_id: COACH_A.id, user_id: null, guardian_id: null, team_id: null,
+          email: null, full_name: 'Off Team', accepted_at: null,
+          adult_confirmed_at: T, consent_given_at: null, age_band: '18_plus', age_band_coach: '18_plus',
           age_confirmed_at: T, age_screen_at: T,
         },
         {
@@ -71,6 +82,7 @@ function seed(user: { id: string; email: string } | null) {
       ],
       team_coaches: [
         { team_id: TEAM_A, coach_id: COACH_A.id, role: 'organizer' },
+        { team_id: TEAM_A, coach_id: ASST.id, role: 'assistant' },
         { team_id: TEAM_B, coach_id: COACH_B.id, role: 'organizer' },
       ],
       player_teams: [
@@ -167,7 +179,7 @@ test('add-player: coach A cannot attach a player to coach B\'s team_id', async (
     birth_year: TEEN_YEAR,
   }))
   assert.equal(r.error, 'Invalid team')
-  assert.equal(state.tables.players.length, 2)
+  assert.equal(state.tables.players.length, 3)
   assert.equal(state.tables.player_teams.length, 2)
 })
 
@@ -189,11 +201,11 @@ test('assistant-coach add/revoke: coach A cannot change staff on coach B\'s team
   state.tables.profiles.push({ id: 'coach-x', role: 'coach', full_name: 'X' })
   const added = await addCoachToTeam(undefined, form({ team_id: TEAM_B, coach_email: 'x@example.com' }))
   assert.equal(added.error, 'Only the team organizer can add coaches')
-  assert.equal(state.tables.team_coaches.length, 2)
+  assert.equal(state.tables.team_coaches.length, 3)
 
   const removed = await removeCoachFromTeam(TEAM_B, COACH_B.id)
   assert.equal(removed.error, 'Only the team organizer can remove coaches')
-  assert.equal(state.tables.team_coaches.length, 2)
+  assert.equal(state.tables.team_coaches.length, 3)
 })
 
 test('TrackMan import: coach A is refused for coach B\'s clip', async () => {
@@ -219,4 +231,60 @@ test('setPinnedComparison: coach A cannot pin on coach B\'s clip', async () => {
   const r = await setPinnedComparison(CB, 'abc123', 'note')
   assert.equal((r as { error?: string }).error, 'Not authorized')
   assert.equal(state.tables.clips.find((c) => c.id === CB)?.featured_youtube_id, undefined)
+})
+
+const pitch = {
+  pitch_type: 'Fastball',
+  velocity: 90,
+  spin_rate: 2200,
+  spin_axis: 180,
+  horizontal_break: 10,
+  vertical_break: 15,
+  extension: 6,
+  vaa: -5,
+}
+
+test('assistant on team A can upload, createClip, pin, and add metrics for a team player', async () => {
+  seed(ASST)
+  const signed = await getSignedUploadUrl(PATH_A)
+  assert.equal((signed as { error?: string }).error, undefined)
+  assert.ok((signed as { signedUrl?: string }).signedUrl)
+
+  const created = await createClip({ player_id: PA, storage_path: `${PA}/asst.mp4`, title: 'Asst clip', session_date: null })
+  assert.equal((created as { error?: string }).error, undefined)
+  assert.ok(state.tables.clips.some((c) => c.title === 'Asst clip' && c.player_id === PA))
+
+  const pin = await setPinnedComparison(CA, 'abc123', 'side by side')
+  assert.equal((pin as { error?: string }).error, undefined)
+  assert.equal(state.tables.clips.find((c) => c.id === CA)?.featured_youtube_id, 'abc123')
+
+  const metric = await addPitchMetric(CA, pitch)
+  assert.equal((metric as { error?: string }).error, undefined)
+  assert.equal(state.tables.pitch_metrics?.length, 1)
+})
+
+test('assistant on team A cannot write for another team\'s player', async () => {
+  seed(ASST)
+  const signed = await quiet(() => getSignedUploadUrl(PATH_B))
+  assert.match(String((signed as { error?: string }).error), /don.t have access to this file/)
+  const created = await createClip({ player_id: PB, storage_path: PATH_B, title: 'Stolen', session_date: null })
+  assert.equal((created as { error?: string }).error, 'Not authorized')
+  const pin = await setPinnedComparison(CB, 'abc123', 'note')
+  assert.equal((pin as { error?: string }).error, 'Not authorized')
+  const metric = await addPitchMetric(CB, pitch)
+  assert.equal((metric as { error?: string }).error, 'Not authorized')
+})
+
+test('assistant cannot write for the head coach\'s off-team roster player', async () => {
+  seed(ASST)
+  const created = await createClip({ player_id: PA2, storage_path: `${PA2}/1.mp4`, title: 'Off team', session_date: null })
+  assert.equal((created as { error?: string }).error, 'Not authorized')
+  assert.ok(!state.ops.some((o) => o.table === 'clips' && o.action === 'insert'))
+})
+
+test('assistant cannot delete a team player (head-coach-only)', async () => {
+  seed(ASST)
+  const r = await deletePlayer(PA)
+  assert.equal((r as { error?: string }).error, 'Player not found')
+  assert.ok(state.tables.players.some((p) => p.id === PA))
 })

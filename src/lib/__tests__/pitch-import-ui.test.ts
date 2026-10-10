@@ -2,8 +2,8 @@
  * Pitch import after migration 035: the CSV and TrackMan PDF imports go through
  * the importPitchMetrics server action (no browser insert, which RLS refuses
  * for players and team coaches after 035), the table changes only after the
- * server confirmed, and entry/import is shown only to the direct coach or the
- * player (team coaches are read-only under 031).
+ * server confirmed, and entry/import is shown to the direct coach, a coach
+ * on the player's team, or the player.
  * Run with: npx tsx --test src/lib/__tests__/pitch-import-ui.test.ts
  */
 import { test } from 'node:test'
@@ -16,11 +16,11 @@ import { csvImportFrom, validatePitchImport, pitchAxisError, importTooBig, impor
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8')
 const between = (src: string, a: string, b: string) => src.slice(src.indexOf(a), src.indexOf(b, src.indexOf(a)))
 
-test('canAddPitchData: direct coach and the player only', () => {
+test('canAddPitchData: direct coach, team coach, and the player', () => {
   const a = (via: 'player' | 'coach' | 'guardian' | 'team_coach'): ClipAccess => ({ allowed: true, via, teamCheck: 'ok' })
   assert.equal(canAddPitchData(a('coach')), true)
   assert.equal(canAddPitchData(a('player')), true)
-  assert.equal(canAddPitchData(a('team_coach')), false)
+  assert.equal(canAddPitchData(a('team_coach')), true)
   assert.equal(canAddPitchData(a('guardian')), false)
   assert.equal(canAddPitchData({ allowed: false, teamCheck: 'ok' }), false)
 })
@@ -101,7 +101,7 @@ test('both imports check the size BEFORE calling the server and show the message
 })
 
 // ── Hitting tab ─────────────────────────────────────────────────────────────
-test('hitting tab: edit form and save only with canEdit (team coaches read-only); save result checked', () => {
+test('hitting tab: edit form and save only with canEdit (direct or team coach); save result checked', () => {
   const src = read('app/clips/[id]/hitting-metrics-tab.tsx')
   assert.match(src, /const isCoach = role === 'coach' && canEdit/)
   // Every edit control is behind isCoach.

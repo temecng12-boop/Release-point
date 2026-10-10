@@ -63,7 +63,7 @@ We reserve the right to suspend or terminate accounts that violate these terms.`
             title: '4. Your Content',
             body: `You own the videos, metrics, notes, and other content you upload to Release Point AI. By uploading content, you grant us a limited license to store and process that content to provide the platform's services.
 
-We do not claim ownership of your content. A player's video can be seen by the player, the player's direct coach, the other coaches on teams the player is on (including assistant coaches), and the player's linked guardian. We share content with service providers only as described in our Privacy Policy.
+We do not claim ownership of your content. A player's video can be seen by the player, the player's direct coach, the other coaches on teams the player is on (including assistant coaches), and the player's linked guardian. A player's video can be uploaded by the player's direct coach, the coaches on teams the player is on (including assistant coaches), and the player. We share content with service providers only as described in our Privacy Policy.
 
 You are responsible for the content you upload and for having the right to upload it. A coach can't give permission on behalf of a parent or guardian.`,
           },

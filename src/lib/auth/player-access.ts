@@ -7,8 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { canUploadForPlayerWith } from './upload-access'
 
 /**
- * True if `userId` may UPLOAD media for this player: only the player's own
- * coach or the player themself. See ./upload-access.ts.
+ * True if `userId` may UPLOAD media for this player: the player's own coach,
+ * a coach on a team that includes the player, or the player themself.
+ * See ./upload-access.ts.
  */
 export async function canUploadForPlayer(userId: string, playerId: string): Promise<boolean> {
   return canUploadForPlayerWith(supabaseAdmin, userId, playerId)

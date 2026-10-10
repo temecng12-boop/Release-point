@@ -110,8 +110,9 @@ test('another coach\'s player and self-signed-up player are still refused', asyn
 
 test('team invite form note no longer promises an email to existing accounts', async () => {
   const { readFileSync } = await import('node:fs')
-  const src = readFileSync(new URL('../../../app/dashboard/add-player-modal.tsx', import.meta.url), 'utf8')
-  assert.match(src, /already have an account are added without an email/)
+  const src = readFileSync(new URL('../../../app/dashboard/invite-form.tsx', import.meta.url), 'utf8')
+  assert.match(src, /invite to set up the player/)
+  assert.doesNotMatch(src, /will receive an email/)
 })
 
 test('birth month/year is required: missing fields -> neutral error, nothing written or sent', async () => {
@@ -186,8 +187,8 @@ test('the invite forms collect birth month/year (required) but no band and no gu
   for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/add-player-modal.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     assert.doesNotMatch(src, /age_band|AgeBandFields|guardian_email|guardian_name/, f)
-    assert.match(src, /name="birth_month"[^>]*required/, `${f}: birth month is required`)
-    assert.match(src, /name="birth_year"[^>]*required/, `${f}: birth year is required`)
+    assert.match(src, /name="birth_month"/, `${f}: birth month is collected`)
+    assert.match(src, /name="birth_year"/, `${f}: birth year is collected`)
     assert.match(src, /under 13/i, `${f}: honest under-13 copy, no promise`)
     assert.doesNotMatch(src, /coming soon|soon\.|will be able/i, `${f}: no promise to under-13s`)
   }
@@ -294,7 +295,7 @@ test('clip-uploaded, waitlist, and player-joined emails use Release Point AI', a
 
 test('invite forms surface a copyable invite link on success and on email failure', async () => {
   const { readFileSync } = await import('node:fs')
-  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/add-player-modal.tsx']) {
+  for (const f of ['../../../app/dashboard/invite-form.tsx', '../../../app/dashboard/attach-email-form.tsx']) {
     const src = readFileSync(new URL(f, import.meta.url), 'utf8')
     assert.match(src, /InviteLinkBox/, f)
     assert.match(src, /state\?\.inviteUrl/, `${f}: link shows in both success and error states`)

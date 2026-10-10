@@ -40,9 +40,14 @@ ${UNDER_13_POLICY_BODY}
 - **AI Coach:** teens can currently use AI Coach. Chat sends text, never video or audio, to our AI provider, Anthropic (see "Service providers"). Clip analysis also sends still frames from a clip.
 - **Removing content:** teens can delete clips they uploaded themselves. They can also email **privacy@releasepointai.com** to ask us to remove anything they posted, or to delete their account and data.
 
+**Roster-only players**
+
+- Roster-only players are managed by their coaches, have no account, and have no email unless a coach adds one.
+- For a roster-only player 13 to 17, the coach's recorded parent or guardian permission is what allows video. The coach records either that they are the player's parent or guardian, or that they have written permission from the parent or guardian to upload video. Once that player creates an account, their own age answer and the existing account rules apply.
+
 **Coaches**
 
-- Coaches must give each player's correct age group and must not add a child under 13. A coach can't give permission on behalf of a parent, and Release Point AI doesn't treat a coach's action as a parent's permission.
+- Coaches must give each player's correct age group and must not add a child under 13. A coach can't give permission on behalf of a parent for anyone under 13, and Release Point AI doesn't treat a coach's action as a parent's permission for children under 13.
 
 **Contact**
 

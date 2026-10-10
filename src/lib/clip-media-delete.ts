@@ -1,8 +1,10 @@
 // Removing a clip's coach voice note (clips bucket) or lesson recording
-// (lessons bucket): only the player's own (direct) coach, the same rule as
-// saving them. Team coaches, the player and guardians can't. Files are removed
-// only if the stored path is that player's/clip's own voice or lesson file.
-import { isPlayersOwnCoach } from './auth/roster-access'
+// (lessons bucket): the player's direct coach or a coach on a team that
+// includes the player, the same rule as saving them. The player and
+// guardians can't. Files are removed only if the stored path is that
+// player's/clip's own voice or lesson file.
+import { canCoachWriteForPlayerWith } from './auth/coach-write-access'
+import type { AccessDb } from './clip-access'
 import { isLessonPathFor } from './lesson-path'
 import { isVoicePathFor } from './voice-path'
 
@@ -32,8 +34,7 @@ export async function removeClipMediaAsOwnCoach(client: unknown, userId: string 
   const { data: clip } = await db.from('clips').select(`player_id, ${k.column}`).eq('id', clipId).maybeSingle()
   const row = clip as Record<string, string | null> | null
   if (!row?.player_id) return { error: 'Clip not found' }
-  const { data: player } = await db.from('players').select('coach_id').eq('id', row.player_id).maybeSingle()
-  if (!isPlayersOwnCoach(userId, player as { coach_id: string | null } | null)) return { error: 'Not authorized' }
+  if (!(await canCoachWriteForPlayerWith(client as AccessDb, userId, row.player_id))) return { error: 'Not authorized' }
   const path = row[k.column]
   if (path && k.valid(path, row.player_id, clipId)) {
     const { error } = await db.storage.from(k.bucket).remove([path])

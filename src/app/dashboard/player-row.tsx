@@ -38,6 +38,8 @@ interface Player {
   age_band_pending_migration?: boolean
   age_band_coach?: string | null
   age_band_self?: string | null
+  user_id?: string | null
+  roster_video_consent?: boolean
   teamIds: string[]
 }
 
@@ -46,8 +48,10 @@ interface Props {
   clips: Clip[]
   teams: Team[]
   sessions: BullpenSession[]
-  /** True if the viewer is this player's coach. Only the coach can add video. */
+  /** True if the viewer is this player's direct coach (edit / identity). */
   isOwnPlayer?: boolean
+  /** True if the viewer may upload and work the player's film (team coaches included). */
+  canWrite?: boolean
 }
 
 function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
@@ -55,7 +59,7 @@ function fmtDate(sessionDate: string | null | undefined, createdAt: string) {
   return new Date(iso + (sessionDate ? 'T12:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer = true }: Props) {
+export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer = true, canWrite = isOwnPlayer }: Props) {
   const [editOpen, setEditOpen]         = useState(false)
   const [bullpenOpen, setBullpenOpen]   = useState(false)
   const [confirmClip, setConfirmClip]   = useState<string | null>(null)
@@ -115,7 +119,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
               )}
               <PositionTags player={player} />
             </div>
-            <p className="text-xs text-[#456080] mt-0.5">{player.email}</p>
+            <p className="text-xs text-[#456080] mt-0.5">{player.email || 'No email yet'}</p>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 ml-2 sm:ml-3 shrink-0">
@@ -126,10 +130,11 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                   : 'bg-[#EEF2F7] text-[#456080]'
               }`}
               style={{ fontFamily: 'var(--font-oswald, Oswald, sans-serif)' }}
+              data-testid={!player.accepted_at && !player.email ? 'roster-only-badge' : undefined}
             >
-              {player.accepted_at ? 'Joined' : 'Invited'}
+              {player.accepted_at ? 'Joined' : player.email ? 'Invited' : 'Roster only'}
             </span>
-            {!player.accepted_at && isOwnPlayer && (
+            {!player.accepted_at && player.email && canWrite && (
               <button
                 type="button"
                 onClick={handleResend}
@@ -139,12 +144,14 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                 {resending ? 'Sending…' : 'Resend'}
               </button>
             )}
+            {isOwnPlayer && (
             <button
               onClick={() => setEditOpen(true)}
               className="text-[10px] sm:text-xs bg-[#EEF2F7] hover:bg-[#DDE4ED] text-[#456080] hover:text-[#0F1F33] px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors border border-[#DDE4ED] max-sm:min-h-11 max-sm:min-w-11"
             >
               Edit
             </button>
+            )}
             <button
               onClick={() => setBullpenOpen(true)}
               title="Log a bullpen session: track pitch types, velo, spin, and coach notes"
@@ -156,7 +163,7 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
                 <span className="text-[9px] bg-[#1C3A5C] text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">{sessions.length}</span>
               )}
             </button>
-            {isOwnPlayer && (
+            {canWrite && (
               <>
                 <RecordButton playerId={player.id} playerName={player.full_name} consent={player} />
                 <UploadButton playerId={player.id} playerName={player.full_name} consent={player} showBlockedNotice={false} maxFiles={50} />
@@ -165,15 +172,15 @@ export default function PlayerRow({ player, clips, teams, sessions, isOwnPlayer 
           </div>
         </div>
 
-        {!isOwnPlayer && (
-          <p className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#3D5166]">Only this player&apos;s coach can add video.</p>
+        {!canWrite && (
+          <p className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#3D5166]">Only this player&apos;s coaches can add video.</p>
         )}
 
         {resendMsg && (
           <p role="status" className="px-4 py-2 border-b border-[#DDE4ED] text-xs text-[#456080]">{resendMsg}</p>
         )}
 
-        {isOwnPlayer && !uploadAllowed && (
+        {canWrite && !uploadAllowed && (
           <div className="px-4 py-2 border-b border-[#DDE4ED]">
             <UploadBlockedNotice viewer="coach" reason={reason ?? undefined} />
           </div>

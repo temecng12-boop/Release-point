@@ -99,21 +99,20 @@ test('direct coach reads and writes clips and lessons', async () => {
   }
 })
 
-test('team (assistant) coach gets read links only', async () => {
+test('team (assistant) coach gets read and write links for clips and lessons', async () => {
   const db = fakeDb(base())
   assert.equal(await allowed(db, ASST, 'clips', tsVoice, 'read'), true)
   assert.equal(await allowed(db, ASST, 'lessons', lesson, 'read'), true)
   const r = await decideStorageAccess(db, ASST, 'clips', clipUpload, 'write')
-  assert.deepEqual(r, { allowed: false, reason: 'read-only access', teamCheck: 'ok' })
-  assert.equal(await allowed(db, ASST, 'lessons', lesson, 'write'), false)
-  assert.deepEqual(await decideStorageAccess(db, ASST, 'lessons', lesson, 'write'), { allowed: false, reason: 'lessons: direct coach only', teamCheck: 'ok' })
+  assert.equal(r.allowed, true)
+  assert.equal(await allowed(db, ASST, 'lessons', lesson, 'write'), true)
 })
 
-test('lessons upload links: direct coach only, even for the team organizer who is not the direct coach', async () => {
+test('lessons upload links: team organizer who is not the direct coach can still write', async () => {
   const t = base()
   ;(t.players as Record<string, unknown>[])[0].coach_id = null     // P1 now has no direct coach
   const db = fakeDb(t)
-  assert.equal(await allowed(db, OWNER, 'lessons', lesson, 'write'), false)   // organizer via team only
+  assert.equal(await allowed(db, OWNER, 'lessons', lesson, 'write'), true)   // organizer via team
   assert.equal(await allowed(db, OWNER, 'lessons', lesson, 'read'), true)
   assert.equal(await allowed(fakeDb(base()), OWNER, 'lessons', lesson, 'write'), true)
 })
@@ -127,11 +126,11 @@ test('guardian is read-only', async () => {
   assert.equal(await allowed(db, GUARD, 'lessons', lesson, 'write'), false)
 })
 
-test('guardian who is also a team coach of the player is still read-only', async () => {
+test('guardian who is also a team coach of the player can write', async () => {
   const db = fakeDb(base())
   assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'read'), true)
-  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), false)
-  assert.equal(await allowed(db, GUARD_COACH, 'lessons', `${P2}/c/lesson.webm`, 'write'), false)
+  assert.equal(await allowed(db, GUARD_COACH, 'clips', `${P2}/1.mp4`, 'write'), true)
+  assert.equal(await allowed(db, GUARD_COACH, 'lessons', `${P2}/c/lesson.webm`, 'write'), true)
 })
 
 test('stranger, off-team coach and signed-out caller are denied', async () => {

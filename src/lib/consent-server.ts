@@ -200,8 +200,8 @@ export async function playerAgeGroups(db: Db, player: { id: string; age_group?: 
  * before migration 023 (see above), when uploads are allowed as before.
  */
 export async function checkUploadConsent(db: Db, playerId: string): Promise<ConsentCheck> {
-  const { data, error } = await selectPlayersWithConsent<PlayerConsentFields & { id: string }>(
-    'id',
+  const { data, error } = await selectPlayersWithConsent<PlayerConsentFields & { id: string; user_id?: string | null }>(
+    'id, user_id',
     (cols) => db.from('players').select(cols).eq('id', playerId).maybeSingle(),
   )
   if (error) {
@@ -209,7 +209,23 @@ export async function checkUploadConsent(db: Db, playerId: string): Promise<Cons
     return { ok: false, error: 'Could not check consent status for this player.' }
   }
   if (!data) return { ok: false, error: 'Player not found' }
-  if (!canUploadVideo(data)) return { ok: false, error: UPLOAD_BLOCKED_MESSAGE }
+  let row = data
+  if (row.user_id === null && (row.age_band_coach === '13_17' || row.age_band === '13_17')) {
+    const { data: consents, error: consentError } = await db
+      .from('player_video_consents')
+      .select('id')
+      .eq('player_id', playerId)
+      .limit(1)
+    if (consentError && !isMissingColumnError(consentError, 'player_id')) {
+      // Table missing (046 not pasted): treat as no roster consent.
+      if (!/could not find the table|does not exist|PGRST205|42P01/i.test(consentError.message ?? '')) {
+        console.error('[checkUploadConsent] could not read roster consent', playerId, consentError.message)
+        return { ok: false, error: 'Could not check consent status for this player.' }
+      }
+    }
+    row = { ...row, roster_video_consent: Array.isArray(consents) && consents.length > 0 }
+  }
+  if (!canUploadVideo(row)) return { ok: false, error: UPLOAD_BLOCKED_MESSAGE }
   return { ok: true }
 }
 

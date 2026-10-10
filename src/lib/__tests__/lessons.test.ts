@@ -72,10 +72,11 @@ test('save: direct coach adds a row, keeps older lessons and files, points clips
   assert.deepEqual(f.removed, [])   // never deletes older lesson files
 })
 
-test('save: direct coach only; team assistant, player, guardian, off-team coach and signed-out denied', async () => {
+test('save: direct coach and team assistant; player, guardian, off-team coach and signed-out denied', async () => {
   const path = newLessonPath(P1, C1, 'video/mp4')
   assert.deepEqual(await saveLessonRecord(fakeSupabase(world()).client, COACH, C1, path), { success: true })
-  for (const who of [ASST, PLAYER, GUARD, OFF]) {
+  assert.deepEqual(await saveLessonRecord(fakeSupabase(world()).client, ASST, C1, path), { success: true })
+  for (const who of [PLAYER, GUARD, OFF]) {
     const f = fakeSupabase(world())
     assert.deepEqual(await saveLessonRecord(f.client, who, C1, path), { error: LESSON_DENIED }, who)
     assert.equal((f.tables.lessons as unknown[]).length, 0)
@@ -144,20 +145,19 @@ test('loadLessons: by player and clip with coach names; falls back to clips.less
   assert.deepEqual(legacy.lessons.map(l => [l.id, l.media_path]), [[`legacy:${C1}`, `${P1}/${C1}/lesson.webm`]])
 })
 
-test('save/delete: team assistant can view but not save or delete (direct coach only)', async () => {
+test('save/delete: team assistant can save and delete on a team player', async () => {
   const f = fakeSupabase(world())
   const path = newLessonPath(P1, C1, 'video/webm', 1, 'x')
-  assert.deepEqual(await saveLessonRecord(f.client, ASST, C1, path), { error: LESSON_DENIED })
-  await saveLessonRecord(f.client, COACH, C1, path)
+  assert.deepEqual(await saveLessonRecord(f.client, ASST, C1, path), { success: true })
   const id = (f.tables.lessons as Record<string, unknown>[])[0].id as string
-  assert.deepEqual(await deleteLessonRecord(f.client, ASST, id), { error: LESSON_DENIED })
-  assert.deepEqual(f.removed, [])
+  assert.deepEqual(await deleteLessonRecord(f.client, ASST, id), { success: true, clipId: C1 })
+  assert.deepEqual(f.removed, [`lessons:${path}`])
   const view = await loadLessonFeedback(f.client, ASST, P1)
-  assert.equal(view?.canManage, false)
-  assert.equal(view?.groups[0].lessons.length, 1)
+  assert.equal(view?.canManage, true)
   assert.equal((await loadLessonFeedback(f.client, COACH, P1))?.canManage, true)
-  assert.equal(canManageLessons('team_coach'), false)
+  assert.equal(canManageLessons('team_coach'), true)
   assert.equal(canManageLessons('coach'), true)
+  assert.equal(canManageLessons('guardian'), false)
 })
 
 test('degrades without the lessons table: save works, feedback falls back to clips.lesson_path, or hides on errors', async () => {

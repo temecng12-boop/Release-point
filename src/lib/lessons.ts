@@ -23,9 +23,9 @@ export type LessonGroup = { clip: LessonClip; lessons: LessonItem[] }
 
 type DbError = { code?: string; message?: string } | null | undefined
 
-/** Saving and deleting lessons is for the player's direct coach only; team coaches view. */
+/** Saving and deleting lessons: direct coach or a team coach (including assistants). */
 export function canManageLessons(via: string | null | undefined): boolean {
-  return via === 'coach'
+  return via === 'coach' || via === 'team_coach'
 }
 
 /** PostgREST / Postgres "table not found" (025 not applied yet). */

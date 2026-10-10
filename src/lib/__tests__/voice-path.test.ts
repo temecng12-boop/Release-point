@@ -40,7 +40,7 @@ test('rejects non-strings and missing ids', () => {
   assert.equal(isVoicePathFor(`${P}/${C}/voice.webm`, P, ''), false)
 })
 
-// saveVoicePath: only the player's own (direct) coach may attach the voice note.
+// isPlayersOwnCoach is the direct-coach helper. saveVoicePath uses the team-aware write check.
 import { isPlayersOwnCoach } from '../auth/roster-access'
 const COACH = '44444444-4444-4444-8444-444444444444'
 const PLAYER_USER = '55555555-5555-4555-8555-555555555555'
@@ -56,11 +56,11 @@ test('voice notes: the direct coach may save; the player, a team coach or a stra
   assert.equal(isPlayersOwnCoach(COACH, null), false)
 })
 
-test('saveVoicePath uses the own-coach check and the exact voice path check', async () => {
+test('saveVoicePath uses the team-aware coach write check and the exact voice path check', async () => {
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../../app/actions/clips.ts', import.meta.url), 'utf8')
   const fn = src.slice(src.indexOf('export async function saveVoicePath'), src.indexOf('export async function deleteClip'))
-  assert.match(fn, /isPlayersOwnCoach\(user\.id,/)
+  assert.match(fn, /canCoachWriteForPlayer\(user\.id,/)
   assert.match(fn, /isVoicePathFor\(voicePath, clip\.player_id, clipId\)/)
   assert.doesNotMatch(fn, /user_id !== user\.id|playerIdFromStoragePath/)
 })

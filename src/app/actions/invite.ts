@@ -9,10 +9,11 @@ import { sendPlayerInviteEmail } from '@/lib/email'
 import { buildInviteAcceptUrl } from '@/lib/invite-accept-link'
 import { SELF_SIGNED_UP_PLAYER_MESSAGE, teamIdsNotOwned } from '@/lib/auth/roster-access'
 import { parsePositionsInput, writeWithPositions, POSITIONS_UNAVAILABLE } from '@/lib/positions'
+import { canCoachWriteForPlayer } from '@/lib/team-access'
 
 export async function resendPlayerInvite(
   playerId: string,
-): Promise<{ error?: string; success?: string }> {
+): Promise<{ error?: string; success?: string; inviteUrl?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -24,7 +25,7 @@ export async function resendPlayerInvite(
     .maybeSingle()
 
   if (!player) return { error: 'Player not found' }
-  if (player.coach_id !== user.id) return { error: 'Not authorized' }
+  if (!(await canCoachWriteForPlayer(user.id, playerId))) return { error: 'Not authorized' }
   if (player.accepted_at) return { error: 'This player has already joined.' }
   if (!player.email) return { error: 'This player has no email on file.' }
 
@@ -64,10 +65,12 @@ export async function resendPlayerInvite(
   } catch (err) {
     sent = { error: err instanceof Error ? err.message : 'unknown error' }
   }
-  if (sent.error) return { error: `Invite link created but the email could not be sent: ${sent.error}`, }
+  if (sent.error) {
+    return { error: `Invite link created but the email could not be sent: ${sent.error}`, inviteUrl }
+  }
 
   revalidatePath('/', 'layout')
-  return { success: `Invite resent to ${player.email}` }
+  return { success: `Invite resent to ${player.email}`, inviteUrl }
 }
 
 export async function invitePlayer(

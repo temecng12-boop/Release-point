@@ -25,7 +25,9 @@ function seed(user: { id: string; email: string }) {
     user,
     tables: {
       clips: [{ id: C, player_id: P, hitting_metrics: { ...HIT } }, { id: 'clip-2', player_id: P, hitting_metrics: { ...HIT } }],
-      players: [{ id: P, coach_id: COACH.id, user_id: PLAYER.id }],
+      players: [{ id: P, coach_id: COACH.id, user_id: PLAYER.id, team_id: 't1' }],
+      team_coaches: [{ team_id: 't1', coach_id: TEAM_COACH.id, role: 'assistant' }],
+      player_teams: [{ player_id: P, team_id: 't1' }],
       pitch_metrics: [
         { id: 'm1', clip_id: C, created_by: COACH.id },
         { id: 'm2', clip_id: C, created_by: COACH.id },
@@ -42,7 +44,7 @@ function seed(user: { id: string; email: string }) {
   state.rls = {
     pitch_metrics: (r, action, uid) => {
       const p = player(r.clip_id)
-      return action === 'select' ? direct(p, uid) || self(p, uid) : direct(p, uid)
+      return action === 'select' ? direct(p, uid) || team(uid) || self(p, uid) : direct(p, uid) || team(uid)
     },
     clips: (r, action, uid) => {
       const p = player(r.id)
@@ -76,12 +78,18 @@ test('a failed delete returns an error and keeps the row', async () => {
   assert.deepEqual(ids(), ['m1', 'm2', 'm3', 'm9'])
 })
 
-test('RLS denial (0 rows deleted) is an error, not a success: team coach, player (even own row), other coach', async () => {
-  for (const user of [TEAM_COACH, PLAYER, OTHER]) {
+test('team coach on the player\'s team can delete a pitch row', async () => {
+  seed(TEAM_COACH)
+  assert.deepEqual(await deletePitchMetric('m1'), { success: true })
+  assert.deepEqual(ids(), ['m2', 'm3', 'm9'])
+})
+
+test('RLS denial (0 rows deleted) is an error, not a success: player (even own row), other coach', async () => {
+  for (const user of [PLAYER, OTHER]) {
     seed(user)
     for (const id of ['m1', 'm3']) {
       const r = await deletePitchMetric(id)
-      assert.ok(isError(r) && /Only the player's own coach/.test(String((r as { error: string }).error)), `${user.id} ${id}: ${JSON.stringify(r)}`)
+      assert.ok(isError(r) && /Only a coach of this player/.test(String((r as { error: string }).error)), `${user.id} ${id}: ${JSON.stringify(r)}`)
     }
     assert.equal(ids().length, 4)
     assert.equal(state.revalidated.length, 0)
@@ -110,8 +118,8 @@ test('delete all: database error -> error, every row kept', async () => {
   assert.equal(ids().length, 4)
 })
 
-test('delete all refused by RLS (0 rows) is an error for team coach, player and other coach', async () => {
-  for (const user of [TEAM_COACH, PLAYER, OTHER]) {
+test('delete all refused by RLS (0 rows) is an error for player and other coach', async () => {
+  for (const user of [PLAYER, OTHER]) {
     seed(user)
     const r = await deleteAllPitchMetrics(C)
     assert.ok(isError(r), `${user.id}: ${JSON.stringify(r)}`)
@@ -147,12 +155,12 @@ test('hitting: direct coach deletes all hitting data of one clip', async () => {
   assert.deepEqual(hitting('clip-2'), HIT)
 })
 
-test('hitting: team coach is refused by the server (RLS alone would allow the clip update)', async () => {
+test('hitting: team coach on the player\'s team can delete saved values', async () => {
   seed(TEAM_COACH)
-  assert.ok(isError(await deleteHittingMetric(C, 'ev_max')))
-  assert.ok(isError(await deleteAllHittingMetrics(C)))
-  assert.deepEqual(hitting(), HIT)
-  assert.equal(state.ops.filter(o => o.action === 'update').length, 0)
+  assert.deepEqual(await deleteHittingMetric(C, 'ev_max'), { success: true })
+  assert.deepEqual(hitting(), { ...HIT, ev_max: null })
+  assert.deepEqual(await deleteAllHittingMetrics(C), { success: true })
+  assert.equal(hitting(), null)
 })
 
 test('hitting: player and other coach are refused, nothing changes', async () => {

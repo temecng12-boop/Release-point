@@ -1,6 +1,6 @@
 /**
- * saveHittingMetrics: the direct coach or the player may save (service role
- * after the check); team coaches and others are refused; a failed or no-op
+ * saveHittingMetrics: the direct coach, a team coach, or the player may save
+ * (service role after the check); others are refused; a failed or no-op
  * update is a friendly error (raw error only in the server log), never success.
  * Run with: npx tsx --tsconfig src/lib/__tests__/actions/tsconfig.json --test src/lib/__tests__/actions/hitting-save.test.ts
  */
@@ -33,8 +33,8 @@ const captureErrors = async <T>(f: () => Promise<T>) => {
   try { return { r: await f(), logged } } finally { console.error = e }
 }
 
-test('direct coach and the player save hitting data', async () => {
-  for (const user of [COACH, PLAYER]) {
+test('direct coach, team coach, and the player save hitting data', async () => {
+  for (const user of [COACH, TEAM_COACH, PLAYER]) {
     seed(user)
     assert.deepEqual(await saveHittingMetrics(C, HIT), { success: true }, user.id)
     assert.deepEqual(saved(), HIT)
@@ -42,8 +42,8 @@ test('direct coach and the player save hitting data', async () => {
   }
 })
 
-test('team coach, stranger and signed-out user are refused with a friendly message; nothing written', async () => {
-  for (const [user, re] of [[TEAM_COACH, /Only the player's coach or the player/], [STRANGER, /Only the player's coach or the player/], [null, /sign in/]] as const) {
+test('stranger and signed-out user are refused with a friendly message; nothing written', async () => {
+  for (const [user, re] of [[STRANGER, /Only the player's coach or the player/], [null, /sign in/]] as const) {
     seed(user)
     const r = await saveHittingMetrics(C, HIT) as { error?: string }
     assert.match(String(r.error), re, user?.id ?? 'anon')

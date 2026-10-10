@@ -213,6 +213,18 @@ test('who can see video reads identically on about, privacy, and terms', () => {
   assert.ok(read('app/terms/page.tsx').includes(sentence), 'terms viewer sentence')
 })
 
+test('who can upload video reads identically on about, privacy, and terms', () => {
+  const sentence =
+    "A player's video can be uploaded by the player's direct coach, " +
+    "the coaches on teams the player is on (including assistant coaches), and the player."
+  const privacy = read('app/privacy/page.tsx') + '\n' + read('lib/privacy-children.ts')
+  assert.ok(read('app/about/page.tsx').includes(sentence), 'about upload sentence')
+  assert.ok(privacy.includes(sentence), 'privacy upload sentence')
+  assert.ok(read('app/terms/page.tsx').includes(sentence), 'terms upload sentence')
+  assert.match(read('lib/privacy-children.ts'), /Roster-only players are managed by their coaches/)
+  assert.match(read('lib/privacy-children.ts'), /coach's recorded parent or guardian permission is what allows video/)
+})
+
 test('privacy collects birth month/year, Google/Apple, parent accounts, and reports', () => {
   const privacy = read('app/privacy/page.tsx')
   assert.match(privacy, /birth month and year/)
